@@ -219,6 +219,20 @@ class AgenticLogger:
         )
         
         return summary
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get performance summary statistics"""
+        total_time = time.time() - self.metrics['session_start']
+        avg_think_time = sum(self.metrics['think_times']) / len(self.metrics['think_times']) if self.metrics['think_times'] else 0
+        avg_action_time = sum(self.metrics['action_times']) / len(self.metrics['action_times']) if self.metrics['action_times'] else 0
+        
+        return {
+            'total_session_time': total_time,
+            'average_think_time': avg_think_time,
+            'average_action_time': avg_action_time,
+            'total_tokens_used': self.metrics['total_tokens'],
+            'agent_call_counts': {k: len(v) for k, v in self.metrics['agent_call_times'].items()}
+        }
 
 
 # Global logger instance

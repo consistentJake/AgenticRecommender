@@ -163,7 +163,7 @@ class BeautyDataset(SequentialDataset):
         
         # Generate items (fewer items for better overlap)
         items = []
-        for i in range(100):  # 100 beauty products
+        for i in range(150):  # 150 beauty products for better coverage
             category = random.choice(categories)
             brand = random.choice(brands)
             item_name = f"{brand} {category} {random.randint(1, 50)}ml"
@@ -176,9 +176,9 @@ class BeautyDataset(SequentialDataset):
         
         # Generate users and sessions
         data = []
-        for user_id in range(50):  # 50 users
-            # Each user has 5-20 interactions
-            n_interactions = random.randint(5, 20)
+        for user_id in range(200):  # 200 users for better 5-core coverage
+            # Each user has 8-25 interactions
+            n_interactions = random.randint(8, 25)
             
             # Users have preference for certain categories
             preferred_cats = random.sample(categories, random.randint(2, 5))
@@ -265,6 +265,10 @@ class DeliveryHeroDataset(SequentialDataset):
             item_names[item_id] = f"Grocery_Item_{item_id}"
         
         return item_names
+    
+    def _create_synthetic_data(self) -> List[Dict[str, Any]]:
+        """Create synthetic data for testing (alias for grocery data)"""
+        return self._create_synthetic_grocery_data()
     
     def _create_synthetic_grocery_data(self) -> List[Dict[str, Any]]:
         """Create synthetic grocery data"""
