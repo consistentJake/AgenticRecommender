@@ -8,26 +8,26 @@ This document provides a detailed analysis of the implementation from the paper 
 This section provides a comprehensive mapping of all code references mentioned in this analysis to their absolute file paths for easy reference in future project implementations:
 
 ### Dataset Preparation & Core Data Structures
-- **Session Dataset Class**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`
-- **Beauty Dataset Creation**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/beauty/create_sessions.ipynb`
-- **Embedding Attachment**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`
+- **Session Dataset Class**: `previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`
+- **Beauty Dataset Creation**: `previousWorks/LLM-Sequential-Recommendation/beauty/create_sessions.ipynb`
+- **Embedding Attachment**: `previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`
 
 ### Neural Model Implementations
-- **SASRec Model**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py`
-- **Projection Head (Neural Prediction)**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py`
+- **SASRec Model**: `previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py`
+- **Projection Head (Neural Prediction)**: `previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py`
 
 ### LLM-Based Approaches
-- **OpenAI Embedding Utils**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`
-- **Create Embeddings Notebook**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/create_embeddings.ipynb`
-- **Fine-tuning Prompt Generation**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb`
-- **GPT Prediction & Hallucination Mapping**: `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`
+- **OpenAI Embedding Utils**: `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`
+- **Create Embeddings Notebook**: `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/create_embeddings.ipynb`
+- **Fine-tuning Prompt Generation**: `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb`
+- **GPT Prediction & Hallucination Mapping**: `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`
 
 ### Key Function Locations by Topic
-- **Data Splitting (`_prepare_to_predict`, `_extract_ground_truths`)**: Found in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`
-- **Neural Model Vocabulary Prediction**: Found in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py`
-- **Embedding Generation**: Found in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`
-- **Hallucination Resolution**: Found in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`
-- **Clustering Implementation**: Found in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`
+- **Data Splitting (`_prepare_to_predict`, `_extract_ground_truths`)**: Found in `previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`
+- **Neural Model Vocabulary Prediction**: Found in `previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py`
+- **Embedding Generation**: Found in `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`
+- **Hallucination Resolution**: Found in `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`
+- **Clustering Implementation**: Found in `previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`
 
 ## 1. Dataset Preparation
 
@@ -117,7 +117,7 @@ The implementation supports multiple recommendation task formulations:
   - Ground truth: item n
   - Task: Predict the next item
 
-**Data Split (from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`):**
+**Data Split (from `previousWorks/LLM-Sequential-Recommendation/main/data/session_dataset.py`):**
 ```python
 def _prepare_to_predict(self, data, n_withheld=1):
     prompt_items = session_items[:-n_withheld]
@@ -175,7 +175,7 @@ Select 20 products from available list.
 
 The classification task uses an intelligent target selection mechanism:
 
-**Ground Truth Mapping (implemented in clustering notebooks like `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`):**
+**Ground Truth Mapping (implemented in clustering notebooks like `previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb`):**
 ```python
 # For each ground truth item:
 gt_embedding = product_embeddings[ground_truth_item]
@@ -197,7 +197,7 @@ target_categories = [cluster_to_popular_item[c] for c in nearest_clusters]
 Top-K recommendations are calculated differently across approaches:
 
 ### 4.1 Neural Models (BERT4Rec, SASRec, GRU4Rec)
-**Implementation in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py` and projection layers:**
+**Implementation in `previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py` and projection layers:**
 ```python
 def predict(self, predict_data, top_k=10):
     scores = model.forward(session_items)  # Get scores for all items
@@ -206,7 +206,7 @@ def predict(self, predict_data, top_k=10):
 ```
 
 ### 4.2 LLMSeqSim (Embedding Similarity)
-**Implementation using embeddings from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`:**
+**Implementation using embeddings from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py`:**
 ```python
 # 1. Compute session embedding
 session_emb = aggregate(item_embeddings)  # Average, weighted, etc.
@@ -219,7 +219,7 @@ top_k_items = similarities.argsort()[-top_k:][::-1]
 ```
 
 ### 4.3 LLMSeqPrompt (Generation)
-**Implementation in `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`:**
+**Implementation in `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb`:**
 ```python
 # For single item generation:
 recommendations = []
@@ -306,14 +306,14 @@ def hit_rate_at_k(predictions, ground_truth, k):
 
 In Section 2.1, **there is NO explicit candidate pool** for next-item prediction. The neural models predict over the **entire item vocabulary** using softmax.
 
-**Code Evidence from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py:20-22`:**
+**Code Evidence from `previousWorks/LLM-Sequential-Recommendation/main/utils/neural_utils/custom_layers/projection_head.py:20-22`:**
 ```python
 # Neural models predict over full vocabulary
 logits = tf.matmul(sequence_output, self.embedding_table, transpose_b=True)
 return logits  # Shape: [batch_size, vocab_size]
 ```
 
-**SASRec implementation from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py:80-85`:**
+**SASRec implementation from `previousWorks/LLM-Sequential-Recommendation/main/transformer/sasrec/sasrec_model.py:80-85`:**
 ```python
 def call(self, x, training=False):
     seq_output = self.seq_layer(x, training=training)
@@ -329,7 +329,7 @@ The models use **leave-one-out evaluation** where each session's last item becom
 
 The LLM generates item names that may not exist in the catalog. These "hallucinations" are mapped back using **dot product similarity** between embeddings.
 
-**Key implementation from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb:285-300`:**
+**Key implementation from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/predict_gpt.ipynb:285-300`:**
 ```python
 # Get embedding for hallucinated item
 item_embedding = unmappable_items_embeddings[item_name]
@@ -353,7 +353,7 @@ This maps the generated text to the **closest real catalog item** via cosine sim
 
 **Clustering reduces the massive vocabulary** (12K+ items) into 200 manageable classes, making classification feasible for LLMs.
 
-**Code from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb:7-15`:**
+**Code from `previousWorks/LLM-Sequential-Recommendation/beauty/attach_embeddings.ipynb:7-15`:**
 ```python
 # Each item gets assigned to one of K=200 clusters
 embeddings = pd.read_csv(f"product_embeddings_{embedding_source_name}.csv.gz")
@@ -367,7 +367,7 @@ This **transforms** the next-item prediction from a **12K-way classification** t
 
 Embeddings are generated using **only the item name** - no additional descriptions.
 
-**Implementation from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py:83-87`:**
+**Implementation from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/openai_utils.py:83-87`:**
 ```python
 def set_embeddings_from_df(df: pd.DataFrame) -> pd.DataFrame:
     names = list(df["name"])  # ONLY item names used
@@ -376,7 +376,7 @@ def set_embeddings_from_df(df: pd.DataFrame) -> pd.DataFrame:
     df["ada_embedding"] = embeddings
 ```
 
-**Example from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/create_embeddings.ipynb:40-45`:**
+**Example from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/embedding_utils/create_embeddings.ipynb:40-45`:**
 ```python
 # Raw item names used directly:
 # "WAWO 15 Color Professionl Makeup Eyeshadow Cam..."
@@ -388,7 +388,7 @@ The embeddings are **1536-dimensional** vectors from OpenAI's `text-embedding-ad
 
 ### 7.5 Fine-tuning Task Breakdown
 
-**Input/Output Structure from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb:110-130`:**
+**Input/Output Structure from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb:110-130`:**
 
 ```python
 SYSTEM_PROMPT = """Provide a unique item recommendation that is complementary to the user's item list. 
@@ -408,7 +408,7 @@ ASSISTANT_PROMPT_TEMPLATE = """{ground_truth}"""
 }
 ```
 
-**Training Data Preparation from `/Users/zhenkai/Documents/personal/Projects/AgenticRecommender/previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb` lines 135-145:**
+**Training Data Preparation from `previousWorks/LLM-Sequential-Recommendation/main/llm_based/prompt_model/genitem/generate_finetune_prompts.ipynb` lines 135-145:**
 ```python
 # Split sessions: first n-1 items = prompt, last item = ground truth
 train_prompts[session_id] = items[:-1]  # Input sequence
