@@ -1,0 +1,8 @@
+# Previous Works folder
+previousWorks/
+
+# OS files
+.DS_Store
+
+# Claude files
+.claude/

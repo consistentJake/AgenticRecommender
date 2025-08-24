@@ -686,8 +686,342 @@ self.prompts.update(read_prompts(self.config['task_agent_prompt'])) # Task-speci
 - Conversational recommendation with dialog management
 - Extensible framework for new recommendation scenarios
 
+## Fine-Tuning and RLHF Training Implementation
+
+### Overview of MACRec's Fine-Tuning Approach
+
+MACRec implements a comprehensive **Reinforcement Learning from Human Feedback (RLHF)** training pipeline using **Proximal Policy Optimization (PPO)** to fine-tune LLMs for recommendation tasks. This approach goes beyond traditional supervised learning by incorporating reward signals that align model outputs with recommendation objectives.
+
+**Important Note**: The fine-tuning specifically targets the **Manager Agent's LLMs** (both thought and action models), NOT the entire multi-agent system. Other agents (Analyst, Searcher, Reflector, Interpreter) continue using their base pre-trained LLMs without fine-tuning.
+
+### Fine-Tuning Architecture
+
+#### Fine-Tuning Target: Manager Agent's LLMs
+
+**What Gets Fine-Tuned**:
+- **Manager's Thought LLM**: Used for reasoning and situation analysis (`/macrec/agents/manager.py:76-79`)
+- **Manager's Action LLM**: Used for generating structured actions (`/macrec/agents/manager.py:81-85`)
+
+**What Does NOT Get Fine-Tuned**:
+- Other agents (Analyst, Searcher, Reflector, Interpreter) - they use base pre-trained models
+- Framework coordination logic - remains unchanged
+- Agent communication protocols - stay the same
+
+#### 1. Training Pipeline (`/macrec/tasks/rlhf.py`)
+
+**Core Training Class**:
+```python
+class RLHFTrainingTask(Task):
+    def train(self, epochs: int = 1):
+        base_dir = os.path.join('ckpts/', str(int(time.time())))
+        os.makedirs(base_dir, exist_ok=True)
+        for epoch in range(epochs):
+            for batch_id, batch in tqdm(enumerate(self.trainer.dataloader)):
+                query_tensors, response_tensors = batch['input_ids'], batch['output_ids']
+                rewards = batch['rewards']
+                # Core PPO training step - fine-tunes the Manager's LLM
+                stats = self.trainer.step(query_tensors, response_tensors, rewards)
+                self.trainer.log_stats(stats, batch, rewards, columns_to_log=["query", "response"])
+            self.trainer.save_pretrained(os.path.join(base_dir, f'epoch-{epoch}'))
+```
+
+**Training Configuration (`/config/training/ppo-main.json`)**:
+```json
+{
+    "model_path": "lmsys/vicuna-7b-v1.5-16k",  // Manager's base LLM to be fine-tuned
+    "epochs": 4,
+    "ppo_kwargs": {
+        "learning_rate": 1.41e-5,
+        "mini_batch_size": 2,
+        "batch_size": 2,
+        "target_kl": 6.0,
+        "kl_penalty": "kl"
+    },
+    "peft_kwargs": {
+        "r": 16,                    # LoRA rank for Manager's LLM adaptation
+        "lora_alpha": 16,           # LoRA scaling parameter
+        "bias": "none",
+        "task_type": "CAUSAL_LM"    # Fine-tuning the Manager as a causal LM
+    }
+}
+```
+
+#### 2. Dataset Preparation for RLHF (`/macrec/rl/offline_ppo_dataset.py`)
+
+**OfflinePPODataset Structure**:
+```python
+class OfflinePPODataset(Dataset):
+    def __init__(self, prompts: list[str], responses: list[str], rewards: list[int | float], tokenizer):
+        self.prompts = prompts      # Input prompts (user/item context)
+        self.responses = responses  # Model responses (recommendations)
+        self.rewards = rewards      # Reward signals (feedback quality)
+        
+    def __getitem__(self, index):
+        return {
+            'input_ids': self.tokenizer.encode(prompt, return_tensors='pt').squeeze(0),
+            'output_ids': self.tokenizer.encode(response, return_tensors='pt').squeeze(0),
+            'rewards': torch.tensor(reward, dtype=torch.float16)
+        }
+```
+
+**Data Format Example**:
+```jsonl
+{
+    "input": "[user_id]: user_524\n[user_profile]: Age: 25\nGender: male...",
+    "output": "4.2",
+    "reward": 0.75
+}
+```
+
+### Reward Model Implementation
+
+#### 1. Base Reward Architecture (`/macrec/rl/reward/base.py`)
+
+**Three Types of Reward Functions**:
+
+**A. Delta Reward** (Improvement-based):
+```python
+class DeltaReward(Reward):
+    def reward(self, action1: Any, action2: Any, gt_answer: Any) -> float:
+        # Reward = improvement from action1 to action2
+        return self.action_reward(action2, gt_answer) - self.action_reward(action1, gt_answer)
+```
+
+**B. Reflection Reward** (Correctness-based):
+```python
+class ReflectionReward(Reward):
+    def __init__(self, alpha: float = 16):
+        self.alpha = alpha  # Reward magnitude
+        
+    def reward(self, action1: float, action2: float, gt_answer: float, reflection_output: str) -> float:
+        reflections = json.loads(reflection_output)  # {"correctness": bool, "reason": str}
+        correctness = self.judge(action1, gt_answer)
+        if correctness == reflections['correctness']:
+            return self.alpha    # Correct self-assessment
+        else:
+            return -self.alpha   # Incorrect self-assessment
+```
+
+#### 2. Task-Specific Reward Functions
+
+**Rating Prediction Rewards (`/macrec/rl/reward/rp.py`)**:
+
+**V1 - Basic Squared Error**:
+```python
+class RatingPredictionRewardV1(DeltaReward):
+    def action_reward(self, action: float, gt_answer: float) -> float:
+        if action < self.lower or action > self.upper:  # Invalid rating
+            return self.invalid  # Heavy penalty
+        return -(gt_answer - action) ** 2  # Negative squared error
+```
+
+**V2 - Enhanced with Validity and Stability**:
+```python
+class RatingPredictionRewardV2(Reward):
+    def __init__(self, invalid: float = -16, alpha: float = 4, gamma: float = 0.25, eta: float = 2):
+        # Parameters for handling invalid actions and stability
+        
+    def reward(self, action1: float, action2: float, gt_answer: float) -> float:
+        # Complex reward considering:
+        # 1. Validity of both actions
+        # 2. Improvement magnitude
+        # 3. Stability (unchanged but correct actions)
+        original_reward = action2_reward - action1_reward
+        return original_reward + np.exp(-np.abs(original_reward) * self.eta) * (self.alpha + action2_reward)
+```
+
+**Sequential Recommendation Rewards (`/macrec/rl/reward/sr.py`)**:
+
+**V1 - Position-based Reward**:
+```python
+class SequentialRecommendationRewardV1(DeltaReward):
+    def action_reward(self, action: list[int], gt_answer: int) -> float:
+        if gt_answer not in action:
+            return 0  # Target item not in ranking
+        gt_pos = action.index(gt_answer)
+        return 1 / (gt_pos + 1)  # Higher reward for better positions
+```
+
+**Reflection Reward**:
+```python
+class SequentialRecommendationReflectionReward(ReflectionReward):
+    def judge(self, action: list[int], gt_answer: int) -> bool:
+        return len(action) > 0 and action[0] == gt_answer  # Top-1 accuracy
+```
+
+### Training Data Generation Pipeline
+
+#### 1. Feedback Collection (`/macrec/tasks/feedback.py`)
+
+**Two-Step Generation Process**:
+```python
+class FeedbackTask(GenerationTask, RewardTask):
+    @property
+    def running_steps(self) -> int:
+        return 2  # Generate two responses per sample
+        
+    def after_step(self, answer: Any, gt_answer: int | float | str, step: int, record: dict):
+        # Store both initial and reflected responses
+        record[f"Answer_{step + 1}"] = answer
+        if hasattr(self.system, 'reflected') and self.system.reflected:
+            record["input"] = self.system.reflector.reflection_input
+            record["output"] = self.system.reflector.reflection_output
+            
+    def after_iteration(self, answer: Any, gt_answer: int | float | str, record: dict, pbar: tqdm):
+        # Calculate reward between first and second attempt
+        record['reward'] = self.reward_model(
+            action1=record["Answer_1"], 
+            action2=record["Answer_2"], 
+            gt_answer=record["Answer_GT"], 
+            reflection_output=record["output"]
+        )
+```
+
+#### 2. Training Data Structure
+
+**Generated Training Samples**:
+```jsonl
+{
+    "input": "[user_id]: user_524\n[user_profile]: Age: 25\n[historical interactions]: ...",
+    "Answer_1": "3.5",                    # Initial response
+    "Answer_2": "4.0",                    # Response after reflection
+    "Answer_GT": 4.0,                     # Ground truth
+    "output": "4.0",                      # Final model output for training
+    "reward": 2.75                        # Computed reward signal
+}
+```
+
+### Training Scripts and Workflow
+
+#### 1. Complete Training Pipeline (`/scripts/train.sh`)
+
+**Step 1: Generate Feedback Data**
+```bash
+# Generate reflection-based feedback data (500 samples)
+python main.py --main Feedback \
+    --data_file data/ml-100k/train.csv \
+    --system reflection \
+    --system_config config/systems/reflection/config_open.json \
+    --task rp \
+    --feedback_file data/ppo/rp/ml-100k-reflection.jsonl \
+    --reward_version reflection
+```
+
+**Step 2: Update Rewards**
+```bash
+# Convert reflection rewards to task-specific rewards
+python main.py --main RewardUpdate \
+    --data_file data/ppo/rp/ml-100k-reflection.jsonl \
+    --output_file data/ppo/rp/ml-100k-v2.jsonl \
+    --reward_version v2
+```
+
+**Step 3: RLHF Training**
+```bash
+# Train with PPO using generated feedback data
+python main.py -m RLHFTraining \
+    --config_path config/training/ppo-main.json \
+    --epochs 1 \
+    --data_file data/ppo/rp/ml-100k-v2.jsonl
+```
+
+**Step 4: Continued Training**
+```bash
+# Continue training from checkpoint
+python main.py -m RLHFTraining \
+    --config_path config/training/ppo-main.json \
+    --epochs 1 \
+    --data_file data/ppo/rp/ml-100k-v2.jsonl \
+    --model_path ckpts/xxxx/epoch-0
+```
+
+#### 2. Feedback Generation Script (`/scripts/feedback.sh`)
+
+**Rating Prediction Task**:
+```bash
+# Generate reflection feedback
+python main.py --main Feedback --data_file data/ml-100k/train.csv --system reflection --task rp --feedback_file data/ppo/rp/ml-100k-reflection.jsonl --reward_version reflection
+
+# Update to V2 rewards  
+python main.py --main RewardUpdate --data_file data/ppo/rp/ml-100k-reflection.jsonl --output_file data/ppo/rp/ml-100k-v2.jsonl --reward_version v2
+```
+
+**Sequential Recommendation Task**:
+```bash
+# Generate reflection feedback
+python main.py --main Feedback --data_file data/ml-100k/train.csv --system reflection --task sr --max_his 5 --feedback_file data/ppo/sr/ml-100k-reflection.jsonl --reward_version reflection
+
+# Update to V1 rewards
+python main.py --main RewardUpdate --data_file data/ppo/sr/ml-100k-reflection.jsonl --output_file data/ppo/sr/ml-100k-v1.jsonl --reward_version v1 --task sr
+```
+
+### Key Innovation: Multi-Agent Feedback Integration
+
+#### 1. Agent-Based Reward Signal Generation
+
+**Reflection Agent as Reward Source**:
+- Generates self-assessment in JSON format: `{"correctness": bool, "reason": str}`
+- Provides natural language explanations for decisions
+- Enables reward functions to assess both accuracy and reasoning quality
+
+**Multi-Agent Collaboration for Training**:
+```python
+# Reward calculation uses full agent interaction history
+record['reward'] = self.reward_model(
+    action1=record["Answer_1"],           # Initial agent response
+    action2=record["Answer_2"],           # Response after agent reflection
+    gt_answer=record["Answer_GT"],        # Ground truth
+    reflection_output=record["output"]    # Agent's self-assessment
+)
+```
+
+#### 2. Fine-Tuning Benefits
+
+**Advantages over Standard Supervised Learning**:
+1. **Reward-Driven Optimization**: Manager's LLMs directly optimize for recommendation quality metrics
+2. **Multi-Turn Learning**: Learns from improvement between initial and reflected Manager responses
+3. **Self-Assessment**: Incorporates Manager's ability to evaluate its own performance through reflection
+4. **Task-Specific Rewards**: Different reward functions for different recommendation tasks
+
+**Technical Implementation Details**:
+- **LoRA Fine-Tuning**: Uses r=16, alpha=16 for efficient adaptation of Manager's LLMs only
+- **PPO Training**: Learning rate 1.41e-5, batch size 2 for stable Manager training
+- **Offline Training**: Uses pre-collected feedback data from multi-agent interactions rather than online exploration
+- **Multi-Task Support**: Manager learns separate behaviors for RP and SR tasks through different reward functions
+
+**What the Manager Learns**:
+- Better thought processes for analyzing recommendation tasks
+- More effective action generation (when to call which agents)
+- Improved final answer synthesis based on agent responses
+- Enhanced ability to leverage reflection feedback for quality improvement
+
+### Fine-Tuning Outcomes
+
+**Expected Improvements for Manager Agent**:
+- **Better Calibration**: Manager learns to assess its own confidence in recommendations
+- **Improved Reasoning**: Reflection-based training enhances Manager's explanatory capabilities
+- **Task Adaptation**: Reward signals guide Manager toward task-specific objectives
+- **Multi-Agent Orchestration**: Manager learns optimal patterns for calling and coordinating other agents
+- **Enhanced Synthesis**: Better ability to combine information from Analyst, Searcher, and other agents
+
+**System-Level Benefits**:
+- **Improved Coordination**: Better Manager leads to more effective multi-agent collaboration
+- **Task-Specific Optimization**: Different Manager behaviors for rating prediction vs. sequential recommendation
+- **Quality Assurance**: Enhanced self-assessment capabilities improve overall system reliability
+
+This comprehensive RLHF pipeline represents a sophisticated approach to fine-tuning the central orchestrator (Manager) in a multi-agent recommendation system, going beyond traditional supervised learning to incorporate multi-agent feedback and reward-driven optimization while keeping other agents unchanged.
+
 ## Conclusion
 
 MACRec represents a significant advancement in applying multi-agent systems to recommendation tasks. Its modular architecture, comprehensive agent types, and flexible configuration system make it a powerful framework for building sophisticated recommendation systems that leverage the reasoning capabilities of Large Language Models.
 
 The framework's strength lies in its ability to decompose complex recommendation tasks into specialized agent roles, enabling more targeted and effective problem-solving compared to single-agent approaches. The extensive prompt management system and standardized communication protocols ensure consistency and reliability across different recommendation scenarios.
+
+**Key Contributions of MACRec's Fine-Tuning Approach**:
+1. **RLHF Integration**: Novel application of PPO training for recommendation tasks using multi-agent feedback
+2. **Reward Function Design**: Task-specific reward functions that capture recommendation quality metrics
+3. **Reflection-Based Training**: Incorporates agent self-assessment as a training signal
+4. **Multi-Turn Learning**: Learns from the improvement process between initial and reflected responses
+5. **Scalable Pipeline**: Complete training infrastructure from data generation to model deployment
+
+The combination of multi-agent collaboration and sophisticated fine-tuning makes MACRec a comprehensive solution for building next-generation recommendation systems that can reason, reflect, and improve their performance through structured feedback mechanisms.
