@@ -143,13 +143,18 @@ class SequentialDataset(ABC):
             'density': sum(lengths) / (len(self.user_items) * len(self.all_items))
         }
     
-    def prepare_to_predict(self, session: Dict[str, Any], n_withheld: int = 1) -> List[int]:
+    def prepare_to_predict(self, session: Dict[str, Any], n_withheld: int = 1) -> Tuple[List[int], int]:
         """
         Prepare session for prediction (leave-one-out).
         
+        Returns:
+            Tuple of (prediction_sequence, ground_truth_target)
+        
         Reference: LLM_Sequential_Recommendation_Analysis.md:122-125
         """
-        return session['items'][:-n_withheld]
+        pred_sequence = session['items'][:-n_withheld] 
+        target = session['items'][-n_withheld]
+        return pred_sequence, target
     
     def extract_ground_truth(self, session: Dict[str, Any], n_withheld: int = 1) -> int:
         """

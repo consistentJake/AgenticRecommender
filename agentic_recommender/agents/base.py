@@ -14,6 +14,16 @@ from ..utils.logging import get_logger
 
 
 class AgentType(Enum):
+    """
+    Enumeration of agent types in the system.
+    
+    Each agent has a specialized role:
+    - MANAGER: Central coordination and decision making
+    - ANALYST: User and item analysis 
+    - REFLECTOR: Self-reflection and improvement
+    - SEARCHER: External information retrieval
+    - INTERPRETER: Result interpretation and formatting
+    """
     MANAGER = "Manager"
     ANALYST = "Analyst"
     REFLECTOR = "Reflector"

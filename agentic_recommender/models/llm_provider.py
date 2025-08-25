@@ -148,14 +148,30 @@ class MockLLMProvider(LLMProvider):
             if key.lower() in prompt.lower():
                 return response
         
-        # Default responses based on prompt content
-        if "think" in prompt.lower() or "analyze" in prompt.lower():
-            return "I need to analyze the user's sequential behavior to make a good recommendation."
-        elif "action" in prompt.lower():
-            if "analyse" in prompt.lower():
-                return "Analyse[user, 524]"
+        # Default responses based on prompt content (check most specific first)
+        if "available actions" in prompt.lower():
+            # This is the action phase - need to return proper action format
+            if "demo_user" in prompt:
+                # For demo scenarios with specific candidates  
+                if "gaming_laptop" in prompt or "mechanical_keyboard" in prompt:
+                    return "Finish[monitor]"  # Good recommendation for tech sequence
+                elif "foundation" in prompt or "concealer" in prompt or "lipstick" in prompt:
+                    return "Finish[mascara]"  # Good recommendation for beauty sequence  
+                elif "fiction_book" in prompt or "bookmark" in prompt:
+                    return "Finish[notebook]"  # Good recommendation for book sequence
+                else:
+                    return "Analyse[user, demo_user]"
             else:
-                return "Finish[Mock recommendation]"
+                # Extract user_id from context if possible
+                import re
+                user_match = re.search(r'"user_id":\s*"([^"]+)"', prompt)
+                if user_match:
+                    user_id = user_match.group(1)
+                    return f"Analyse[user, {user_id}]"
+                else:
+                    return "Finish[default_recommendation]"
+        elif "think" in prompt.lower() or "analyze" in prompt.lower():
+            return "I need to analyze the user's sequential behavior to make a good recommendation."
         else:
             return "Mock LLM response"
     
