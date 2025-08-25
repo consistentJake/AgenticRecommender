@@ -21,7 +21,13 @@ class BeautyDataset(SequentialDataset):
     - previousWorks/LLM-Sequential-Recommendation/beauty/create_sessions.ipynb
     """
     
-    def __init__(self, data_path: str, metadata_path: str = None, **kwargs):
+    def __init__(self, data_path: str = None, metadata_path: str = None, **kwargs):
+        # Set default paths to the actual data location
+        if data_path is None:
+            data_path = "/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/data/inputs/reviews_Beauty.json"
+        if metadata_path is None:
+            metadata_path = "/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/data/inputs/meta_Beauty.json"
+        
         self.metadata_path = metadata_path
         super().__init__(data_path, **kwargs)
         
@@ -110,14 +116,23 @@ class BeautyDataset(SequentialDataset):
         if self.metadata_path and Path(self.metadata_path).exists():
             try:
                 with open(self.metadata_path, 'r') as f:
-                    for line in f:
-                        meta = json.loads(line.strip())
-                        if 'asin' in meta and 'title' in meta:
-                            # Clean product name
-                            title = self._clean_product_name(meta['title'])
-                            item_names[meta['asin']] = title
+                    for line_num, line in enumerate(f, 1):
+                        try:
+                            # The metadata file uses Python dict format, not JSON
+                            # Use eval() carefully with restricted builtins
+                            line = line.strip()
+                            if line:
+                                meta = eval(line, {"__builtins__": {}}, {})
+                                if 'asin' in meta and 'title' in meta:
+                                    # Clean product name
+                                    title = self._clean_product_name(meta['title'])
+                                    item_names[meta['asin']] = title
+                        except Exception as line_e:
+                            if line_num <= 5:  # Only show errors for first few lines
+                                print(f"⚠️ Error parsing metadata line {line_num}: {line_e}")
+                            continue
             except Exception as e:
-                print(f"⚠️ Error processing metadata: {e}")
+                print(f"⚠️ Error processing metadata file: {e}")
         
         # For items without metadata, create generic names
         for item_id in self.all_items:

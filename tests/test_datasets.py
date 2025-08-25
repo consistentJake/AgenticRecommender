@@ -98,10 +98,8 @@ class TestDatasets:
     
     def test_beauty_dataset_creation(self):
         """Test Beauty dataset creation and processing"""
-        # Create dataset with synthetic data and skip 5-core filter for testing
-        dataset = BeautyDataset(data_path="dummy_path.json")
-        dataset.min_interactions_per_user = 1  # Relax filter for testing
-        dataset.min_interactions_per_item = 1
+        # Create dataset - will use real data if available, synthetic otherwise
+        dataset = BeautyDataset()  # Uses default paths to real data
         dataset.process_data()
         
         # Check basic properties
