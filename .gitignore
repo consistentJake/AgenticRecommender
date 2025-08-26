@@ -6,3 +6,10 @@ previousWorks/
 
 # Claude files
 .claude/
+
+# data 
+agentic_recommender/data/inputs
+agentic_recommender/data/outputs
+
+# Python virtual environment
+venv/

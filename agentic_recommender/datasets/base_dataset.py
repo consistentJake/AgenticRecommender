@@ -10,6 +10,7 @@ import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 from abc import ABC, abstractmethod
 from pathlib import Path
+import re
 
 
 class SequentialDataset(ABC):
@@ -310,3 +311,25 @@ class SequentialDataset(ABC):
         
         print("✅ All data integrity tests passed")
         return True
+    
+    def _clean_product_name(self, title: str) -> str:
+        """
+        Clean product title by removing HTML entities and special characters.
+        
+        Reference: LLM_Sequential_Recommendation_Analysis.md:62-65
+        """
+        # Replace HTML entities
+        title = title.replace('&amp;', 'and')
+        title = title.replace('&lt;', '<')
+        title = title.replace('&gt;', '>')
+        title = title.replace('&quot;', '"')
+        title = title.replace('&#39;', "'")
+        
+        # Remove excessive whitespace
+        title = re.sub(r'\s+', ' ', title).strip()
+        
+        # Truncate if too long
+        if len(title) > 100:
+            title = title[:97] + "..."
+        
+        return title
