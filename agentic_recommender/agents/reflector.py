@@ -169,6 +169,8 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
         """
         Build prompt for LLM-based reflection.
         
+        Template reference: previousWorks/MACRec/config/prompts/agent_prompt/reflector.json
+        Uses MACRec reflect_prompt_json template for structured self-reflection.
         Reference: MACRec_Analysis.md:153-163
         """
         base_prompt = """You are an advanced reasoning agent that can improve based on self reflection.

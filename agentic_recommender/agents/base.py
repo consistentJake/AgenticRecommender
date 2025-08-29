@@ -246,6 +246,11 @@ def create_agent_prompt(agent_type: AgentType, task_context: Dict[str, Any],
     """
     Create prompt for agent based on type and context.
     
+    Template references:
+    - Manager: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
+    - Analyst: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json  
+    - Reflector: previousWorks/MACRec/config/prompts/agent_prompt/reflector.json
+    
     Args:
         agent_type: Type of agent
         task_context: Current task context

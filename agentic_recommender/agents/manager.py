@@ -147,7 +147,12 @@ class Manager(Agent):
             return f"Thought: {thought}\nAction: {action_type}[{argument}]"
     
     def _build_thinking_prompt(self, task_context: Dict[str, Any]) -> str:
-        """Build prompt for thinking phase"""
+        """
+        Build prompt for thinking phase.
+        
+        Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
+        Based on MACRec manager_prompt template for thought generation.
+        """
         context_str = json.dumps(task_context, indent=2) if task_context else "No context"
         
         prompt = f"""You are a Manager agent in a sequential recommendation system.
@@ -170,7 +175,12 @@ Think step by step about the reasoning process."""
         return prompt
     
     def _build_action_prompt(self, task_context: Dict[str, Any]) -> str:
-        """Build prompt for action phase"""
+        """
+        Build prompt for action phase.
+        
+        Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
+        Uses MACRec manager_prompt template with AVAILABLE ACTIONS format.
+        """
         prompt = f"""Based on your thinking, choose the most appropriate action:
 
 AVAILABLE ACTIONS:

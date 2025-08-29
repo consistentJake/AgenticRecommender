@@ -73,7 +73,12 @@ class Analyst(ToolAgent):
             return self._analyze_general(argument, json_mode, **kwargs)
     
     def _analyze_user(self, user_id: str, json_mode: bool = False, **kwargs) -> str:
-        """Analyze user preferences and sequential patterns"""
+        """
+        Analyze user preferences and sequential patterns.
+        
+        Template reference: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json
+        Uses MACRec analyst_prompt template for user analysis.
+        """
         
         # Get user information
         user_info = self._get_user_info([user_id])
@@ -110,7 +115,12 @@ TASK: Provide insights about:
         return analysis
     
     def _analyze_item(self, item_id: str, json_mode: bool = False, **kwargs) -> str:
-        """Analyze item characteristics and popularity"""
+        """
+        Analyze item characteristics and popularity.
+        
+        Template reference: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json
+        Uses MACRec analyst_prompt template for item analysis.
+        """
         
         # Get item information
         item_info = self._get_item_info([item_id])

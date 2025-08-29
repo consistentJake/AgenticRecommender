@@ -66,7 +66,8 @@ class TrainingDataGenerator:
             target = self.dataset.extract_ground_truth(session)
             candidates, target_idx = self.dataset.create_candidate_pool(session)
             
-            # Think phase example
+            # Think phase example  
+            # Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
             think_prompt = f"""You are a Manager agent. Analyze this recommendation task:
 
 User ID: {session['user_id']}
@@ -88,6 +89,7 @@ Think step by step about what information you need to make a good recommendation
             ))
             
             # Act phase example
+            # Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json  
             act_prompt = f"""Based on your analysis, choose the best action:
 
 Available actions:
@@ -123,6 +125,7 @@ Context: {think_target}"""
             target = self.dataset.extract_ground_truth(session)
             
             # User analysis example
+            # Template reference: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json
             analysis_prompt = f"""Analyze this user's preferences for sequential recommendation:
 
 User ID: {session['user_id']}
