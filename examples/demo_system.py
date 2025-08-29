@@ -27,15 +27,21 @@ def demo_agentic_recommendation():
     
     if use_real_api:
         print("🤖 Using real Gemini API")
-        llm_provider = GeminiProvider(api_key)
+        # Check if this is an OpenRouter API key (starts with sk-or)
+        if api_key.startswith('sk-or'):
+            print("🔗 Using OpenRouter endpoint")
+            llm_provider = GeminiProvider(api_key, model_name="google/gemini-flash-1.5", use_openrouter=True)
+        else:
+            print("🔗 Using direct Gemini API")
+            llm_provider = GeminiProvider(api_key)
     else:
         print("🎭 Using mock LLM for demo")
-        # Create realistic mock responses
+        # Create realistic mock responses - separated by phase
         mock_responses = {
-            "analyze": "I should analyze the user's sequential behavior first",
-            "action": "Analyse[user, user_123]",
-            "user_analysis": "User shows preference for tech accessories, buys complementary items",
-            "final_rec": "Finish[wireless_mouse]"
+            # Phase-specific responses
+            "step by step": "I should analyze the user's sequential behavior first",  # For thinking phase
+            "choose one action": "Analyse[user, user_123]",  # For initial action phase  
+            "tech accessories": "Finish[wireless_mouse]",  # For final recommendation when analysis is present
         }
         llm_provider = MockLLMProvider(mock_responses)
     
