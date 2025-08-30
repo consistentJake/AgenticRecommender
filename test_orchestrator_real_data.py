@@ -15,7 +15,11 @@ import traceback
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agentic_recommender.core import AgentOrchestrator, RecommendationRequest
-from agentic_recommender.models.llm_provider import GeminiProvider, MockLLMProvider, DEFAULT_GEMINI_KEY
+from agentic_recommender.models.llm_provider import (
+    GeminiProvider, MockLLMProvider, 
+    DEFAULT_GEMINI_KEY, DEFAULT_OPENROUTER_KEY,
+    get_default_openrouter_gemini_provider
+)
 from agentic_recommender.datasets import BeautyDataset
 from agentic_recommender.agents.reflector import ReflectionStrategy
 from agentic_recommender.utils.metrics import evaluate_recommendations
@@ -24,29 +28,47 @@ from agentic_recommender.utils.metrics import evaluate_recommendations
 class OrchestoratorRealDataTester:
     """Test AgentOrchestrator with real Beauty dataset"""
     
-    def __init__(self, use_real_api: bool = True):
+    def __init__(self, use_real_api: bool = True, use_openrouter: bool = False):
         """
         Initialize tester
         
         Args:
             use_real_api: If True, use Gemini API. If False, use MockLLMProvider
+            use_openrouter: If True, use OpenRouter API instead of direct Gemini
         """
         self.use_real_api = use_real_api
+        self.use_openrouter = use_openrouter
         self.dataset = None
         self.orchestrator = None
         self.test_results = []
         
     def setup_llm_provider(self):
-        """Setup LLM provider (Gemini or Mock)"""
+        """Setup LLM provider (Gemini Direct, OpenRouter, or Mock)"""
         if self.use_real_api:
-            api_key = os.getenv('GEMINI_API_KEY', DEFAULT_GEMINI_KEY)
-            if not api_key or api_key == "your-api-key-here":
-                print("⚠️ No Gemini API key found. Using Mock LLM instead.")
-                self.use_real_api = False
-                return MockLLMProvider()
+            if self.use_openrouter:
+                # Use OpenRouter with default key
+                api_key = os.getenv('OPENROUTER_API_KEY', DEFAULT_OPENROUTER_KEY)
+                if not api_key or api_key == "your-api-key-here":
+                    print("⚠️ No OpenRouter API key found. Using Mock LLM instead.")
+                    self.use_real_api = False
+                    return MockLLMProvider()
+                else:
+                    print("🔗 Using OpenRouter API with Gemini Flash")
+                    return GeminiProvider(
+                        api_key=api_key,
+                        model_name="google/gemini-flash-1.5",
+                        use_openrouter=True
+                    )
             else:
-                print("🔗 Using real Gemini API")
-                return GeminiProvider(api_key=api_key)
+                # Use direct Gemini API
+                api_key = os.getenv('GEMINI_API_KEY', DEFAULT_GEMINI_KEY)
+                if not api_key or api_key == "your-api-key-here":
+                    print("⚠️ No Gemini API key found. Using Mock LLM instead.")
+                    self.use_real_api = False
+                    return MockLLMProvider()
+                else:
+                    print("🔗 Using direct Gemini API")
+                    return GeminiProvider(api_key=api_key)
         else:
             print("🎭 Using Mock LLM provider")
             return MockLLMProvider({
@@ -380,13 +402,22 @@ def main():
     print("=" * 50)
     
     # Configuration
-    USE_REAL_API = True  # Set to False to use Mock LLM
-    USE_REAL_DATA = True  # Set to True to try loading real Beauty dataset files
-    NUM_SESSIONS = 2  # Number of sessions to test
+    USE_REAL_API = True      # Set to False to use Mock LLM
+    USE_OPENROUTER = True    # Set to True to use OpenRouter instead of direct Gemini
+    USE_REAL_DATA = True     # Set to True to try loading real Beauty dataset files
+    NUM_SESSIONS = 2         # Number of sessions to test
     
     try:
         # Initialize tester
-        tester = OrchestoratorRealDataTester(use_real_api=USE_REAL_API)
+        tester = OrchestoratorRealDataTester(
+            use_real_api=USE_REAL_API,
+            use_openrouter=USE_OPENROUTER
+        )
+        
+        # Show configuration
+        api_mode = "OpenRouter" if USE_OPENROUTER else "Direct Gemini" if USE_REAL_API else "Mock"
+        data_mode = "Real Beauty data" if USE_REAL_DATA else "Synthetic data"
+        print(f"🔧 Configuration: {api_mode} API, {data_mode}, {NUM_SESSIONS} sessions")
         
         # Run comprehensive test
         tester.run_comprehensive_test(
