@@ -13,6 +13,7 @@ sys.path.insert(0, str(project_root))
 
 from agentic_recommender.system import create_pipeline
 from agentic_recommender.core import RecommendationRequest
+from agentic_recommender.models import llm_provider as llm_provider_module
 from agentic_recommender.models.llm_provider import (
     MockLLMProvider,
     GeminiProvider,
@@ -210,10 +211,15 @@ def demo_complete_pipeline():
     print("   ✅ Performance monitoring and logging")
     print("   ✅ End-to-end recommendation pipeline")
     print("   ✅ Evaluation metrics and analysis")
-    
+
+    log_path = llm_provider_module.LOG_FILE
+    if log_path.exists():
+        print(f"\n📝 Gemini provider logs saved to: {log_path}")
+    else:
+        print(f"\n📝 Gemini provider log path: {log_path} (file will appear after next provider run)")
+
     return main_pipeline
 
 
 if __name__ == "__main__":
     pipeline = demo_complete_pipeline()
-
