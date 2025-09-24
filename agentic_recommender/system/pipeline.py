@@ -13,7 +13,7 @@ from ..core import AgentOrchestrator, RecommendationRequest, RecommendationRespo
 from ..agents.base import ReflectionStrategy
 from ..models.llm_provider import LLMProvider
 from ..utils.metrics import evaluate_recommendations
-from ..utils.logging import get_logger
+from ..utils.logging import get_component_logger
 
 
 class RecommendationPipeline:
@@ -38,7 +38,6 @@ class RecommendationPipeline:
         self.llm_provider = llm_provider
         self.dataset_type = dataset_type
         self.config = config or {}
-        self.logger = get_logger()
         
         # Initialize components
         self.dataset = None
@@ -52,12 +51,17 @@ class RecommendationPipeline:
         self.evaluation_results = []
         self.performance_logs = []
         
-        print(f"🚀 Pipeline initialized: {dataset_type} dataset, {reflection_strategy.value} reflection")
+        self.logger = get_component_logger("system.pipeline")
+        self.logger.info(
+            "🚀 Pipeline initialized: %s dataset, %s reflection",
+            dataset_type,
+            reflection_strategy.value,
+        )
     
     def load_dataset(self, data_path: str, metadata_path: str = None,
                     use_synthetic: bool = False):
         """Load and process dataset"""
-        print(f"📊 Loading {self.dataset_type} dataset...")
+        self.logger.info("📊 Loading %s dataset...", self.dataset_type)
         
         if self.dataset_type == "beauty":
             self.dataset = BeautyDataset(data_path, metadata_path)
@@ -86,7 +90,11 @@ class RecommendationPipeline:
         )
         
         stats = self.dataset.get_statistics()
-        print(f"✅ Dataset loaded: {stats['num_sessions']} sessions, {stats['num_items']} items")
+        self.logger.info(
+            "✅ Dataset loaded: %s sessions, %s items",
+            stats['num_sessions'],
+            stats['num_items'],
+        )
     
     def run_evaluation(self, split: str = "test", max_samples: int = 10) -> Dict[str, float]:
         """
@@ -102,7 +110,11 @@ class RecommendationPipeline:
         if not self.dataset:
             raise ValueError("Dataset not loaded. Call load_dataset() first.")
         
-        print(f"🔍 Running evaluation on {split} split (max {max_samples} samples)...")
+        self.logger.info(
+            "🔍 Running evaluation on %s split (max %s samples)...",
+            split,
+            max_samples,
+        )
         
         # Get evaluation data
         splits = self.dataset.create_evaluation_splits()
@@ -112,7 +124,11 @@ class RecommendationPipeline:
         ground_truths = []
         
         for i, session in enumerate(eval_sessions):
-            print(f"  Processing sample {i+1}/{len(eval_sessions)}", end="\r")
+            self.logger.info(
+                "Processing sample %s/%s",
+                i + 1,
+                len(eval_sessions),
+            )
             
             # Prepare prediction task
             pred_sequence, target = self.dataset.prepare_to_predict(session)
@@ -150,7 +166,7 @@ class RecommendationPipeline:
             # Reset for next sample
             self.orchestrator.reset_session()
         
-        print(f"\n📊 Evaluating {len(predictions_list)} predictions...")
+        self.logger.info("📊 Evaluating %s predictions...", len(predictions_list))
         
         # Calculate metrics
         metrics = evaluate_recommendations(
@@ -168,9 +184,9 @@ class RecommendationPipeline:
             'config': self.config
         })
         
-        print("✅ Evaluation completed:")
+        self.logger.info("✅ Evaluation completed:")
         for metric, value in metrics.items():
-            print(f"  {metric}: {value:.4f}")
+            self.logger.info("  %s: %.4f", metric, value)
         
         return metrics
     
@@ -186,9 +202,9 @@ class RecommendationPipeline:
         Returns:
             Recommendation response with full reasoning
         """
-        print(f"🎯 Demo prediction:")
-        print(f"   User sequence: {' → '.join(user_sequence)}")
-        print(f"   Candidates: {', '.join(candidates)}")
+        self.logger.info("🎯 Demo prediction:")
+        self.logger.info("   User sequence: %s", ' → '.join(user_sequence))
+        self.logger.info("   Candidates: %s", ', '.join(candidates))
         
         # Create request
         request = RecommendationRequest(
@@ -201,14 +217,17 @@ class RecommendationPipeline:
         # Get recommendation
         response = self.orchestrator.recommend(request)
         
-        print(f"\n📋 Results:")
-        print(f"   Recommendation: {response.recommendation}")
-        print(f"   Confidence: {response.confidence:.3f}")
-        print(f"   Reasoning: {response.reasoning}")
+        self.logger.info("📋 Results:")
+        self.logger.info("   Recommendation: %s", response.recommendation)
+        self.logger.info("   Confidence: %.3f", response.confidence)
+        self.logger.info("   Reasoning: %s", response.reasoning)
         
         if response.metadata.get('reflection'):
             ref = response.metadata['reflection']
-            print(f"   Reflection: {ref.get('reason', 'No specific feedback')}")
+            self.logger.info(
+                "   Reflection: %s",
+                ref.get('reason', 'No specific feedback'),
+            )
         
         return response
     
@@ -240,7 +259,7 @@ class RecommendationPipeline:
                 'evaluation_results': self.evaluation_results
             }, f, indent=2)
         
-        print(f"💾 Results saved to {results_file}")
+        self.logger.info("💾 Results saved to %s", results_file)
 
 
 def create_pipeline(llm_provider: LLMProvider, 

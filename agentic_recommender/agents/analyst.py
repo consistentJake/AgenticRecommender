@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 
 from .base import ToolAgent, AgentType, create_agent_prompt
 from ..models.llm_provider import LLMProvider
+from ..utils.logging import get_component_logger
 
 
 class Analyst(ToolAgent):
@@ -38,6 +39,7 @@ class Analyst(ToolAgent):
         }
         
         super().__init__(AgentType.ANALYST, llm_provider, tools, config=config)
+        self.component_logger = get_component_logger("agents.analyst")
         
         # Data sources
         self.user_data = user_data or {}
@@ -45,7 +47,11 @@ class Analyst(ToolAgent):
         self.user_histories = {}  # Will be populated with session data
         self.item_histories = {}
         
-        print(f"🔍 Analyst initialized with {len(self.user_data)} users, {len(self.item_data)} items")
+        self.component_logger.info(
+            "🔍 Analyst initialized with %s users, %s items",
+            len(self.user_data),
+            len(self.item_data),
+        )
     
     def forward(self, argument: Any, json_mode: bool = False, **kwargs) -> str:
         """
@@ -269,7 +275,11 @@ Provide insights about what the user might want next.
         if item_histories:
             self.item_histories.update(item_histories)
         
-        print(f"📊 Analyst data updated: {len(self.user_data)} users, {len(self.item_data)} items")
+        self.component_logger.info(
+            "📊 Analyst data updated: %s users, %s items",
+            len(self.user_data),
+            len(self.item_data),
+        )
     
     def get_analysis_summary(self) -> Dict[str, Any]:
         """Get summary of analyses performed"""

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from ..agents import Manager, Analyst, Reflector
 from ..agents.base import AgentType, ReflectionStrategy
 from ..models.llm_provider import LLMProvider
-from ..utils.logging import get_logger
+from ..utils.logging import get_component_logger, get_logger
 
 
 @dataclass
@@ -52,6 +52,7 @@ class AgentOrchestrator:
         
         self.config = config or {}
         self.logger = get_logger()
+        self.component_logger = get_component_logger("core.orchestrator")
         
         # Initialize agents
         self.manager = Manager(llm_provider, llm_provider, config)
@@ -66,7 +67,10 @@ class AgentOrchestrator:
         self.total_requests = 0
         self.successful_requests = 0
         
-        print(f"🎭 Orchestrator initialized with {reflection_strategy.value} reflection")
+        self.component_logger.info(
+            "🎭 Orchestrator initialized with %s reflection",
+            reflection_strategy.value,
+        )
     
     def recommend(self, request: RecommendationRequest, 
                  max_iterations: int = 5) -> RecommendationResponse:
@@ -331,7 +335,7 @@ class AgentOrchestrator:
             item_histories=item_histories
         )
         
-        print(f"📊 Orchestrator data updated")
+        self.component_logger.info("📊 Orchestrator data updated")
     
     def reset_session(self):
         """Reset for new recommendation session"""

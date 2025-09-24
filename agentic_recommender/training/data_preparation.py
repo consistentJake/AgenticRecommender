@@ -16,6 +16,10 @@ from ..datasets.base_dataset import SequentialDataset
 from ..core import AgentOrchestrator, RecommendationRequest
 from ..agents.base import ReflectionStrategy
 from ..models.llm_provider import LLMProvider
+from ..utils.logging import get_component_logger
+
+
+logger = get_component_logger("training.data_preparation")
 
 
 @dataclass
@@ -52,7 +56,10 @@ class TrainingDataGenerator:
         self.config = config or {}
         self.examples = []
         
-        print(f"📚 Training data generator initialized with {len(dataset.sessions)} sessions")
+        logger.info(
+            "📚 Training data generator initialized with %s sessions",
+            len(dataset.sessions),
+        )
     
     def generate_manager_examples(self, num_examples: int = 1000) -> List[TrainingExample]:
         """Generate training examples for Manager agent"""
@@ -111,7 +118,7 @@ Context: {think_target}"""
                 }
             ))
         
-        print(f"✅ Generated {len(examples)} Manager training examples")
+        logger.info("✅ Generated %s Manager training examples", len(examples))
         return examples
     
     def generate_analyst_examples(self, num_examples: int = 1000) -> List[TrainingExample]:
@@ -154,7 +161,7 @@ Provide insights about:
                 }
             ))
         
-        print(f"✅ Generated {len(examples)} Analyst training examples")
+        logger.info("✅ Generated %s Analyst training examples", len(examples))
         return examples
     
     def generate_all_training_data(self, output_dir: str, num_examples: int = 500):
@@ -163,7 +170,10 @@ Provide insights about:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
-        print(f"📚 Generating training data (max {num_examples} examples each)...")
+        logger.info(
+            "📚 Generating training data (max %s examples each)...",
+            num_examples,
+        )
         
         # Generate examples for each agent type
         manager_examples = self.generate_manager_examples(num_examples)
@@ -196,9 +206,13 @@ Provide insights about:
         with open(summary_file, 'w') as f:
             json.dump(summary, f, indent=2)
         
-        print(f"💾 Training data saved:")
-        print(f"   📄 {training_file} ({len(all_examples)} examples)")
-        print(f"   📊 {summary_file} (summary)")
+        logger.info("💾 Training data saved:")
+        logger.info(
+            "   📄 %s (%s examples)",
+            training_file,
+            len(all_examples),
+        )
+        logger.info("   📊 %s (summary)", summary_file)
         
         return all_examples
     
@@ -250,7 +264,7 @@ class ReflectionDataGenerator:
         self.dataset = dataset
         self.reflection_examples = []
         
-        print("🪞 Reflection data generator initialized")
+        logger.info("🪞 Reflection data generator initialized")
     
     def generate_reflection_examples(self, num_examples: int = 200) -> List[ReflectionExample]:
         """Generate reflection training examples"""
@@ -310,7 +324,10 @@ class ReflectionDataGenerator:
             # Reset for next example
             self.orchestrator.reset_session()
         
-        print(f"✅ Generated {len(examples)} reflection training examples")
+        logger.info(
+            "✅ Generated %s reflection training examples",
+            len(examples),
+        )
         return examples
     
     def save_reflection_data(self, examples: List[ReflectionExample], output_file: str):
@@ -329,10 +346,10 @@ class ReflectionDataGenerator:
                 }, f)
                 f.write('\n')
         
-        print(f"💾 Reflection data saved to {output_path}")
+        logger.info("💾 Reflection data saved to %s", output_path)
 
 
-def prepare_training_pipeline(dataset: SequentialDataset, 
+def prepare_training_pipeline(dataset: SequentialDataset,
                              llm_provider: LLMProvider,
                              output_dir: str = "training_data",
                              num_examples: int = 500) -> Dict[str, Any]:
@@ -349,7 +366,7 @@ def prepare_training_pipeline(dataset: SequentialDataset,
         Summary of generated training data
     """
     
-    print("🎓 Preparing complete training pipeline...")
+    logger.info("🎓 Preparing complete training pipeline...")
     
     # Generate basic training data
     data_generator = TrainingDataGenerator(dataset)
@@ -380,9 +397,9 @@ def prepare_training_pipeline(dataset: SequentialDataset,
         'ready_for_training': True
     }
     
-    print("🎉 Training pipeline preparation completed!")
-    print(f"   📚 {len(training_examples)} agent training examples")
-    print(f"   🪞 {len(reflection_examples)} reflection examples") 
-    print(f"   📁 Data saved to {output_dir}/")
+    logger.info("🎉 Training pipeline preparation completed!")
+    logger.info("   📚 %s agent training examples", len(training_examples))
+    logger.info("   🪞 %s reflection examples", len(reflection_examples))
+    logger.info("   📁 Data saved to %s/", output_dir)
     
     return summary

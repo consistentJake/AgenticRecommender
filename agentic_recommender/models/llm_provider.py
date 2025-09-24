@@ -5,10 +5,8 @@ Supports Gemini API integration configured via `configs/config`.
 
 import json
 import logging
-import os
 import time
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
@@ -16,9 +14,6 @@ from abc import ABC, abstractmethod
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT_DIR / "configs" / "config"
-LOG_DIR = ROOT_DIR / "logs"
-LOG_FILE = LOG_DIR / f"llm_provider_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-LOG_TO_CONSOLE = os.getenv("LLM_PROVIDER_CONSOLE_LOG", "1").lower() not in {"0", "false", "no"}
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
 DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
@@ -28,28 +23,11 @@ DEFAULT_GEMINI_KEY = None
 DEFAULT_OPENROUTER_KEY = None
 
 
-def _get_provider_logger() -> logging.Logger:
-    """Create or retrieve a logger that writes Gemini provider events."""
-    logger = logging.getLogger("agentic_recommender.llm_provider")
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(logging.INFO)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    file_handler = logging.FileHandler(LOG_FILE)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logger.addHandler(file_handler)
-
-    if LOG_TO_CONSOLE:
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter("%(message)s"))
-        logger.addHandler(console_handler)
-
-    return logger
+from ..utils.logging import get_component_logger, get_general_log_file
 
 
-PROVIDER_LOGGER = _get_provider_logger()
+PROVIDER_LOGGER = get_component_logger("models.llm_provider")
+LOG_FILE = get_general_log_file()
 
 DEFAULT_CONFIG = {
     "mode": "gemini",

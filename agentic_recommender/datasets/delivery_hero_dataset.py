@@ -7,6 +7,10 @@ import random
 from pathlib import Path
 from typing import Dict, Any, List
 from .base_dataset import SequentialDataset
+from ..utils.logging import get_component_logger
+
+
+logger = get_component_logger("datasets.delivery_hero_dataset")
 
 
 class DeliveryHeroDataset(SequentialDataset):
@@ -43,10 +47,10 @@ class DeliveryHeroDataset(SequentialDataset):
         Expected format: customer_id, geohash, order_id, vendor_id, product_id, day_of_week, order_time, order_day
         """
         try:
-            print(f"📊 Loading Delivery Hero {self.city.upper()} dataset...")
+            logger.info("📊 Loading Delivery Hero %s dataset...", self.city.upper())
             df = pd.read_csv(self.data_path)
             
-            print(f"Raw data loaded: {len(df):,} order items")
+            logger.info("Raw data loaded: %s order items", f"{len(df):,}")
             
             # Convert DH format to our standard format
             df_clean = df.rename(columns={
@@ -65,19 +69,19 @@ class DeliveryHeroDataset(SequentialDataset):
             # Remove any rows with missing values
             df_clean = df_clean.dropna()
             
-            print(f"After cleaning: {len(df_clean):,} interactions")
+            logger.info("After cleaning: %s interactions", f"{len(df_clean):,}")
             
             # No need to filter by order size - we'll create sequential sessions per customer
-            print(f"Ready for session creation: {len(df_clean):,} interactions")
+            logger.info("Ready for session creation: %s interactions", f"{len(df_clean):,}")
             return df_clean
             
         except FileNotFoundError:
-            print(f"⚠️ DH data file not found: {self.data_path}")
-            print("Creating synthetic grocery data...")
+            logger.warning("⚠️ DH data file not found: %s", self.data_path)
+            logger.info("Creating synthetic grocery data...")
             return pd.DataFrame(self._create_synthetic_grocery_data())
         except Exception as e:
-            print(f"⚠️ Error loading DH data: {e}")
-            print("Creating synthetic grocery data...")
+            logger.warning("⚠️ Error loading DH data: %s", e)
+            logger.info("Creating synthetic grocery data...")
             return pd.DataFrame(self._create_synthetic_grocery_data())
     
     def _create_sessions(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
@@ -121,7 +125,7 @@ class DeliveryHeroDataset(SequentialDataset):
         
         if self.products_path and Path(self.products_path).exists():
             try:
-                print("🍔 Loading product metadata...")
+                logger.info("🍔 Loading product metadata...")
                 products_df = pd.read_csv(self.products_path)
                 
                 # Create item name mapping
@@ -136,10 +140,10 @@ class DeliveryHeroDataset(SequentialDataset):
                             name = name[:97] + "..."
                         item_names[product_id] = name
                     
-                print(f"Loaded {len(item_names):,} product names")
-                    
+                logger.info("Loaded %s product names", f"{len(item_names):,}")
+
             except Exception as e:
-                print(f"⚠️ Error processing products metadata: {e}")
+                logger.warning("⚠️ Error processing products metadata: %s", e)
         
         # For items without metadata, create generic names
         for item_id in self.all_items:
@@ -154,7 +158,7 @@ class DeliveryHeroDataset(SequentialDataset):
     
     def _create_synthetic_grocery_data(self) -> List[Dict[str, Any]]:
         """Create synthetic grocery data"""
-        print("🛒 Creating synthetic grocery dataset...")
+        logger.info("🛒 Creating synthetic grocery dataset...")
         
         # Grocery categories
         categories = [

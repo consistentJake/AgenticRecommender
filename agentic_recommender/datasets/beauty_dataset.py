@@ -10,6 +10,10 @@ import random
 from pathlib import Path
 from typing import Dict, Any, List
 from .base_dataset import SequentialDataset
+from ..utils.logging import get_component_logger
+
+
+logger = get_component_logger("datasets.beauty_dataset")
 
 
 class BeautyDataset(SequentialDataset):
@@ -58,13 +62,13 @@ class BeautyDataset(SequentialDataset):
                     })
         except FileNotFoundError:
             # For demo purposes, create synthetic data
-            print("⚠️ Raw data file not found. Creating synthetic Beauty data...")
+            logger.warning("⚠️ Raw data file not found. Creating synthetic Beauty data...")
             data = self._create_synthetic_data()
         
         df = pd.DataFrame(data)
         
         # Apply 5-core filtering
-        print("🔍 Applying 5-core filtering...")
+        logger.info("🔍 Applying 5-core filtering...")
         df = self._apply_5core_filtering(df)
         
         return df
@@ -95,9 +99,9 @@ class BeautyDataset(SequentialDataset):
             df = df[df['item_id'].isin(valid_items)]
             
             current_size = len(df)
-            print(f"  Iteration {iteration}: {current_size} interactions")
-        
-        print(f"✅ 5-core filtering completed after {iteration} iterations")
+            logger.info("  Iteration %s: %s interactions", iteration, current_size)
+
+        logger.info("✅ 5-core filtering completed after %s iterations", iteration)
         return df
     
     def _process_metadata(self) -> Dict[str, str]:
@@ -129,10 +133,14 @@ class BeautyDataset(SequentialDataset):
                                     item_names[meta['asin']] = title
                         except Exception as line_e:
                             if line_num <= 5:  # Only show errors for first few lines
-                                print(f"⚠️ Error parsing metadata line {line_num}: {line_e}")
+                                logger.warning(
+                                    "⚠️ Error parsing metadata line %s: %s",
+                                    line_num,
+                                    line_e,
+                                )
                             continue
             except Exception as e:
-                print(f"⚠️ Error processing metadata file: {e}")
+                logger.warning("⚠️ Error processing metadata file: %s", e)
         
         # For items without metadata, create generic names
         for item_id in self.all_items:
@@ -165,7 +173,7 @@ class BeautyDataset(SequentialDataset):
     
     def _create_synthetic_data(self) -> List[Dict[str, Any]]:
         """Create synthetic beauty data for testing"""
-        print("🧪 Creating synthetic beauty dataset...")
+        logger.info("🧪 Creating synthetic beauty dataset...")
         
         # Beauty product categories
         categories = [
@@ -238,4 +246,3 @@ class BeautyDataset(SequentialDataset):
         }
         info.update(self.stats)
         return info
-

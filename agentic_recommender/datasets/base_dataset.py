@@ -12,6 +12,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 import re
 
+from ..utils.logging import get_component_logger
+
+
+logger = get_component_logger("datasets.base_dataset")
+
 
 class SequentialDataset(ABC):
     """
@@ -62,23 +67,27 @@ class SequentialDataset(ABC):
         4. Apply filtering
         5. Generate statistics
         """
-        print("📊 Loading raw data...")
+        logger.info("📊 Loading raw data...")
         raw_data = self._load_raw_data()
         
-        print("🏷️ Processing metadata...")
+        logger.info("🏷️ Processing metadata...")
         self.item_to_name = self._process_metadata()
         self.name_to_item = {v: k for k, v in self.item_to_name.items()}
         
-        print("📝 Creating sessions...")
+        logger.info("📝 Creating sessions...")
         self.sessions = self._create_sessions(raw_data)
         
-        print("🔍 Applying filters...")
+        logger.info("🔍 Applying filters...")
         self.sessions = self._apply_filters(self.sessions)
         
-        print("📈 Generating statistics...")
+        logger.info("📈 Generating statistics...")
         self._generate_statistics()
         
-        print(f"✅ Dataset processed: {len(self.sessions)} sessions, {len(self.all_items)} items")
+        logger.info(
+            "✅ Dataset processed: %s sessions, %s items",
+            len(self.sessions),
+            len(self.all_items),
+        )
     
     def _create_sessions(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
         """
@@ -123,7 +132,7 @@ class SequentialDataset(ABC):
         # Remove sessions that are too short
         filtered = [s for s in sessions if s['length'] >= self.min_session_length]
         
-        print(f"Filtered {len(sessions) - len(filtered)} short sessions")
+        logger.info("Filtered %s short sessions", len(sessions) - len(filtered))
         return filtered
     
     def _generate_statistics(self):
@@ -259,7 +268,12 @@ class SequentialDataset(ABC):
             'test': shuffled[val_end:]
         }
         
-        print(f"Created splits: train={len(splits['train'])}, val={len(splits['val'])}, test={len(splits['test'])}")
+        logger.info(
+            "Created splits: train=%s, val=%s, test=%s",
+            len(splits['train']),
+            len(splits['val']),
+            len(splits['test']),
+        )
         return splits
     
     def get_statistics(self) -> Dict[str, Any]:
@@ -279,7 +293,11 @@ class SequentialDataset(ABC):
         # Test 1: Check session lengths
         for session in self.sessions:
             if session['length'] < self.min_session_length:
-                print(f"❌ Session {session['session_id']} too short: {session['length']}")
+                logger.error(
+                    "❌ Session %s too short: %s",
+                    session['session_id'],
+                    session['length'],
+                )
                 return False
         
         # Test 2: Check negative sampling
@@ -287,29 +305,33 @@ class SequentialDataset(ABC):
         negatives = self.negative_sample(test_session['user_id'], test_session['items'])
         
         if len(negatives) != self.n_neg_items:
-            print(f"❌ Wrong number of negatives: {len(negatives)} != {self.n_neg_items}")
+            logger.error(
+                "❌ Wrong number of negatives: %s != %s",
+                len(negatives),
+                self.n_neg_items,
+            )
             return False
         
         # Check no overlap with user items
         user_items_set = set(test_session['items'])
         negative_set = set(negatives)
         if user_items_set & negative_set:
-            print(f"❌ Negatives overlap with user items")
+            logger.error("❌ Negatives overlap with user items")
             return False
         
         # Test 3: Check candidate pool
         candidates, target_idx = self.create_candidate_pool(test_session)
         
         if len(candidates) != self.n_neg_items + 1:
-            print(f"❌ Wrong candidate pool size: {len(candidates)}")
+            logger.error("❌ Wrong candidate pool size: %s", len(candidates))
             return False
         
         target_item = self.extract_ground_truth(test_session)
         if candidates[target_idx] != target_item:
-            print(f"❌ Target index incorrect")
+            logger.error("❌ Target index incorrect")
             return False
         
-        print("✅ All data integrity tests passed")
+        logger.info("✅ All data integrity tests passed")
         return True
     
     def _clean_product_name(self, title: str) -> str:

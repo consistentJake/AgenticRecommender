@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from .base import Agent, AgentType, ReflectionStrategy
 from ..models.llm_provider import LLMProvider
+from ..utils.logging import get_component_logger
 
 
 class Reflector(Agent):
@@ -30,6 +31,7 @@ class Reflector(Agent):
                  reflection_strategy: ReflectionStrategy = ReflectionStrategy.REFLEXION,
                  config: Dict[str, Any] = None):
         super().__init__(AgentType.REFLECTOR, llm_provider, config)
+        self.component_logger = get_component_logger("agents.reflector")
         
         self.reflection_strategy = reflection_strategy
         self.reflections = []
@@ -37,7 +39,10 @@ class Reflector(Agent):
         self.reflection_input = ""
         self.reflection_output = ""
         
-        print(f"🪞 Reflector initialized with strategy: {reflection_strategy.value}")
+        self.component_logger.info(
+            "🪞 Reflector initialized with strategy: %s",
+            reflection_strategy.value,
+        )
     
     def forward(self, input_task: str = None, scratchpad: str = None, 
                first_attempt: Any = None, ground_truth: Any = None, **kwargs) -> str:

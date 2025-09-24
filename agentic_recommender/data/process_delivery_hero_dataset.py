@@ -14,12 +14,16 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from agentic_recommender.datasets import DeliveryHeroDataset
+from agentic_recommender.utils.logging import get_component_logger
+
+
+logger = get_component_logger("data.process_delivery_hero_dataset")
 
 
 def process_and_save_delivery_hero_dataset(city: str = "sg"):
     """Process Delivery Hero dataset and save outputs for agentic workflow"""
     
-    print(f"🚀 Starting Delivery Hero {city.upper()} dataset processing...")
+    logger.info("🚀 Starting Delivery Hero %s dataset processing...", city.upper())
     
     # Create dataset instance
     dataset = DeliveryHeroDataset(city=city)
@@ -29,18 +33,18 @@ def process_and_save_delivery_hero_dataset(city: str = "sg"):
     
     # Get statistics
     stats = dataset.get_statistics()
-    print(f"\n📊 Dataset Statistics:")
+    logger.info("📊 Dataset Statistics:")
     for key, value in stats.items():
         if isinstance(value, float):
-            print(f"  {key}: {value:.4f}")
+            logger.info("  %s: %.4f", key, value)
         else:
-            print(f"  {key}: {value:,}")
+            logger.info("  %s: %s", key, f"{value:,}")
     
     # Create output directory
     output_dir = Path(__file__).parent / "outputs"
     output_dir.mkdir(exist_ok=True)
     
-    print(f"\n💾 Saving processed data to {output_dir}")
+    logger.info("💾 Saving processed data to %s", output_dir)
     
     # Save processed dataset
     with open(output_dir / f"delivery_hero_{city}_dataset.pkl", "wb") as f:
@@ -51,7 +55,7 @@ def process_and_save_delivery_hero_dataset(city: str = "sg"):
         json.dump(stats, f, indent=2)
     
     # Save evaluation splits
-    print("📑 Creating evaluation splits...")
+    logger.info("📑 Creating evaluation splits...")
     splits = dataset.create_evaluation_splits()
     
     for split_name, split_data in splits.items():
@@ -82,7 +86,7 @@ def process_and_save_delivery_hero_dataset(city: str = "sg"):
         json.dump(dataset.name_to_item, f, indent=2)
     
     # Create a sample for demo (fewer samples since DH sessions are typically shorter)
-    print("🎯 Creating evaluation samples...")
+    logger.info("🎯 Creating evaluation samples...")
     sample_sessions = splits['test'][:5]  # First 5 test sessions
     
     evaluation_samples = []
@@ -108,23 +112,23 @@ def process_and_save_delivery_hero_dataset(city: str = "sg"):
     with open(output_dir / f"delivery_hero_{city}_evaluation_samples.json", "w") as f:
         json.dump(evaluation_samples, f, indent=2)
     
-    print(f"\n✅ Delivery Hero {city.upper()} dataset processing completed!")
-    print(f"📁 Files saved in: {output_dir}")
-    print(f"   - delivery_hero_{city}_dataset.pkl: Complete dataset object")
-    print(f"   - delivery_hero_{city}_stats.json: Dataset statistics") 
-    print(f"   - delivery_hero_{city}_train.json: Training sessions")
-    print(f"   - delivery_hero_{city}_val.json: Validation sessions")
-    print(f"   - delivery_hero_{city}_test.json: Test sessions")
-    print(f"   - delivery_hero_{city}_item_to_name.json: Item ID to name mapping")
-    print(f"   - delivery_hero_{city}_name_to_item.json: Item name to ID mapping")
-    print(f"   - delivery_hero_{city}_evaluation_samples.json: Sample evaluation tasks")
+    logger.info("✅ Delivery Hero %s dataset processing completed!", city.upper())
+    logger.info("📁 Files saved in: %s", output_dir)
+    logger.info("   - delivery_hero_%s_dataset.pkl: Complete dataset object", city)
+    logger.info("   - delivery_hero_%s_stats.json: Dataset statistics", city)
+    logger.info("   - delivery_hero_%s_train.json: Training sessions", city)
+    logger.info("   - delivery_hero_%s_val.json: Validation sessions", city)
+    logger.info("   - delivery_hero_%s_test.json: Test sessions", city)
+    logger.info("   - delivery_hero_%s_item_to_name.json: Item ID to name mapping", city)
+    logger.info("   - delivery_hero_%s_name_to_item.json: Item name to ID mapping", city)
+    logger.info("   - delivery_hero_%s_evaluation_samples.json: Sample evaluation tasks", city)
     
     # Test data integrity
-    print(f"\n🔍 Testing data integrity...")
+    logger.info("🔍 Testing data integrity...")
     if dataset.test_data_integrity():
-        print("✅ All data integrity tests passed!")
+        logger.info("✅ All data integrity tests passed!")
     else:
-        print("❌ Data integrity tests failed!")
+        logger.error("❌ Data integrity tests failed!")
     
     return dataset
 
@@ -135,18 +139,19 @@ def process_all_cities():
     
     for city in cities:
         try:
-            print(f"\n{'='*60}")
-            print(f"Processing {city.upper()} dataset...")
-            print(f"{'='*60}")
+            separator = '=' * 60
+            logger.info(separator)
+            logger.info("Processing %s dataset...", city.upper())
+            logger.info(separator)
             
             dataset = process_and_save_delivery_hero_dataset(city)
-            print(f"✅ {city.upper()} completed successfully!")
+            logger.info("✅ %s completed successfully!", city.upper())
             
         except Exception as e:
-            print(f"❌ Error processing {city.upper()}: {e}")
+            logger.error("❌ Error processing %s: %s", city.upper(), e)
             continue
     
-    print(f"\n🎉 All Delivery Hero datasets processed!")
+    logger.info("🎉 All Delivery Hero datasets processed!")
 
 
 if __name__ == "__main__":

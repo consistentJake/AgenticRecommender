@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional, Tuple
 
 from .base import Agent, AgentType, create_agent_prompt
 from ..models.llm_provider import LLMProvider
+from ..utils.logging import get_component_logger
 
 
 class Manager(Agent):
@@ -31,6 +32,7 @@ class Manager(Agent):
     def __init__(self, thought_llm: LLMProvider, action_llm: LLMProvider, 
                  config: Dict[str, Any] = None):
         super().__init__(AgentType.MANAGER, thought_llm, config)
+        self.component_logger = get_component_logger("agents.manager")
         
         # Two separate LLMs for specialization
         self.thought_llm = thought_llm  # Optimized for reasoning
@@ -41,8 +43,14 @@ class Manager(Agent):
         self.current_task = None
         self.max_steps = config.get('max_steps', 10) if config else 10
         
-        print(f"🧠 Manager initialized with thought_llm: {thought_llm.get_model_info()['model_name']}")
-        print(f"⚡ Manager initialized with action_llm: {action_llm.get_model_info()['model_name']}")
+        self.component_logger.info(
+            "🧠 Manager initialized with thought_llm: %s",
+            thought_llm.get_model_info()['model_name'],
+        )
+        self.component_logger.info(
+            "⚡ Manager initialized with action_llm: %s",
+            action_llm.get_model_info()['model_name'],
+        )
     
     def think(self, task_context: Dict[str, Any]) -> str:
         """

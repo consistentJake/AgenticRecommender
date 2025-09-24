@@ -1,15 +1,60 @@
-"""
-Logging system for agentic recommendation system.
-Based on MACRec's logging implementation.
-"""
+"""Logging utilities for the agentic recommendation system."""
 
 import json
 import logging
+import os
 import time
-from datetime import datetime
-from typing import Optional, Dict, Any
 from collections import defaultdict
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+
+BASE_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+GENERAL_LOG_FILE = BASE_LOG_DIR / f"agentic_recommender_{RUN_TIMESTAMP}.log"
+CONSOLE_LOG_ENABLED = os.getenv("AGENTIC_CONSOLE_LOG", "1").lower() not in {"0", "false", "no"}
+_COMPONENT_LOGGING_INITIALISED = False
+
+
+def _ensure_component_logging() -> None:
+    """Initialise shared logging handlers for the project."""
+    global _COMPONENT_LOGGING_INITIALISED
+    if _COMPONENT_LOGGING_INITIALISED:
+        return
+
+    BASE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    base_logger = logging.getLogger("agentic_recommender")
+    base_logger.setLevel(logging.INFO)
+    base_logger.propagate = False
+
+    file_handler = logging.FileHandler(GENERAL_LOG_FILE)
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+    )
+    base_logger.addHandler(file_handler)
+
+    if CONSOLE_LOG_ENABLED:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+        base_logger.addHandler(console_handler)
+
+    _COMPONENT_LOGGING_INITIALISED = True
+
+
+def get_component_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """Return a logger that shares the global component logging configuration."""
+    _ensure_component_logging()
+    logger = logging.getLogger(f"agentic_recommender.{name}")
+    logger.setLevel(level)
+    return logger
+
+
+def get_general_log_file() -> Path:
+    """Expose the shared log file path for the current run."""
+    _ensure_component_logging()
+    return GENERAL_LOG_FILE
 
 
 class LogLevel(Enum):
@@ -30,8 +75,8 @@ class AgenticLogger:
     - Performance metrics tracking
     """
     
-    def __init__(self, log_dir: str = "logs", web_demo: bool = False):
-        self.log_dir = log_dir
+    def __init__(self, log_dir: Optional[str] = None, web_demo: bool = False):
+        self.log_dir = Path(log_dir) if log_dir else BASE_LOG_DIR
         self.web_demo = web_demo
         self.web_log = []
         
@@ -50,15 +95,15 @@ class AgenticLogger:
     
     def _setup_file_logging(self):
         """Setup structured file logging"""
-        import os
-        os.makedirs(self.log_dir, exist_ok=True)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
         
         # Create logger
         self.file_logger = logging.getLogger('agentic_rec_file')
         self.file_logger.setLevel(logging.DEBUG)
         
         # File handler
-        handler = logging.FileHandler(f"{self.log_dir}/session_{int(time.time())}.jsonl")
+        log_path = self.log_dir / f"session_{int(time.time())}.jsonl"
+        handler = logging.FileHandler(log_path)
         handler.setLevel(logging.DEBUG)
         
         # JSON formatter
@@ -238,7 +283,8 @@ class AgenticLogger:
 # Global logger instance
 _global_logger = None
 
-def get_logger(log_dir: str = "logs", web_demo: bool = False) -> AgenticLogger:
+
+def get_logger(log_dir: Optional[str] = None, web_demo: bool = False) -> AgenticLogger:
     """Get or create global logger instance"""
     global _global_logger
     if _global_logger is None:
