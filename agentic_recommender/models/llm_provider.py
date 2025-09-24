@@ -4,6 +4,7 @@ Supports Gemini API integration configured via `configs/config`.
 """
 
 import json
+import logging
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -12,6 +13,8 @@ from abc import ABC, abstractmethod
 
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "config"
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_FILE = LOG_DIR / "llm_provider.log"
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
 DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
@@ -19,6 +22,21 @@ DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
 # Default API keys sourced from APIs.md for local development.
 DEFAULT_GEMINI_KEY = None
 DEFAULT_OPENROUTER_KEY = None
+
+
+def _get_provider_logger() -> logging.Logger:
+    """Create or retrieve a logger that writes Gemini provider events to file."""
+    logger = logging.getLogger("agentic_recommender.llm_provider")
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(LOG_FILE)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+    return logger
+
+
+PROVIDER_LOGGER = _get_provider_logger()
 
 DEFAULT_CONFIG = {
     "mode": "gemini",
@@ -183,9 +201,14 @@ class GeminiProvider(LLMProvider):
         self.total_time = 0.0
 
         provider_mode = "OpenRouter" if self.use_openrouter else "Gemini SDK"
-        print(
+        self._log_event(
             f"[GeminiProvider] Initialised using {provider_mode} (model={self.model_name})"
         )
+
+    def _log_event(self, message: str, level: int = logging.INFO) -> None:
+        """Log provider events to both stdout and a persistent file."""
+        PROVIDER_LOGGER.log(level, message)
+        print(message)
 
     def generate(self, prompt: str, temperature: float = 0.7, 
                 max_tokens: int = 512, json_mode: bool = False, **kwargs) -> str:
@@ -205,7 +228,9 @@ class GeminiProvider(LLMProvider):
         start_time = time.time()
 
         mode_label = "OpenRouter" if self.use_openrouter else "Gemini"
-        print(f"[GeminiProvider] Generating via {mode_label} (model={self.model_name})")
+        self._log_event(
+            f"[GeminiProvider] Generating via {mode_label} (model={self.model_name})"
+        )
 
         if self.use_openrouter:
             return self._generate_openrouter(prompt, temperature, max_tokens, json_mode, start_time, **kwargs)
@@ -283,11 +308,11 @@ class GeminiProvider(LLMProvider):
             
         except requests_module.exceptions.RequestException as e:  # type: ignore[union-attr]
             error_msg = f"OpenRouter API request error: {str(e)}"
-            print(f"❌ {error_msg}")
+            self._log_event(f"❌ {error_msg}", level=logging.ERROR)
             return f"ERROR: {error_msg}"
         except Exception as e:
             error_msg = f"OpenRouter API error: {str(e)}"
-            print(f"❌ {error_msg}")
+            self._log_event(f"❌ {error_msg}", level=logging.ERROR)
             return f"ERROR: {error_msg}"
     
     def _generate_direct(self, prompt: str, temperature: float, max_tokens: int, 
@@ -334,7 +359,7 @@ class GeminiProvider(LLMProvider):
             
         except Exception as e:
             error_msg = f"Gemini API error: {str(e)}"
-            print(f"❌ {error_msg}")
+            self._log_event(f"❌ {error_msg}", level=logging.ERROR)
             return f"ERROR: {error_msg}"
     
     def get_model_info(self) -> Dict[str, Any]:
