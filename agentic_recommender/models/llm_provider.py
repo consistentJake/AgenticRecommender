@@ -5,16 +5,20 @@ Supports Gemini API integration configured via `configs/config`.
 
 import json
 import logging
+import os
 import time
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "config"
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
-LOG_FILE = LOG_DIR / "llm_provider.log"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT_DIR / "configs" / "config"
+LOG_DIR = ROOT_DIR / "logs"
+LOG_FILE = LOG_DIR / f"llm_provider_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+LOG_TO_CONSOLE = os.getenv("LLM_PROVIDER_CONSOLE_LOG", "1").lower() not in {"0", "false", "no"}
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
 DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
@@ -25,14 +29,23 @@ DEFAULT_OPENROUTER_KEY = None
 
 
 def _get_provider_logger() -> logging.Logger:
-    """Create or retrieve a logger that writes Gemini provider events to file."""
+    """Create or retrieve a logger that writes Gemini provider events."""
     logger = logging.getLogger("agentic_recommender.llm_provider")
-    if not logger.handlers:
-        logger.setLevel(logging.INFO)
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(LOG_FILE)
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-        logger.addHandler(handler)
+    if logger.handlers:
+        return logger
+
+    logger.setLevel(logging.INFO)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(file_handler)
+
+    if LOG_TO_CONSOLE:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(console_handler)
+
     return logger
 
 
@@ -206,9 +219,8 @@ class GeminiProvider(LLMProvider):
         )
 
     def _log_event(self, message: str, level: int = logging.INFO) -> None:
-        """Log provider events to both stdout and a persistent file."""
+        """Log provider events to configured outputs."""
         PROVIDER_LOGGER.log(level, message)
-        print(message)
 
     def generate(self, prompt: str, temperature: float = 0.7, 
                 max_tokens: int = 512, json_mode: bool = False, **kwargs) -> str:
