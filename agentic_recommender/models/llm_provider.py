@@ -1,23 +1,87 @@
 """
 LLM provider implementations for agentic recommendation system.
-Supports Gemini API integration.
+Supports Gemini API integration configured via `configs/config`.
 """
 
+import json
 import time
+from copy import deepcopy
+from pathlib import Path
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
 
-try:
-    import requests
-    OPENROUTER_AVAILABLE = True
-except ImportError:
-    OPENROUTER_AVAILABLE = False
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "config"
+
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
+
+# Default API keys sourced from APIs.md for local development.
+DEFAULT_GEMINI_KEY = None
+DEFAULT_OPENROUTER_KEY = None
+
+DEFAULT_CONFIG = {
+    "mode": "gemini",
+    "gemini": {
+        "api_key": None,
+        "model_name": DEFAULT_GEMINI_MODEL,
+    },
+    "openrouter": {
+        "api_key": None,
+        "model_name": DEFAULT_OPENROUTER_MODEL,
+    },
+}
+
+
+def _load_llm_config() -> Dict[str, Any]:
+    """Load LLM configuration from `configs/config` with sensible defaults."""
+    config = deepcopy(DEFAULT_CONFIG)
+
+    if not CONFIG_PATH.exists():
+        return config
+
+    try:
+        raw_text = CONFIG_PATH.read_text().strip()
+    except OSError:
+        return config
+
+    if not raw_text:
+        return config
+
+    try:
+        parsed = json.loads(raw_text)
+    except json.JSONDecodeError:
+        provider = raw_text.lower()
+        if provider in {"gemini", "openrouter", "mock"}:
+            config["mode"] = provider
+        return config
+
+    if isinstance(parsed, dict):
+        llm_section = parsed.get("llm", parsed)
+
+        mode = llm_section.get("mode")
+        if isinstance(mode, str) and mode.strip():
+            config["mode"] = mode.strip().lower()
+
+        for provider_key in ("gemini", "openrouter"):
+            provider_section = llm_section.get(provider_key)
+            if isinstance(provider_section, dict):
+                for field in ("api_key", "model_name"):
+                    if field in provider_section and provider_section[field] is not None:
+                        config[provider_key][field] = provider_section[field]
+
+        # Allow simple overrides that apply to the active mode.
+        if llm_section.get("api_key") is not None:
+            target = "openrouter" if config["mode"] == "openrouter" else "gemini"
+            config[target]["api_key"] = llm_section["api_key"]
+        if llm_section.get("model_name") is not None:
+            target = "openrouter" if config["mode"] == "openrouter" else "gemini"
+            config[target]["model_name"] = llm_section["model_name"]
+
+    if config["mode"] not in {"gemini", "openrouter", "mock"}:
+        config["mode"] = "gemini"
+
+    return config
 
 
 class LLMProvider(ABC):
@@ -42,38 +106,76 @@ class GeminiProvider(LLMProvider):
     Uses Gemini 2.0 Flash for fast, cost-effective generation.
     """
     
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp", use_openrouter: bool = False):
-        self.api_key = api_key
-        self.model_name = model_name
-        self.use_openrouter = use_openrouter
-        
-        if use_openrouter:
-            # OpenRouter mode - use requests
-            if not OPENROUTER_AVAILABLE:
-                raise ImportError("requests not installed. Run: pip install requests")
-            
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: Optional[str] = None,
+        use_openrouter: Optional[bool] = None,
+    ):
+        config = _load_llm_config()
+        resolved_use_openrouter = (
+            use_openrouter if use_openrouter is not None else config["mode"] == "openrouter"
+        )
+
+        provider_key = "openrouter" if resolved_use_openrouter else "gemini"
+        provider_config = config.get(provider_key, {})
+
+        resolved_model_name = (
+            model_name
+            or provider_config.get("model_name")
+            or (DEFAULT_OPENROUTER_MODEL if resolved_use_openrouter else DEFAULT_GEMINI_MODEL)
+        )
+
+        resolved_api_key = (
+            api_key
+            or provider_config.get("api_key")
+            or (DEFAULT_OPENROUTER_KEY if resolved_use_openrouter else DEFAULT_GEMINI_KEY)
+        )
+
+        if not resolved_api_key:
+            raise ValueError("api_key required for Gemini provider")
+
+        self.api_key = resolved_api_key
+        self.model_name = resolved_model_name
+        self.use_openrouter = resolved_use_openrouter
+        self._genai = None
+        self._requests = None
+        self.model = None
+
+        if self.use_openrouter:
+            try:
+                import requests  # type: ignore
+            except ImportError as exc:  # pragma: no cover - dependency check
+                raise ImportError(
+                    "requests not installed. Run: pip install requests"
+                ) from exc
+
+            self._requests = requests
             self.base_url = "https://openrouter.ai/api/v1/chat/completions"
             self.headers = {
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com/AgenticRecommender/system",
-                "X-Title": "Agentic Recommender System"
+                "X-Title": "Agentic Recommender System",
             }
-            
+
             # Convert model name for OpenRouter if needed
-            if model_name.startswith("gemini"):
-                if "2.0" in model_name or "flash" in model_name:
+            if self.model_name.startswith("gemini"):
+                if "2.0" in self.model_name or "flash" in self.model_name:
                     self.model_name = "google/gemini-flash-1.5"
                 else:
                     self.model_name = "google/gemini-pro-1.5"
         else:
-            # Direct Gemini API mode
-            if not GEMINI_AVAILABLE:
-                raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
-            
-            # Configure Gemini
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model_name)
+            try:
+                import google.generativeai as genai  # type: ignore
+            except ImportError as exc:  # pragma: no cover - dependency check
+                raise ImportError(
+                    "google-generativeai not installed. Run: pip install google-generativeai"
+                ) from exc
+
+            self._genai = genai
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel(self.model_name)
         
         # Performance tracking
         self.total_calls = 0
@@ -106,6 +208,10 @@ class GeminiProvider(LLMProvider):
                            json_mode: bool, start_time: float, **kwargs) -> str:
         """Generate using OpenRouter API"""
         try:
+            requests_module = self._requests
+            if requests_module is None:
+                raise RuntimeError("OpenRouter support not initialised; requests missing")
+
             # Prepare messages in OpenAI chat format
             messages = [{"role": "user", "content": prompt}]
             
@@ -127,7 +233,7 @@ class GeminiProvider(LLMProvider):
                 payload["response_format"] = {"type": "json_object"}
             
             # Make API request
-            response = requests.post(
+            response = requests_module.post(
                 self.base_url,
                 headers=self.headers,
                 json=payload,
@@ -167,7 +273,7 @@ class GeminiProvider(LLMProvider):
             
             return text.strip()
             
-        except requests.exceptions.RequestException as e:
+        except requests_module.exceptions.RequestException as e:  # type: ignore[union-attr]
             error_msg = f"OpenRouter API request error: {str(e)}"
             print(f"❌ {error_msg}")
             return f"ERROR: {error_msg}"
@@ -180,8 +286,11 @@ class GeminiProvider(LLMProvider):
                         json_mode: bool, start_time: float, **kwargs) -> str:
         """Generate using direct Gemini API"""
         try:
+            if self._genai is None or self.model is None:
+                raise RuntimeError("Gemini SDK not initialised; google-generativeai missing")
+
             # Configure generation
-            generation_config = genai.types.GenerationConfig(
+            generation_config = self._genai.types.GenerationConfig(
                 temperature=temperature,
                 top_p=kwargs.get('top_p', 0.9),
                 top_k=kwargs.get('top_k', 40),
@@ -308,57 +417,103 @@ class MockLLMProvider(LLMProvider):
         }
 
 
-def create_llm_provider(provider_type: str = "gemini", **kwargs) -> LLMProvider:
+def create_llm_provider(provider_type: Optional[str] = None, **kwargs) -> LLMProvider:
     """
-    Factory function to create LLM providers.
-    
+    Factory function to create LLM providers based on configuration overrides.
+
     Args:
-        provider_type: Type of provider ("gemini", "openrouter", "mock")
-        **kwargs: Provider-specific arguments
-        
+        provider_type: Type of provider ("gemini", "openrouter", "mock", "config").
+            When ``None`` or ``"config"``, the value from ``configs/config`` is used.
+        **kwargs: Provider-specific arguments taking precedence over config values.
+
     Returns:
         LLM provider instance
     """
-    if provider_type.lower() == "gemini":
-        api_key = kwargs.get('api_key')
-        if not api_key:
-            raise ValueError("api_key required for Gemini provider")
-        return GeminiProvider(
-            api_key=api_key, 
-            model_name=kwargs.get('model_name', 'gemini-2.0-flash-exp'),
-            use_openrouter=False
+    config = _load_llm_config()
+
+    requested_type = provider_type.lower() if isinstance(provider_type, str) else None
+    if requested_type == "config":
+        requested_type = None
+
+    target_type = (requested_type or config["mode"]).lower()
+
+    if target_type == "mock":
+        return MockLLMProvider(kwargs.get('responses'))
+
+    if target_type == "openrouter":
+        api_key = kwargs.get('api_key') or config["openrouter"].get("api_key") or DEFAULT_OPENROUTER_KEY
+        model_name = (
+            kwargs.get('model_name')
+            or config["openrouter"].get("model_name")
+            or DEFAULT_OPENROUTER_MODEL
         )
-    
-    elif provider_type.lower() == "openrouter":
-        api_key = kwargs.get('api_key')
-        if not api_key:
-            raise ValueError("api_key required for OpenRouter provider")
         return GeminiProvider(
             api_key=api_key,
-            model_name=kwargs.get('model_name', 'google/gemini-flash-1.5'),
-            use_openrouter=True
+            model_name=model_name,
+            use_openrouter=True,
         )
-    
-    elif provider_type.lower() == "mock":
-        return MockLLMProvider(kwargs.get('responses'))
-    
-    else:
-        raise ValueError(f"Unknown provider type: {provider_type}")
+
+    if target_type == "gemini":
+        api_key = kwargs.get('api_key') or config["gemini"].get("api_key") or DEFAULT_GEMINI_KEY
+        model_name = (
+            kwargs.get('model_name')
+            or config["gemini"].get("model_name")
+            or DEFAULT_GEMINI_MODEL
+        )
+        return GeminiProvider(
+            api_key=api_key,
+            model_name=model_name,
+            use_openrouter=False,
+        )
+
+    raise ValueError(f"Unknown provider type: {provider_type or target_type}")
 
 
-def get_default_openrouter_provider(api_key: str, model_name: str = "google/gemini-flash-1.5") -> GeminiProvider:
-    """Get Gemini provider configured for OpenRouter"""
-    return GeminiProvider(api_key=api_key, model_name=model_name, use_openrouter=True)
+def get_default_openrouter_provider(
+    api_key: Optional[str] = None,
+    model_name: Optional[str] = None,
+) -> GeminiProvider:
+    """Get Gemini provider configured for OpenRouter using config fallbacks."""
+    config = _load_llm_config()
+    resolved_api_key = api_key or config["openrouter"].get("api_key") or DEFAULT_OPENROUTER_KEY
+    resolved_model_name = (
+        model_name
+        or config["openrouter"].get("model_name")
+        or DEFAULT_OPENROUTER_MODEL
+    )
+    return GeminiProvider(
+        api_key=resolved_api_key,
+        model_name=resolved_model_name,
+        use_openrouter=True,
+    )
 
-
-# Default API key from APIs.md
-DEFAULT_GEMINI_KEY = "AIzaSyC-Ku57fAg294TDJ0iIgpkp7X8fs191W-M"
-DEFAULT_OPENROUTER_KEY = "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"
 
 def get_default_gemini_provider() -> GeminiProvider:
-    """Get Gemini provider with default API key"""
-    return GeminiProvider(DEFAULT_GEMINI_KEY)
+    """Get Gemini provider honouring the mode specified in `configs/config`."""
+    config = _load_llm_config()
+
+    if config["mode"] == "mock":
+        raise ValueError("LLM config is set to 'mock'; Gemini provider is unavailable")
+
+    use_openrouter = config["mode"] == "openrouter"
+    provider_key = "openrouter" if use_openrouter else "gemini"
+    provider_config = config[provider_key]
+
+    api_key = provider_config.get("api_key") or (
+        DEFAULT_OPENROUTER_KEY if use_openrouter else DEFAULT_GEMINI_KEY
+    )
+    model_name = provider_config.get("model_name") or (
+        DEFAULT_OPENROUTER_MODEL if use_openrouter else DEFAULT_GEMINI_MODEL
+    )
+
+    return GeminiProvider(
+        api_key=api_key,
+        model_name=model_name,
+        use_openrouter=use_openrouter,
+    )
+
 
 def get_default_openrouter_gemini_provider() -> GeminiProvider:
-    """Get Gemini provider with default OpenRouter API key"""
-    return GeminiProvider(api_key=DEFAULT_OPENROUTER_KEY, model_name="google/gemini-flash-1.5", use_openrouter=True)
+    """Get Gemini provider with OpenRouter settings derived from config."""
+    return get_default_openrouter_provider()
+

@@ -1,0 +1,13 @@
+{
+  "llm": {
+    "mode": "gemini",
+    "gemini": {
+      "api_key": null,
+      "model_name": "gemini-2.0-flash-exp"
+    },
+    "openrouter": {
+      "api_key": "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",
+      "model_name": "google/gemini-flash-1.5"
+    }
+  }
+}
