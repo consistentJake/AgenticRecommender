@@ -176,12 +176,17 @@ class GeminiProvider(LLMProvider):
             self._genai = genai
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(self.model_name)
-        
+
         # Performance tracking
         self.total_calls = 0
         self.total_tokens = 0
         self.total_time = 0.0
-    
+
+        provider_mode = "OpenRouter" if self.use_openrouter else "Gemini SDK"
+        print(
+            f"[GeminiProvider] Initialised using {provider_mode} (model={self.model_name})"
+        )
+
     def generate(self, prompt: str, temperature: float = 0.7, 
                 max_tokens: int = 512, json_mode: bool = False, **kwargs) -> str:
         """
@@ -198,7 +203,10 @@ class GeminiProvider(LLMProvider):
             Generated text
         """
         start_time = time.time()
-        
+
+        mode_label = "OpenRouter" if self.use_openrouter else "Gemini"
+        print(f"[GeminiProvider] Generating via {mode_label} (model={self.model_name})")
+
         if self.use_openrouter:
             return self._generate_openrouter(prompt, temperature, max_tokens, json_mode, start_time, **kwargs)
         else:
@@ -516,4 +524,3 @@ def get_default_gemini_provider() -> GeminiProvider:
 def get_default_openrouter_gemini_provider() -> GeminiProvider:
     """Get Gemini provider with OpenRouter settings derived from config."""
     return get_default_openrouter_provider()
-

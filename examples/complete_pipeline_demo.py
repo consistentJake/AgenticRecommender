@@ -13,7 +13,11 @@ sys.path.insert(0, str(project_root))
 
 from agentic_recommender.system import create_pipeline
 from agentic_recommender.core import RecommendationRequest
-from agentic_recommender.models.llm_provider import MockLLMProvider, GeminiProvider
+from agentic_recommender.models.llm_provider import (
+    MockLLMProvider,
+    GeminiProvider,
+    create_llm_provider,
+)
 
 
 def demo_complete_pipeline():
@@ -24,20 +28,32 @@ def demo_complete_pipeline():
     # Check for API key
     api_key = os.getenv('GEMINI_API_KEY')
     use_real_api = api_key is not None
-    
+
     if use_real_api:
-        print("🤖 Using real Gemini API")
+        print("🤖 Using real Gemini API (environment key)")
         llm_provider = GeminiProvider(api_key)
     else:
-        print("🎭 Using mock LLM responses")
-        # Create comprehensive mock responses
-        mock_responses = {
-            "analyze": "I should analyze the user's preferences first",
-            "user": "User shows strong preference for tech accessories, sequential pattern detected",
-            "action": "Finish[wireless_headphones]",
-            "reflection": '{"correctness": true, "reason": "Good recommendation based on user sequence"}'
-        }
-        llm_provider = MockLLMProvider(mock_responses)
+        provider_from_config = None
+        try:
+            provider_from_config = create_llm_provider('config')
+        except Exception as exc:
+            print(f"⚠️  Could not create provider from config: {exc}")
+
+        if isinstance(provider_from_config, GeminiProvider):
+            llm_provider = provider_from_config
+            use_real_api = True
+            mode_label = "OpenRouter" if llm_provider.use_openrouter else "Gemini"
+            print(f"🤖 Using real Gemini API via config ({mode_label})")
+        else:
+            print("🎭 Using mock LLM responses")
+            # Create comprehensive mock responses
+            mock_responses = {
+                "analyze": "I should analyze the user's preferences first",
+                "user": "User shows strong preference for tech accessories, sequential pattern detected",
+                "action": "Finish[wireless_headphones]",
+                "reflection": '{"correctness": true, "reason": "Good recommendation based on user sequence"}'
+            }
+            llm_provider = MockLLMProvider(mock_responses)
     
     print("\n1. 🏗️ PIPELINE INITIALIZATION")
     print("-" * 30)
@@ -200,3 +216,4 @@ def demo_complete_pipeline():
 
 if __name__ == "__main__":
     pipeline = demo_complete_pipeline()
+

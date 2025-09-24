@@ -1,6 +1,6 @@
 {
   "llm": {
-    "mode": "gemini",
+    "mode": "openrouter",
     "gemini": {
       "api_key": null,
       "model_name": "gemini-2.0-flash-exp"
