@@ -1,0 +1,217 @@
+2025-09-27 21:20:40,049 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Initialised using OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] 🧠 Manager initialized with thought_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] ⚡ Manager initialized with action_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.analyst] 🔍 Analyst initialized with 0 users, 0 items
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.reflector] 🪞 Reflector initialized with strategy: base
+2025-09-27 21:20:40,050 INFO [agentic_recommender.core.orchestrator] 🎭 Orchestrator initialized with base reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.system.pipeline] 🚀 Pipeline initialized: beauty dataset, base reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] 🧠 Manager initialized with thought_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] ⚡ Manager initialized with action_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.analyst] 🔍 Analyst initialized with 0 users, 0 items
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.reflector] 🪞 Reflector initialized with strategy: reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.core.orchestrator] 🎭 Orchestrator initialized with reflection reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.system.pipeline] 🚀 Pipeline initialized: beauty dataset, reflection reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] 🧠 Manager initialized with thought_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.manager] ⚡ Manager initialized with action_llm: google/gemini-2.5-flash-preview-09-2025
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.analyst] 🔍 Analyst initialized with 0 users, 0 items
+2025-09-27 21:20:40,050 INFO [agentic_recommender.agents.reflector] 🪞 Reflector initialized with strategy: last_trial
+2025-09-27 21:20:40,050 INFO [agentic_recommender.core.orchestrator] 🎭 Orchestrator initialized with last_trial reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.system.pipeline] 🚀 Pipeline initialized: beauty dataset, last_trial reflection
+2025-09-27 21:20:40,050 INFO [agentic_recommender.system.pipeline] 📊 Loading beauty dataset...
+2025-09-27 21:20:40,050 INFO [agentic_recommender.datasets.base_dataset] 📊 Loading raw data...
+2025-09-27 21:20:40,050 WARNING [agentic_recommender.datasets.beauty_dataset] ⚠️ Raw data file not found. Creating synthetic Beauty data...
+2025-09-27 21:20:40,050 INFO [agentic_recommender.datasets.beauty_dataset] 🧪 Creating synthetic beauty dataset...
+2025-09-27 21:20:40,063 INFO [agentic_recommender.datasets.beauty_dataset] 🔍 Applying 5-core filtering...
+2025-09-27 21:20:40,065 INFO [agentic_recommender.datasets.beauty_dataset]   Iteration 1: 2828 interactions
+2025-09-27 21:20:40,065 INFO [agentic_recommender.datasets.beauty_dataset] ✅ 5-core filtering completed after 1 iterations
+2025-09-27 21:20:40,065 INFO [agentic_recommender.datasets.base_dataset] 🏷️ Processing metadata...
+2025-09-27 21:20:40,065 INFO [agentic_recommender.datasets.base_dataset] 📝 Creating sessions...
+2025-09-27 21:20:40,080 INFO [agentic_recommender.datasets.base_dataset] 🔍 Applying filters...
+2025-09-27 21:20:40,080 INFO [agentic_recommender.datasets.base_dataset] Filtered 0 short sessions
+2025-09-27 21:20:40,080 INFO [agentic_recommender.datasets.base_dataset] 📈 Generating statistics...
+2025-09-27 21:20:40,080 INFO [agentic_recommender.datasets.base_dataset] ✅ Dataset processed: 200 sessions, 150 items
+2025-09-27 21:20:40,081 INFO [agentic_recommender.agents.analyst] 📊 Analyst data updated: 200 users, 150 items
+2025-09-27 21:20:40,081 INFO [agentic_recommender.core.orchestrator] 📊 Orchestrator data updated
+2025-09-27 21:20:40,081 INFO [agentic_recommender.system.pipeline] ✅ Dataset loaded: 200 sessions, 150 items
+2025-09-27 21:20:40,081 INFO [agentic_recommender.system.pipeline] 🎯 Demo prediction:
+2025-09-27 21:20:40,081 INFO [agentic_recommender.system.pipeline]    User sequence: gaming_laptop → mechanical_keyboard → gaming_mouse
+2025-09-27 21:20:40,081 INFO [agentic_recommender.system.pipeline]    Candidates: wireless_headphones, monitor, webcam, usb_hub, mouse_pad
+2025-09-27 21:20:40,081 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:41,947 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:42,549 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:44,857 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:46,602 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:47,410 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:49,590 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:51,231 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:51,818 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:54,069 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:55,774 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:56,260 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:20:58,574 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:00,172 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:00,828 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:03,490 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline] 📋 Results:
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline]    Recommendation: wireless_headphones
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline]    Confidence: 0.850
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline]    Reasoning: User analysis: Given the complete lack of information for `User demo_user` (no profile, no recent interaction histo... | Final recommendation: wireless_headphones
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline]    Reflection: Reflection: ```json
+{
+  "correctness": false,
+  "reason": "The agent failed to correctly interpret the provided context. The input explicitly provided a `user_sequence` of items that the user has interacted with: [\"gaming_laptop\", \"mechanical_keyboard\", \"gaming_mouse\"]. This sequence is not empty and clearly defines a strong interest in PC gaming peripherals. The agent repeatedly called the 'Analyst' component, which incorrectly returned a 'cold start' response, stating that the user had 'no profile' and 'no interaction history,' thus ignoring the crucial `user_sequence` provided in the task context. The final recommendation of 'wireless_headphones' is plausible within the gaming context but was arrived at through flawed reasoning (relying on domain knowledge while explicitly ignoring the 'Analyst's' incorrect cold-start assessment, but failing to fully integrate the sequential pattern). The most critical failure was the inability to properly utilize the given sequential data due to a miscommunication or misinterpretation between the Manager and Analyst components regarding the available context.",
+  "improvement": "Force the Manager Agent to prioritize and explicitly state the context provided in the `user_sequence` before consulting the Analyst. If the Analyst returns a 'cold start' response despite the provided sequence, the Manager must override this assumption, base the reasoning solely on the explicit sequence and domain knowledge (PC gaming setup completion), and select the most essential missing component (e.g., 'monitor' or 'headphones')."
+}
+```
+2025-09-27 21:21:05,801 INFO [agentic_recommender.system.pipeline] 🎯 Demo prediction:
+2025-09-27 21:21:05,802 INFO [agentic_recommender.system.pipeline]    User sequence: foundation → concealer → lipstick
+2025-09-27 21:21:05,802 INFO [agentic_recommender.system.pipeline]    Candidates: mascara, eyeshadow, blush, nail_polish, perfume
+2025-09-27 21:21:05,802 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:07,460 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:08,097 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:10,582 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:12,399 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:13,016 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:14,754 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:16,597 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:17,332 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:19,582 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:21,303 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:21,947 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:24,987 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:26,577 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:27,352 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:29,204 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline] 📋 Results:
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    Recommendation: mascara
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    Confidence: 0.850
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    Reasoning: User analysis: ```json
+{
+  "patterns": "Due to the lack of a user profile and any interaction history, no preferenc... | Final recommendation: mascara
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    Reflection: Reflection: ```json
+{
+  "correctness": true,
+  "reason": "The answer 'mascara' is the most logical sequential recommendation based on the provided user sequence [\"foundation\", \"concealer\", \"lipstick\"]. This sequence indicates a clear interest in a full makeup routine. After establishing the base (foundation, concealer) and addressing the lips (lipstick), the most critical remaining area for a standard makeup look is the eyes. Both 'mascara' and 'eyeshadow' are strong candidates, but mascara is often considered a more essential, high-frequency, and foundational item for eye definition than eyeshadow. The recommendation successfully used domain knowledge and sequential pattern recognition, despite the Analyst component incorrectly returning 'cold start' due to a presumed system limitation on accessing the immediate context sequence.",
+  "improvement": "Implement a context validation step: If the Manager Agent is provided with an explicit `user_sequence` in the task prompt, it must override any 'cold start' response from the Analyst and proceed with reasoning based solely on the provided sequence and domain knowledge. The Manager should explicitly state that the provided sequence is the primary source of sequential data."
+}
+```
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline] 🎯 Demo prediction:
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    User sequence: fiction_book → bookmark → reading_light
+2025-09-27 21:21:31,365 INFO [agentic_recommender.system.pipeline]    Candidates: notebook, pen_set, book_stand, reading_chair, coffee_mug
+2025-09-27 21:21:31,365 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:33,220 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:34,140 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:35,971 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:37,662 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:38,735 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:40,739 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:42,505 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:43,339 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:45,854 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:47,727 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:48,463 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:51,620 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:53,565 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:54,312 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:57,097 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:21:59,401 INFO [agentic_recommender.system.pipeline] 📋 Results:
+2025-09-27 21:21:59,401 INFO [agentic_recommender.system.pipeline]    Recommendation: notebook
+2025-09-27 21:21:59,402 INFO [agentic_recommender.system.pipeline]    Confidence: 0.850
+2025-09-27 21:21:59,402 INFO [agentic_recommender.system.pipeline]    Reasoning: User analysis: Given the complete lack of information for `user_id` (no profile, no recent interaction history), a ... | Final recommendation: notebook
+2025-09-27 21:21:59,402 INFO [agentic_recommender.system.pipeline]    Reflection: Reflection: ```json
+{
+  "correctness": false,
+  "reason": "The recommendation 'notebook' is a plausible, but secondary, accessory for a reader. The user sequence [\"fiction_book\", \"bookmark\", \"reading_light\"] strongly indicates a focus on optimizing the physical comfort and environment for extended reading. The most significant missing element for achieving sustained physical comfort and an optimal reading setup is the means of support, which is either a 'book_stand' (for the book itself) or a 'reading_chair' (for the user). Between the available candidates, 'book_stand' is a highly complementary item to a 'reading_light' and 'bookmark', as it addresses the ergonomics of holding the book. 'Reading_chair' is too high-level and expensive for a typical sequential recommendation. 'Notebook' and 'pen_set' relate to annotation or journaling, which is a secondary activity to the core act of reading fiction, making 'book_stand' the more immediate and logical completion of the reading setup sequence.",
+  "improvement": "The plan should explicitly rank the candidates based on how essential they are to completing the established sequential goal (Optimizing the reading environment). The ranking must prioritize ergonomic support (book_stand) over secondary activities (notebook/pen_set) or general comfort items (coffee_mug)."
+}
+```
+2025-09-27 21:21:59,402 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:01,350 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:01,996 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:03,889 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:05,347 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:06,007 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:08,209 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:09,749 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:10,449 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:12,372 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:14,314 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:14,966 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:18,066 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:20,168 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:22,056 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:23,245 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:25,711 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:27,635 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:28,381 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:31,788 INFO [agentic_recommender.system.pipeline] 🔍 Running evaluation on test split (max 3 samples)...
+2025-09-27 21:22:31,788 INFO [agentic_recommender.datasets.base_dataset] Created splits: train=160, val=20, test=20
+2025-09-27 21:22:31,788 INFO [agentic_recommender.system.pipeline] Processing sample 1/3
+2025-09-27 21:22:31,788 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:33,605 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:34,213 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:37,291 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:39,025 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:39,730 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:42,511 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:44,048 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:44,872 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:47,794 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:50,048 INFO [agentic_recommender.system.pipeline] Processing sample 2/3
+2025-09-27 21:22:50,048 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:52,040 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:52,597 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:55,504 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:57,086 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:22:58,092 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:01,303 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:03,197 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:03,893 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:06,804 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:09,196 INFO [agentic_recommender.system.pipeline] Processing sample 3/3
+2025-09-27 21:23:09,197 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:10,835 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:11,685 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:14,418 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:16,135 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:17,353 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:20,508 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:22,106 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:22,917 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:25,927 INFO [agentic_recommender.models.llm_provider] [GeminiProvider] Generating via OpenRouter (model=google/gemini-2.5-flash-preview-09-2025)
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline] 📊 Evaluating 3 predictions...
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline] ✅ Evaluation completed:
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   mrr: 0.0196
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   mrr_std: 0.0082
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   hr@1: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   hr@1_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   ndcg@1: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   ndcg@1_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   precision@1: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   precision@1_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   recall@1: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   recall@1_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   hr@3: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   hr@3_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   ndcg@3: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   ndcg@3_std: 0.0000
+2025-09-27 21:23:28,770 INFO [agentic_recommender.system.pipeline]   precision@3: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   precision@3_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@3: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@3_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   hr@5: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   hr@5_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   ndcg@5: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   ndcg@5_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   precision@5: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   precision@5_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@5: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@5_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   hr@10: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   hr@10_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   ndcg@10: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   ndcg@10_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   precision@10: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   precision@10_std: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@10: 0.0000
+2025-09-27 21:23:28,771 INFO [agentic_recommender.system.pipeline]   recall@10_std: 0.0000
