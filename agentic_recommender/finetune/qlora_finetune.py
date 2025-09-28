@@ -25,6 +25,11 @@ from transformers import (
 )
 from trl import SFTTrainer
 
+from agentic_recommender.finetune.dataset_builder import (
+    AgenticDatasetConfig,
+    build_agentic_dataset,
+)
+
 
 LOG = logging.getLogger(__name__)
 
@@ -51,12 +56,16 @@ class ScriptArgs:
     seed: int
     packing: bool
     report_to: str
+    agentic_dataset: Optional[str]
+    agentic_data_root: Optional[str]
+    agentic_include_reasoning: bool
+    agentic_negatives: int
 
 
 def parse_args() -> ScriptArgs:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-name", default="meta-llama/Meta-Llama-3-8B-Instruct")
-    parser.add_argument("--dataset-name", default="yahma/alpaca-cleaned")
+    parser.add_argument("--dataset-name")
     parser.add_argument("--dataset-config")
     parser.add_argument("--train-file")
     parser.add_argument("--eval-file")
@@ -75,6 +84,10 @@ def parse_args() -> ScriptArgs:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--packing", action="store_true", help="Enable sequence packing via TRL")
     parser.add_argument("--report-to", default="tensorboard")
+    parser.add_argument("--agentic-dataset", help="Name of processed Agentic dataset (e.g., beauty)")
+    parser.add_argument("--agentic-data-root", help="Directory containing processed Agentic splits")
+    parser.add_argument("--agentic-include-reasoning", action="store_true", help="Include reasoning-style examples")
+    parser.add_argument("--agentic-negatives", type=int, default=1, help="Negatives per positive example")
     args = parser.parse_args()
     return ScriptArgs(
         model_name=args.model_name,
@@ -97,10 +110,24 @@ def parse_args() -> ScriptArgs:
         seed=args.seed,
         packing=args.packing,
         report_to=args.report_to,
+        agentic_dataset=args.agentic_dataset,
+        agentic_data_root=args.agentic_data_root,
+        agentic_include_reasoning=args.agentic_include_reasoning,
+        agentic_negatives=args.agentic_negatives,
     )
 
 
 def load_training_corpus(opts: ScriptArgs) -> DatasetDict:
+    if opts.agentic_dataset:
+        data_root = Path(opts.agentic_data_root) if opts.agentic_data_root else Path("agentic_recommender/data/outputs")
+        config = AgenticDatasetConfig(
+            name=opts.agentic_dataset,
+            data_root=data_root,
+            include_reasoning=opts.agentic_include_reasoning,
+            negatives_per_positive=opts.agentic_negatives,
+            seed=opts.seed,
+        )
+        return build_agentic_dataset(config)
     if opts.dataset_name:
         LOG.info("Loading dataset %s", opts.dataset_name)
         dataset = load_dataset(opts.dataset_name, opts.dataset_config)
