@@ -4,11 +4,12 @@ import json
 import logging
 import os
 import time
+import textwrap
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -125,10 +126,13 @@ class AgenticLogger:
             'total_tokens': 0,
             'session_start': time.time()
         }
-        
+
         # Setup logging handlers
         self._setup_file_logging()
         self._setup_console_logging()
+
+        # Pretty-print configuration for context payloads
+        self.wrap_width = int(os.getenv("AGENTIC_LOG_WRAP", "120"))
     
     def _setup_file_logging(self):
         """Setup structured file logging"""
@@ -197,10 +201,19 @@ class AgenticLogger:
         }
         
         # Log to file as JSON
-        self.file_logger.info(json.dumps(log_entry))
-        
+        self.file_logger.info(json.dumps(log_entry, ensure_ascii=False))
+
         # Log to console with formatting
         self._console_format(log_entry)
+
+        # Mirror to general component logger so plaintext log captures full context
+        try:
+            component_logger = get_component_logger("agent_actions")
+            component_logger.info(self._format_plain_log_entry(log_entry))
+        except Exception as exc:  # pragma: no cover - logging fallback
+            self.console_logger.warning(
+                f"AgenticLogger mirror logging failed: {exc}"
+            )
         
         # Update performance metrics
         if duration_ms:
@@ -218,6 +231,95 @@ class AgenticLogger:
         
         if tokens_used:
             self.metrics['total_tokens'] += tokens_used
+
+    def _format_plain_log_entry(self, log_entry: Dict[str, Any]) -> str:
+        """Render a multiline plaintext representation for general logs."""
+        timestamp = log_entry.get('timestamp')
+        agent = log_entry.get('agent')
+        action_type = log_entry.get('type')
+        content = log_entry.get('content', {})
+        message = content.get('message', '')
+        ctx = content.get('context') or {}
+        performance = log_entry.get('performance') or {}
+
+        lines = [f"[{timestamp}] {agent}::{action_type}"]
+        lines.append("Message:")
+        lines.append(str(message))
+
+        if ctx:
+            lines.append("Context:")
+            lines.append(self._format_context_block(ctx, indent="  "))
+
+        perf_bits = []
+        if performance.get('duration_ms') is not None:
+            perf_bits.append(f"duration_ms={performance['duration_ms']:.2f}")
+        if performance.get('tokens_used') is not None:
+            perf_bits.append(f"tokens_used={performance['tokens_used']}")
+        if perf_bits:
+            lines.append("Performance: " + ", ".join(perf_bits))
+
+        lines.append("-")
+        return "\n".join(lines)
+
+    def _format_context_block(self, value: Any, indent: str = "") -> str:
+        """Pretty-format context payloads with controlled line width."""
+        if isinstance(value, dict):
+            lines: List[str] = []
+            for key in sorted(value.keys()):
+                formatted = self._format_context_block(value[key], indent=indent + "  ")
+                if "\n" in formatted:
+                    lines.append(f"{indent}{key}:")
+                    lines.append(formatted)
+                else:
+                    lines.append(f"{indent}{key}: {formatted}")
+            return "\n".join(lines) if lines else f"{indent}{{}}"
+
+        if isinstance(value, list):
+            if not value:
+                return f"{indent}[]"
+            lines: List[str] = []
+            for idx, item in enumerate(value):
+                formatted = self._format_context_block(item, indent=indent + "  ")
+                if "\n" in formatted:
+                    lines.append(f"{indent}- item_{idx}:")
+                    lines.append(formatted)
+                else:
+                    lines.append(f"{indent}- {formatted}")
+            return "\n".join(lines)
+
+        if isinstance(value, (tuple, set)):
+            return self._format_context_block(list(value), indent=indent)
+
+        if isinstance(value, str):
+            wrapped = self._wrap_text(value)
+            if "\n" in wrapped:
+                return textwrap.indent(wrapped, indent)
+            return f"{indent}{wrapped}" if indent else wrapped
+
+        return f"{indent}{value}" if indent else str(value)
+
+    def _wrap_text(self, text: str) -> str:
+        """Soft-wrap text to configured width while preserving blank lines."""
+        if not text:
+            return text
+
+        width = max(self.wrap_width, 40)
+        wrapped_lines: List[str] = []
+        for raw_line in str(text).splitlines():
+            if not raw_line.strip():
+                wrapped_lines.append("")
+                continue
+
+            wrapped_lines.extend(
+                textwrap.wrap(
+                    raw_line,
+                    width=width,
+                    replace_whitespace=False,
+                    drop_whitespace=False,
+                ) or [raw_line]
+            )
+
+        return "\n".join(wrapped_lines)
     
     def _console_format(self, entry: Dict[str, Any]):
         """Format log entry for console with color coding"""

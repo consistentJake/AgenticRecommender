@@ -342,7 +342,11 @@ class AgentOrchestrator:
             agent_name=agent_name,
             action_type=f"communication_{message_type}",
             message=content[:100] + "..." if len(content) > 100 else content,
-            context={'iteration': iteration, 'session_id': self.current_session_id}
+            context={
+                'iteration': iteration,
+                'session_id': self.current_session_id,
+                'full_content': content,
+            }
         )
     
     def update_agent_data(self, user_data: Dict[str, Any] = None,

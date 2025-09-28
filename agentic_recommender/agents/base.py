@@ -168,9 +168,13 @@ class ToolAgent(Agent):
             agent_name=self.agent_type.value,
             action_type="tool_usage",
             message=f"Executing: {command}",
-            context={'command_type': cmd_type, 'arguments': cmd_args}
+            context={
+                'command_type': cmd_type,
+                'arguments': cmd_args,
+                'raw_command': command,
+            }
         )
-        
+
         # Execute command
         try:
             if cmd_type in self.tools:
@@ -191,6 +195,7 @@ class ToolAgent(Agent):
                 agent_name=self.agent_type.value,
                 action_type="tool_result",
                 message=f"Tool result: {result[:100]}..." if len(result) > 100 else f"Tool result: {result}",
+                context={'command': command, 'result': result},
                 duration_ms=duration * 1000
             )
             
