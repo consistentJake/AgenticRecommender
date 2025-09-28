@@ -8,9 +8,10 @@ Reference: previousWorks/MACRec/macrec/agents/analyst.py
 import json
 from typing import Dict, Any, List, Optional
 
-from .base import ToolAgent, AgentType, create_agent_prompt
+from .base import ToolAgent, AgentType
 from ..models.llm_provider import LLMProvider
 from ..utils.logging import get_component_logger
+from ..configs.prompt_loader import load_prompt_config
 
 
 class Analyst(ToolAgent):
@@ -40,12 +41,17 @@ class Analyst(ToolAgent):
         
         super().__init__(AgentType.ANALYST, llm_provider, tools, config=config)
         self.component_logger = get_component_logger("agents.analyst")
-        
+
         # Data sources
         self.user_data = user_data or {}
         self.item_data = item_data or {}
         self.user_histories = {}  # Will be populated with session data
         self.item_histories = {}
+
+        # Prompt configuration
+        self.prompt_config = load_prompt_config("analyst")
+        self.max_analysis_steps = (config or {}).get('max_steps', 6)
+        self.command_temperature = (config or {}).get('command_temperature', 0.3)
         
         self.component_logger.info(
             "🔍 Analyst initialized with %s users, %s items",
@@ -54,127 +60,190 @@ class Analyst(ToolAgent):
         )
     
     def forward(self, argument: Any, json_mode: bool = False, **kwargs) -> str:
-        """
-        Main forward method for analyst.
-        
-        Args:
-            argument: Analysis request (e.g., ["user", "524"] or ["item", "181"])
-            json_mode: Whether to return JSON format
-            **kwargs: Additional context
-            
-        Returns:
-            Analysis result
-        """
+        """Iteratively gather evidence using tool commands before finishing."""
+        target_type, target_id = self._resolve_target(argument)
+        history: List[Dict[str, str]] = []
+
+        for step in range(self.max_analysis_steps):
+            prompt = self._build_command_prompt(
+                target_type=target_type,
+                target_id=target_id,
+                history=history,
+                request_context=kwargs.get('request_context'),
+                manager_notes=kwargs.get('manager_notes'),
+            )
+
+            raw_command = self.llm_provider.generate(
+                prompt,
+                temperature=self.command_temperature,
+                max_tokens=196,
+                json_mode=True,
+            )
+
+            self.logger.log_agent_action(
+                agent_name=self.agent_type.value,
+                action_type="command_generation",
+                message=f"Step {step + 1} command",
+                context={
+                    'prompt': prompt,
+                    'raw_response': raw_command,
+                    'target_type': target_type,
+                    'target_id': target_id,
+                },
+                step_number=step + 1,
+            )
+
+            command_obj = self._parse_command_response(raw_command)
+            command_type = command_obj.get('type')
+            content = command_obj.get('content')
+
+            if not command_type:
+                # Unable to parse; bail with fallback summary
+                return self._fallback_summary(target_id, history, json_mode)
+
+            command_type_lower = str(command_type).lower()
+
+            if command_type_lower == 'finish':
+                summary = self._ensure_report_schema(content)
+                self.logger.log_agent_action(
+                    agent_name=self.agent_type.value,
+                    action_type="analysis_summary",
+                    message=f"Completed analysis for {target_id}",
+                    context={'summary': summary},
+                    step_number=step + 1,
+                )
+                return json.dumps(summary, ensure_ascii=False) if json_mode else self._format_text_summary(summary)
+
+            command_repr, observation = self._execute_analysis_command(command_type_lower, content)
+            history.append({
+                'command': command_repr,
+                'observation': observation,
+            })
+
+        # Max steps reached without explicit finish – synthesise summary.
+        self.logger.log_agent_action(
+            agent_name=self.agent_type.value,
+            action_type="analysis_fallback",
+            message=f"Max steps reached for {target_id}",
+            context={'history': history},
+            step_number=self.max_analysis_steps,
+        )
+        return self._fallback_summary(target_id, history, json_mode)
+    
+    def _resolve_target(self, argument: Any) -> tuple[str, str]:
+        """Determine analysis target type and id from the manager request."""
         if isinstance(argument, list) and len(argument) >= 2:
-            analysis_type = argument[0].lower()
-            target_id = argument[1]
-            
-            if analysis_type == "user":
-                return self._analyze_user(target_id, json_mode, **kwargs)
-            elif analysis_type == "item":
-                return self._analyze_item(target_id, json_mode, **kwargs)
-            else:
-                return self._analyze_general(argument, json_mode, **kwargs)
+            return str(argument[0]).lower(), str(argument[1])
+        if isinstance(argument, dict):
+            target_type = argument.get('type') or argument.get('target') or 'general'
+            target_id = argument.get('id') or argument.get('target_id') or 'unknown'
+            return str(target_type).lower(), str(target_id)
+
+        return 'general', str(argument)
+
+    def _build_command_prompt(
+        self,
+        *,
+        target_type: str,
+        target_id: str,
+        history: List[Dict[str, str]],
+        request_context: Any = None,
+        manager_notes: Any = None,
+    ) -> str:
+        template = self.prompt_config.get('command_template', '')
+        history_block = self._format_history(history)
+        request_block = json.dumps(request_context, ensure_ascii=False, indent=2) if request_context else "{}"
+        manager_block = self._summarise_text(manager_notes)
+
+        return template.format(
+            analysis_target=target_type,
+            target_id=target_id,
+            request_context=request_block,
+            manager_notes=manager_block,
+            history=history_block,
+        )
+
+    def _parse_command_response(self, raw_command: str) -> Dict[str, Any]:
+        try:
+            return json.loads(raw_command)
+        except json.JSONDecodeError:
+            self.logger.log_agent_action(
+                agent_name=self.agent_type.value,
+                action_type="warning",
+                message=f"Analyst command not JSON: {raw_command[:200]}",
+            )
+            return {}
+
+    def _execute_analysis_command(self, command_type: str, content: Any) -> tuple[str, str]:
+        command_repr = self._format_command_repr(command_type, content)
+        observation = self.execute_command(command_repr)
+        return command_repr, observation
+
+    def _format_command_repr(self, command_type: str, content: Any) -> str:
+        if command_type == 'finish':
+            return 'Finish[analysis]'
+
+        if isinstance(content, list):
+            args = ", ".join(str(item) for item in content)
+        elif content is None:
+            args = ""
         else:
-            return self._analyze_general(argument, json_mode, **kwargs)
-    
-    def _analyze_user(self, user_id: str, json_mode: bool = False, **kwargs) -> str:
-        """
-        Analyze user preferences and sequential patterns.
-        
-        Template reference: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json
-        Uses MACRec analyst_prompt template for user analysis.
-        """
-        
-        # Get user information
-        user_info = self._get_user_info([user_id])
-        user_history = self._get_user_history([user_id, "10"])  # Last 10 interactions
-        
-        # Build analysis prompt
-        prompt = f"""Analyze this user's preferences for sequential recommendation:
+            args = str(content)
 
-USER INFORMATION:
-{user_info}
+        command_name = command_type[0].upper() + command_type[1:]
+        return f"{command_name}[{args}]"
 
-RECENT INTERACTION HISTORY:
-{user_history}
+    def _ensure_report_schema(self, content: Any) -> Dict[str, str]:
+        schema = self.prompt_config.get('report_schema', {})
+        summary: Dict[str, str] = {}
+        if isinstance(content, dict):
+            for key in schema:
+                value = content.get(key)
+                summary[key] = self._summarise_text(value) if value else ""
+        else:
+            fallback_text = self._summarise_text(content)
+            for key in schema:
+                summary[key] = fallback_text
 
-TASK: Provide insights about:
-1. User's preference patterns
-2. Sequential behavior (what they tend to buy after what)
-3. Recent trends or shifts in preferences
-4. Recommendations for next item
+        for key, description in schema.items():
+            summary.setdefault(key, description)
 
-{"Return analysis in JSON format with keys: patterns, sequential_behavior, recent_trends, recommendations" if json_mode else "Provide detailed analysis."}
-"""
-        
-        analysis = self.llm_provider.generate(prompt, temperature=0.7)
-        
-        # Log the analysis
-        self.logger.log_agent_action(
-            agent_name=self.agent_type.value,
-            action_type="user_analysis",
-            message=f"Analyzed user {user_id}",
-            context={'user_id': user_id, 'analysis_length': len(analysis)}
-        )
-        
-        return analysis
-    
-    def _analyze_item(self, item_id: str, json_mode: bool = False, **kwargs) -> str:
-        """
-        Analyze item characteristics and popularity.
-        
-        Template reference: previousWorks/MACRec/config/prompts/agent_prompt/analyst.json
-        Uses MACRec analyst_prompt template for item analysis.
-        """
-        
-        # Get item information
-        item_info = self._get_item_info([item_id])
-        item_history = self._get_item_history([item_id, "5"])  # Recent interactions
-        
-        # Build analysis prompt
-        prompt = f"""Analyze this item for recommendation purposes:
+        return summary
 
-ITEM INFORMATION:
-{item_info}
+    def _format_text_summary(self, summary: Dict[str, str]) -> str:
+        lines = []
+        for key, value in summary.items():
+            lines.append(f"{key}: {value}")
+        return "\n".join(lines)
 
-INTERACTION HISTORY:
-{item_history}
+    def _fallback_summary(self, target_id: str, history: List[Dict[str, str]], json_mode: bool) -> str:
+        summary = {
+            'patterns': f"Limited evidence gathered for {target_id}.",
+            'sequential_behavior': self._summarise_text(history[-1]['observation']) if history else "No sequential cues collected.",
+            'recent_trends': "Insufficient data to assess trends.",
+            'recommendations': "Request additional analyst steps or expand history window.",
+        }
 
-TASK: Provide insights about:
-1. Item characteristics and features
-2. Who typically interacts with this item
-3. What items are commonly purchased with/after this item
-4. Item's popularity and trends
+        return json.dumps(summary, ensure_ascii=False) if json_mode else self._format_text_summary(summary)
 
-{"Return analysis in JSON format with keys: characteristics, typical_users, related_items, popularity" if json_mode else "Provide detailed analysis."}
-"""
-        
-        analysis = self.llm_provider.generate(prompt, temperature=0.7)
-        
-        # Log the analysis
-        self.logger.log_agent_action(
-            agent_name=self.agent_type.value,
-            action_type="item_analysis",
-            message=f"Analyzed item {item_id}",
-            context={'item_id': item_id, 'analysis_length': len(analysis)}
-        )
-        
-        return analysis
-    
-    def _analyze_general(self, argument: Any, json_mode: bool = False, **kwargs) -> str:
-        """Handle general analysis requests"""
-        prompt = f"""You are an Analyst agent. Analyze the following:
+    def _summarise_text(self, value: Any) -> str:
+        if not value:
+            return ""
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, ensure_ascii=False)
+        text = str(value).strip()
+        return text[:400] + ('…' if len(text) > 400 else '')
 
-REQUEST: {argument}
+    def _format_history(self, history: List[Dict[str, str]]) -> str:
+        if not history:
+            return "No previous commands."
 
-CONTEXT: {kwargs}
-
-Provide thorough analysis based on the request.
-{"Return in JSON format." if json_mode else ""}
-"""
-        
-        return self.llm_provider.generate(prompt, temperature=0.7)
+        lines = []
+        for idx, entry in enumerate(history, start=1):
+            observation = entry.get('observation', '')
+            observation = observation.replace('\n', ' ')[:400]
+            lines.append(f"Step {idx}: {entry.get('command')} -> {observation}")
+        return "\n".join(lines)
     
     def _get_user_info(self, args: List[str]) -> str:
         """Get user profile information"""

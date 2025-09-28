@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from .base import Agent, AgentType, ReflectionStrategy
 from ..models.llm_provider import LLMProvider
 from ..utils.logging import get_component_logger
+from ..configs.prompt_loader import load_prompt_config
 
 
 class Reflector(Agent):
@@ -43,6 +44,8 @@ class Reflector(Agent):
             "🪞 Reflector initialized with strategy: %s",
             reflection_strategy.value,
         )
+
+        self.prompt_config = load_prompt_config("reflector")
     
     def forward(self, input_task: str = None, scratchpad: str = None, 
                first_attempt: Any = None, ground_truth: Any = None, **kwargs) -> str:
@@ -105,27 +108,40 @@ Use this context to improve your next attempt."""
         """
         start_time = time.time()
         
-        # Build reflection prompt
-        prompt = self._build_reflection_prompt(input_task, scratchpad, first_attempt, ground_truth)
-        
-        # Generate reflection
-        reflection = self.llm_provider.generate(
-            prompt, 
-            temperature=0.7,
-            json_mode=True  # Encourage JSON output for structured feedback
-        )
-        
-        # Try to parse as JSON for structured feedback
-        try:
-            reflection_data = json.loads(reflection)
-            formatted_reflection = f"""Reflection Analysis:
-Correctness: {reflection_data.get('correctness', 'unknown')}
-Reason: {reflection_data.get('reason', 'No reason provided')}
-Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
-        except json.JSONDecodeError:
-            # Fallback to text format
-            formatted_reflection = f"Reflection: {reflection}"
-            reflection_data = {'correctness': False, 'reason': reflection}
+        attempt = 0
+        max_retries = 2
+        reflection_data: Dict[str, Any] = {}
+        formatted_reflection = ""
+        prompt = ""
+        reflection = ""
+
+        while attempt <= max_retries:
+            prompt = self._build_reflection_prompt(input_task, scratchpad, first_attempt, ground_truth)
+
+            reflection = self.llm_provider.generate(
+                prompt,
+                temperature=0.4,
+                max_tokens=256,
+                json_mode=True,
+            )
+
+            try:
+                reflection_data = json.loads(reflection)
+            except json.JSONDecodeError:
+                reflection_data = {}
+
+            if self._validate_reflection_schema(reflection_data):
+                formatted_reflection = self._format_reflection_summary(reflection_data)
+                break
+
+            attempt += 1
+            if attempt > max_retries:
+                formatted_reflection = f"Reflection (unstructured): {reflection}"
+                reflection_data = {'correctness': 'unknown', 'reason': reflection, 'improvement': 'Parsing failed', 'next_action': 'Retry with adjusted prompt'}
+                break
+
+            retry_prompt = self.prompt_config.get('retry_message', 'Invalid reflection output. Try again with the required keys.')
+            scratchpad = f"{scratchpad}\nNOTE: {retry_prompt}"
         
         # Store reflection
         self.reflections.append(reflection)
@@ -141,7 +157,9 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
             context={
                 'input_task': input_task,
                 'first_attempt': first_attempt,
-                'reflection_data': reflection_data
+                'reflection_data': reflection_data,
+                'prompt': prompt,
+                'raw_response': self.reflection_output,
             },
             duration_ms=duration * 1000
         )
@@ -152,7 +170,7 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
                          first_attempt: Any = None, ground_truth: Any = None) -> str:
         """
         Combine last attempt storage with LLM reflection.
-        
+
         Reference: MACRec_Analysis.md:142-149
         """
         # First, store last attempt
@@ -168,7 +186,7 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
         
         self.reflections_str = combined_reflection
         return combined_reflection
-    
+
     def _build_reflection_prompt(self, input_task: str, scratchpad: str,
                                first_attempt: Any = None, ground_truth: Any = None) -> str:
         """
@@ -178,44 +196,42 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
         Uses MACRec reflect_prompt_json template for structured self-reflection.
         Reference: MACRec_Analysis.md:153-163
         """
-        base_prompt = """You are an advanced reasoning agent that can improve based on self reflection.
-You will be given a previous reasoning trial in which you were given a task to complete.
+        template = self.prompt_config.get('reflection_template', '')
 
-Firstly, you should determine if the given answer is correct.
-Then, provide reasons for your judgement.
-Possible reasons for failure may be:
-- Guessing the wrong answer
-- Using wrong format for action
-- Insufficient analysis of user sequential patterns
-- Ignoring important contextual information
+        conversation_table = self._format_conversation_table(scratchpad)
+        task_summary = input_task or "Sequential recommendation"
+        formatted = template.format(
+            task_summary=task_summary,
+            conversation_table=conversation_table,
+            first_attempt=first_attempt or "unknown",
+            ground_truth=ground_truth or "unknown",
+        )
 
-In a few sentences, discover the potential problems in your previous reasoning trial
-and devise a new, concise, high level plan that aims to mitigate the same failure.
+        return formatted
 
-Return JSON format: {"correctness": boolean, "reason": "detailed explanation", "improvement": "suggested improvement plan"}
-"""
-        
-        task_info = f"""
-ORIGINAL TASK:
-{input_task}
+    def _format_conversation_table(self, scratchpad: str) -> str:
+        if not scratchpad:
+            return "No conversation captured."
 
-PREVIOUS ATTEMPT (scratchpad):
-{scratchpad}
-"""
-        
-        if first_attempt is not None:
-            task_info += f"""
-FIRST PREDICTION:
-{first_attempt}
-"""
-        
-        if ground_truth is not None:
-            task_info += f"""
-CORRECT ANSWER:
-{ground_truth}
-"""
-        
-        return base_prompt + task_info
+        rows = []
+        for line in scratchpad.split('\n'):
+            if not line.strip():
+                continue
+            rows.append(f"- {line.strip()}")
+        return '\n'.join(rows)
+
+    def _validate_reflection_schema(self, data: Dict[str, Any]) -> bool:
+        required_keys = {"correctness", "reason", "improvement", "next_action"}
+        return bool(data) and required_keys.issubset(set(data.keys()))
+
+    def _format_reflection_summary(self, data: Dict[str, Any]) -> str:
+        return (
+            "Reflection Analysis:\n"
+            f"Correctness: {data.get('correctness', 'unknown')}\n"
+            f"Reason: {data.get('reason', 'No reason provided')}\n"
+            f"Improvement: {data.get('improvement', 'No improvement suggested')}\n"
+            f"Next action: {data.get('next_action', 'Not specified')}"
+        )
     
     def reflect_and_retry(self, task_context: Dict[str, Any], 
                          first_attempt: Any) -> Tuple[str, Dict[str, Any]]:

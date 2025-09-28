@@ -224,7 +224,12 @@ class AgentOrchestrator:
         self._log_communication("Orchestrator", "routing", f"Routing analysis request: {argument}")
         
         # Route to analyst
-        analysis_result = self.analyst.forward(argument, json_mode=True)
+        analysis_result = self.analyst.forward(
+            argument,
+            json_mode=True,
+            request_context=self._extract_request_context(context),
+            manager_notes=self._collect_manager_notes(),
+        )
         
         self._log_communication("Analyst", "analysis", analysis_result)
         return analysis_result
@@ -269,6 +274,23 @@ class AgentOrchestrator:
             reflection_data = {"reason": reflection, "correctness": "unknown"}
         
         return reflection_data
+
+    def _extract_request_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'user_id': context.get('user_id'),
+            'user_sequence': context.get('user_sequence'),
+            'candidates': context.get('candidates'),
+            'ground_truth': context.get('ground_truth'),
+        }
+
+    def _collect_manager_notes(self) -> str:
+        if not self.conversation_history:
+            return ""
+
+        notes = []
+        for entry in self.conversation_history[-5:]:
+            notes.append(f"{entry['agent']}({entry.get('type')}): {entry.get('content')}")
+        return "\n".join(notes)
     
     def _calculate_confidence(self, context: Dict[str, Any]) -> float:
         """Calculate confidence score for recommendation"""

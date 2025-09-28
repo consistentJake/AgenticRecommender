@@ -50,6 +50,9 @@ class RecommendationPipeline:
         # Evaluation results
         self.evaluation_results = []
         self.performance_logs = []
+        self.item_metadata: Dict[str, Any] = {}
+        self.user_metadata: Dict[str, Any] = {}
+        self.max_iterations = (self.config or {}).get('max_iterations', 5)
         
         self.logger = get_component_logger("system.pipeline")
         self.logger.info(
@@ -82,12 +85,14 @@ class RecommendationPipeline:
         user_data = {s['user_id']: {'sequence_length': len(s['items'])} for s in self.dataset.sessions}
         item_data = self.dataset.item_to_name
         user_histories = {s['user_id']: s['items'] for s in self.dataset.sessions}
-        
+
         self.orchestrator.update_agent_data(
             user_data=user_data,
             item_data=item_data,
             user_histories=user_histories
         )
+        self.item_metadata = item_data
+        self.user_metadata = user_data
         
         stats = self.dataset.get_statistics()
         self.logger.info(
@@ -135,16 +140,24 @@ class RecommendationPipeline:
             candidates, target_idx = self.dataset.create_candidate_pool(session)
             
             # Create recommendation request
+            request_context = {
+                'candidate_names': {c: self.item_metadata.get(c, c) for c in candidates},
+                'dataset': self.dataset_type,
+                'session_id': session.get('session_id'),
+                'user_profile': self.user_metadata.get(session['user_id']),
+            }
+
             request = RecommendationRequest(
                 user_id=session['user_id'],
                 user_sequence=pred_sequence,
                 candidates=candidates,
-                ground_truth=target
+                ground_truth=target,
+                context=request_context
             )
-            
+
             # Get recommendation
             try:
-                response = self.orchestrator.recommend(request, max_iterations=3)
+                response = self.orchestrator.recommend(request, max_iterations=self.max_iterations)
                 
                 # Find recommendation in candidates
                 try:
@@ -211,11 +224,15 @@ class RecommendationPipeline:
             user_id="demo_user",
             user_sequence=user_sequence,
             candidates=candidates,
-            context={"demo_mode": True}
+            context={
+                "demo_mode": True,
+                "candidate_names": {c: self.item_metadata.get(c, c) for c in candidates},
+                "dataset": self.dataset_type,
+            }
         )
-        
+
         # Get recommendation
-        response = self.orchestrator.recommend(request)
+        response = self.orchestrator.recommend(request, max_iterations=self.max_iterations)
         
         self.logger.info("📋 Results:")
         self.logger.info("   Recommendation: %s", response.recommendation)

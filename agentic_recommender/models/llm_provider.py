@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT_DIR / "configs" / "config"
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
-DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
+DEFAULT_OPENROUTER_MODEL = "google/gemini-1.5-flash-latest"
 
 # Default API keys sourced from APIs.md for local development.
 DEFAULT_GEMINI_KEY = None
@@ -24,6 +24,37 @@ DEFAULT_OPENROUTER_KEY = None
 
 
 from ..utils.logging import get_component_logger, get_general_log_file
+
+
+OPENROUTER_MODEL_ALIASES = {
+    "google/gemini-flash-1.5": "google/gemini-1.5-flash",
+    "google/gemini-flash-1.5-latest": "google/gemini-1.5-flash-latest",
+    "gemini-flash-1.5": "google/gemini-1.5-flash",
+    "gemini-1.5-flash": "google/gemini-1.5-flash",
+    "gemini-1.5-flash-latest": "google/gemini-1.5-flash-latest",
+    "gemini-1.5-pro": "google/gemini-1.5-pro",
+    "gemini-1.5-pro-latest": "google/gemini-1.5-pro-latest",
+    "gemini-2.0-flash-exp": "google/gemini-2.0-flash-exp",
+}
+
+
+def _normalise_openrouter_model(model_name: Optional[str]) -> str:
+    """Convert Gemini-style names to OpenRouter provider/model ids."""
+    if not model_name:
+        return DEFAULT_OPENROUTER_MODEL
+
+    lower_name = model_name.lower()
+    alias = OPENROUTER_MODEL_ALIASES.get(lower_name)
+    if alias:
+        return alias
+
+    if lower_name.startswith("google/"):
+        return model_name
+
+    if lower_name.startswith("gemini"):
+        return f"google/{model_name}"
+
+    return model_name
 
 
 PROVIDER_LOGGER = get_component_logger("models.llm_provider")
@@ -129,11 +160,19 @@ class GeminiProvider(LLMProvider):
         provider_key = "openrouter" if resolved_use_openrouter else "gemini"
         provider_config = config.get(provider_key, {})
 
-        resolved_model_name = (
-            model_name
-            or provider_config.get("model_name")
-            or (DEFAULT_OPENROUTER_MODEL if resolved_use_openrouter else DEFAULT_GEMINI_MODEL)
-        )
+        if resolved_use_openrouter:
+            base_model_name = (
+                model_name
+                or provider_config.get("model_name")
+                or DEFAULT_OPENROUTER_MODEL
+            )
+            resolved_model_name = _normalise_openrouter_model(base_model_name)
+        else:
+            resolved_model_name = (
+                model_name
+                or provider_config.get("model_name")
+                or DEFAULT_GEMINI_MODEL
+            )
 
         resolved_api_key = (
             api_key
@@ -167,13 +206,7 @@ class GeminiProvider(LLMProvider):
                 "HTTP-Referer": "https://github.com/AgenticRecommender/system",
                 "X-Title": "Agentic Recommender System",
             }
-
-            # Convert model name for OpenRouter if needed
-            if self.model_name.startswith("gemini"):
-                if "2.0" in self.model_name or "flash" in self.model_name:
-                    self.model_name = "google/gemini-flash-1.5"
-                else:
-                    self.model_name = "google/gemini-pro-1.5"
+            self.model_name = _normalise_openrouter_model(self.model_name)
         else:
             try:
                 import google.generativeai as genai  # type: ignore
@@ -297,7 +330,17 @@ class GeminiProvider(LLMProvider):
             return text.strip()
             
         except requests_module.exceptions.RequestException as e:  # type: ignore[union-attr]
-            error_msg = f"OpenRouter API request error: {str(e)}"
+            response = getattr(e, "response", None)
+            if response is not None:
+                status = response.status_code
+                # Trim body to avoid flooding logs
+                body_preview = response.text.strip().replace("\n", " ")[:300]
+                error_msg = (
+                    f"OpenRouter API request error: {str(e)} (status={status}, body={body_preview})"
+                )
+            else:
+                error_msg = f"OpenRouter API request error: {str(e)}"
+
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
             return f"ERROR: {error_msg}"
         except Exception as e:

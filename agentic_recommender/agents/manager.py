@@ -10,9 +10,10 @@ import json
 import re
 from typing import Dict, Any, Optional, Tuple
 
-from .base import Agent, AgentType, create_agent_prompt
+from .base import Agent, AgentType
 from ..models.llm_provider import LLMProvider
 from ..utils.logging import get_component_logger
+from ..configs.prompt_loader import load_prompt_config
 
 
 class Manager(Agent):
@@ -37,11 +38,17 @@ class Manager(Agent):
         # Two separate LLMs for specialization
         self.thought_llm = thought_llm  # Optimized for reasoning
         self.action_llm = action_llm    # Optimized for structured output
-        
+
         # State management
         self.scratchpad = ""
         self.current_task = None
         self.max_steps = config.get('max_steps', 10) if config else 10
+
+        # Prompt configuration
+        self.prompt_config = load_prompt_config("manager")
+        self.max_thought_tokens = self.prompt_config.get("max_thought_tokens", 256)
+        self.max_action_tokens = self.prompt_config.get("max_action_tokens", 128)
+        self.stop_sequences = self.prompt_config.get("stop", [])
         
         self.component_logger.info(
             "🧠 Manager initialized with thought_llm: %s",
@@ -66,12 +73,12 @@ class Manager(Agent):
         
         # Build thinking prompt
         prompt = self._build_thinking_prompt(task_context)
-        
+
         # Generate thought using thought LLM
         thought = self.thought_llm.generate(
             prompt, 
             temperature=0.8,  # Higher temperature for creative reasoning
-            max_tokens=256
+            max_tokens=self.max_thought_tokens
         )
         
         # Update scratchpad
@@ -83,7 +90,10 @@ class Manager(Agent):
             agent_name=self.agent_type.value,
             action_type="thought",
             message=thought,
-            context=task_context,
+            context={
+                'prompt': prompt,
+                'task_context': self._compact_task_context(task_context),
+            },
             step_number=self.step_count + 1,
             duration_ms=duration * 1000
         )
@@ -108,11 +118,11 @@ class Manager(Agent):
         # Generate action using action LLM
         action_text = self.action_llm.generate(
             prompt,
-            temperature=0.3,  # Lower temperature for structured output
-            max_tokens=128,
-            json_mode=False  # Start with text format
+            temperature=0.2,  # Lower temperature for structured output
+            max_tokens=self.max_action_tokens,
+            json_mode=True
         )
-        
+
         # Parse action
         action_type, argument = self._parse_action(action_text)
         
@@ -125,7 +135,12 @@ class Manager(Agent):
             agent_name=self.agent_type.value,
             action_type="action",
             message=f"{action_type}[{argument}]",
-            context={'parsed_action': action_type, 'argument': argument},
+            context={
+                'parsed_action': action_type,
+                'argument': argument,
+                'prompt': prompt,
+                'raw_response': action_text,
+            },
             step_number=self.step_count + 1,
             duration_ms=duration * 1000
         )
@@ -161,26 +176,25 @@ class Manager(Agent):
         Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
         Based on MACRec manager_prompt template for thought generation.
         """
-        context_str = json.dumps(task_context, indent=2) if task_context else "No context"
-        
-        prompt = f"""You are a Manager agent in a sequential recommendation system.
+        template = self.prompt_config.get("thinking_template", "")
 
-CURRENT SITUATION:
-{context_str}
+        user_context = self._format_user_context(task_context)
+        candidate_table = self._format_candidate_table(task_context)
+        analyst_summary = self._summarise_text(task_context.get('last_analysis'))
+        search_summary = self._summarise_text(task_context.get('last_search'))
+        reflection_notes = self._format_reflection_notes(task_context)
+        scratchpad = self.scratchpad or "No previous thoughts yet."
 
-SCRATCHPAD (previous thoughts and actions):
-{self.scratchpad}
+        filled = template.format(
+            user_context=user_context,
+            candidate_table=candidate_table,
+            analyst_summary=analyst_summary,
+            search_summary=search_summary,
+            reflection_notes=reflection_notes,
+            scratchpad=scratchpad,
+        )
 
-TASK: Analyze the current situation and think about what information you need to make a good sequential recommendation.
-
-Consider:
-1. What do we know about the user's sequential behavior?
-2. What additional information might be helpful?
-3. What should be our next step?
-
-Think step by step about the reasoning process."""
-        
-        return prompt
+        return filled
     
     def _build_action_prompt(self, task_context: Dict[str, Any]) -> str:
         """
@@ -189,39 +203,44 @@ Think step by step about the reasoning process."""
         Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
         Uses MACRec manager_prompt template with AVAILABLE ACTIONS format.
         """
-        prompt = f"""Based on your thinking, choose the most appropriate action:
+        template = self.prompt_config.get("action_template", "")
 
-AVAILABLE ACTIONS:
-- Analyse[user, user_id] - analyze user preferences and sequential patterns
-- Analyse[item, item_id] - analyze specific item characteristics
-- Search[query] - search for external information
-- Finish[result] - return final recommendation result
+        action_context = self._format_action_context(task_context)
+        scratchpad = self.scratchpad or "No previous thoughts yet."
 
-CURRENT CONTEXT:
-{json.dumps(task_context, indent=2) if task_context else "No context"}
+        filled = template.format(
+            action_context=action_context,
+            scratchpad=scratchpad,
+        )
 
-SCRATCHPAD:
-{self.scratchpad}
-
-Choose ONE action and return it in the exact format shown above.
-If you have enough information to make a recommendation, use Finish[result].
-Otherwise, choose the most useful analysis or search action."""
-        
-        return prompt
+        return filled
     
     def _parse_action(self, action_text: str) -> Tuple[str, Any]:
         """
         Parse action text into type and argument.
-        
+
         Args:
             action_text: Raw action text from LLM
-            
+
         Returns:
             Tuple of (action_type, argument)
         """
         # Clean the action text
         action_text = action_text.strip()
-        
+
+        # Try JSON parsing first
+        try:
+            action_obj = json.loads(action_text)
+            action_type = str(action_obj.get('type', '')).strip().lower().capitalize()
+            argument = action_obj.get('content')
+
+            if action_type == "Analyse" and isinstance(argument, list):
+                return action_type, [str(part) for part in argument]
+            if action_type in {"Search", "Finish"}:
+                return action_type, argument
+        except json.JSONDecodeError:
+            pass
+
         # Try to extract action using regex
         patterns = [
             r'(Analyse|Search|Finish)\[([^\]]+)\]',  # Standard format
@@ -255,6 +274,100 @@ Otherwise, choose the most useful analysis or search action."""
         )
         
         return "Finish", "Unable to parse action"
+
+    def _format_user_context(self, task_context: Dict[str, Any]) -> str:
+        """Build a readable snapshot of the user context."""
+        if not task_context:
+            return "No context provided."
+
+        user_id = task_context.get('user_id', 'unknown')
+        sequence = task_context.get('user_sequence', [])
+        ground_truth = task_context.get('ground_truth')
+        extra_context = task_context.get('context', {})
+        
+        lines = [f"user_id: {user_id}"]
+        if sequence:
+            lines.append(f"recent_sequence: {' → '.join(sequence[-10:])}")
+        if ground_truth:
+            lines.append(f"ground_truth: {ground_truth}")
+        user_profile = extra_context.get('user_profile') if isinstance(extra_context, dict) else None
+        if user_profile:
+            lines.append(f"user_profile: {json.dumps(user_profile, ensure_ascii=False)}")
+
+        return "\n".join(lines)
+
+    def _format_candidate_table(self, task_context: Dict[str, Any]) -> str:
+        """Format candidate items into a compact table representation."""
+        candidates = task_context.get('candidates') or []
+        if not candidates:
+            return "No candidates provided."
+
+        candidate_names = {}
+        context_block = task_context.get('context') or {}
+        if isinstance(context_block, dict):
+            candidate_names = context_block.get('candidate_names') or {}
+
+        lines = []
+        for idx, item in enumerate(candidates):
+            display = candidate_names.get(item, item)
+            lines.append(f"- {idx+1}. {display} ({item})")
+        return "\n".join(lines)
+
+    def _summarise_text(self, text: Any) -> str:
+        """Trim and normalise optional text snippets for prompt injection."""
+        if not text:
+            return "None yet."
+
+        if isinstance(text, (dict, list)):
+            text = json.dumps(text, ensure_ascii=False)
+
+        text = str(text).strip()
+        return text[:400] + ('…' if len(text) > 400 else '')
+
+    def _format_reflection_notes(self, task_context: Dict[str, Any]) -> str:
+        """Prepare reflection information for the thinking prompt."""
+        reflection = task_context.get('reflection') or task_context.get('reflection_notes')
+        if not reflection:
+            return "No prior reflections."
+
+        if isinstance(reflection, dict):
+            return json.dumps(reflection, ensure_ascii=False)
+
+        return str(reflection)
+
+    def _format_action_context(self, task_context: Dict[str, Any]) -> str:
+        """Compact context block for the action prompt."""
+        context = {
+            'user_id': task_context.get('user_id'),
+            'sequence_tail': task_context.get('user_sequence', [])[-5:],
+            'candidates': task_context.get('candidates'),
+            'last_analysis': task_context.get('last_analysis'),
+            'last_search': task_context.get('last_search'),
+        }
+
+        return json.dumps(context, ensure_ascii=False, indent=2)
+
+    def _compact_task_context(self, task_context: Dict[str, Any]) -> Dict[str, Any]:
+        if not task_context:
+            return {}
+
+        compact = {
+            'user_id': task_context.get('user_id'),
+            'sequence_tail': task_context.get('user_sequence', [])[-5:],
+            'candidates': task_context.get('candidates'),
+            'ground_truth': task_context.get('ground_truth'),
+        }
+
+        if task_context.get('context'):
+            compact['context_keys'] = list(task_context['context'].keys())
+
+        if task_context.get('last_analysis'):
+            compact['last_analysis'] = self._summarise_text(task_context['last_analysis'])
+
+        if task_context.get('last_search'):
+            compact['last_search'] = self._summarise_text(task_context['last_search'])
+
+        return compact
     
     def should_continue(self) -> bool:
         """Check if manager should continue processing"""
