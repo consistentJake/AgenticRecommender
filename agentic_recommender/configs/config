@@ -1,4 +1,7 @@
 {
+  "logging": {
+    "base_log_dir": "logs"
+  },
   "llm": {
     "mode": "openrouter",
     "gemini": {

@@ -11,7 +11,44 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
-BASE_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT_DIR / "configs" / "config"
+
+
+def _resolve_base_log_dir() -> Path:
+    """Resolve base log directory, optionally from configs/config."""
+    default_dir = ROOT_DIR / "logs"
+
+    try:
+        raw_config = CONFIG_PATH.read_text().strip()
+    except OSError:
+        return default_dir
+
+    if not raw_config:
+        return default_dir
+
+    try:
+        parsed = json.loads(raw_config)
+    except json.JSONDecodeError:
+        return default_dir
+
+    logging_section = None
+    if isinstance(parsed, dict):
+        candidate = parsed.get("logging")
+        logging_section = candidate if isinstance(candidate, dict) else parsed
+
+    if not logging_section:
+        return default_dir
+
+    base_log_dir = logging_section.get("base_log_dir") or logging_section.get("log_dir")
+    if not isinstance(base_log_dir, str) or not base_log_dir.strip():
+        return default_dir
+
+    path = Path(base_log_dir.strip()).expanduser()
+    return path if path.is_absolute() else (ROOT_DIR / path)
+
+
+BASE_LOG_DIR = _resolve_base_log_dir()
 RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 GENERAL_LOG_FILE = BASE_LOG_DIR / f"agentic_recommender_{RUN_TIMESTAMP}.log"
 CONSOLE_LOG_ENABLED = os.getenv("AGENTIC_CONSOLE_LOG", "1").lower() not in {"0", "false", "no"}
