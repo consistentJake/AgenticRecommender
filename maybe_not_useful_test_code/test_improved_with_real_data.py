@@ -10,7 +10,7 @@ from pathlib import Path
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from improved_agentic_system import ImprovedAgenticSystem
+from tobedeleted.tests.improved_agentic_system import ImprovedAgenticSystem
 
 
 def load_real_samples():
