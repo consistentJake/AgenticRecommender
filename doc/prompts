@@ -1,0 +1,21 @@
+## build the finetune system
+
+task1. can you read https://medium.com/@trademamba/fine-tuning-llama-3-with-qlora-on-amd-rocm-a-smooth-high-performance-workflow-1e6a6588da51
+understand how the finetune code should looks like. write one finetune code as basic. under folder of '/home/zhenkai/personal/Pr
+ojects/AgenticRecommender/agentic_recommender/finetune'
+
+do a git commit after task 1.
+
+task2. what I want to finetune is to read how thinkRec do Lora training for the recommendation task. tech report is here /home/zhenkai/personal/Projects/AgenticRecommender/doc/design/ThinkRec_Technical_Analysis.md. paper is '/home/zhenkai/personal/Projects/AgenticRecommender/doc/design/thinkRec.pdf'(you can just read the tech report only, if you still feel unclear, read the paper , focus on `3.2 Thinking Enhanced Recommendation` ).and understand how /home/zhenkai/personal/Projects/AgenticRecommender/previousWorks/ThinkRec/minigpt4/models/minigpt4rec_v3.py this code work, this code has implemnetation of training. the repo of the thinkRec is in /home/zhenkai/personal/Projects/AgenticRecommender/previousWorks/ThinkRec. write down your idea of 
+1)how the data should looks like for this finetuning mode
+2) which code from ThinkRec we can reuse
+3) propose some idea of how the code from task1 should upgrade to, or we should reuse the code thinkRec for training
+   eventually . write a doc about this. I believe you can write a detailed suggestion of how to resuse thinkRec code to help my own task.
+
+do a git commit for the new doc
+
+task3. for my own task, understand how the data is prepared by reading codes under /home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/data''/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/datasets'. use the data we have to apply into lora training.
+update the doc we created in task3. 
+do a git commit. 
+
+task 4. then start the implementation of fusing the dataset into your training.
