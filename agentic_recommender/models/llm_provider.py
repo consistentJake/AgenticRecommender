@@ -23,11 +23,10 @@ DEFAULT_GEMINI_KEY = None
 DEFAULT_OPENROUTER_KEY = None
 
 
-from ..utils.logging import get_component_logger, get_general_log_file
+from ..utils.logging import get_component_logger, get_general_log_file, get_logger
 
 
 PROVIDER_LOGGER = get_component_logger("models.llm_provider")
-LOG_FILE = get_general_log_file()
 
 DEFAULT_CONFIG = {
     "mode": "gemini",
@@ -200,6 +199,13 @@ class GeminiProvider(LLMProvider):
         """Log provider events to configured outputs."""
         PROVIDER_LOGGER.log(level, message)
 
+    def _enrich_metadata(self, metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Attach provider-specific details to logging metadata."""
+        meta = dict(metadata or {})
+        meta.setdefault("model_name", self.model_name)
+        meta.setdefault("provider_mode", "openrouter" if self.use_openrouter else "direct")
+        return meta
+
     def generate(self, prompt: str, temperature: float = 0.7, 
                 max_tokens: int = 512, json_mode: bool = False, **kwargs) -> str:
         """
@@ -215,7 +221,8 @@ class GeminiProvider(LLMProvider):
         Returns:
             Generated text
         """
-        start_time = time.time()
+        log_metadata = kwargs.pop("log_metadata", None)
+        meta = self._enrich_metadata(log_metadata)
 
         mode_label = "OpenRouter" if self.use_openrouter else "Gemini"
         self._log_event(
@@ -223,133 +230,189 @@ class GeminiProvider(LLMProvider):
         )
 
         if self.use_openrouter:
-            return self._generate_openrouter(prompt, temperature, max_tokens, json_mode, start_time, **kwargs)
+            return self._generate_openrouter(prompt, temperature, max_tokens, json_mode, meta, **kwargs)
         else:
-            return self._generate_direct(prompt, temperature, max_tokens, json_mode, start_time, **kwargs)
+            return self._generate_direct(prompt, temperature, max_tokens, json_mode, meta, **kwargs)
     
-    def _generate_openrouter(self, prompt: str, temperature: float, max_tokens: int, 
-                           json_mode: bool, start_time: float, **kwargs) -> str:
-        """Generate using OpenRouter API"""
-        try:
-            requests_module = self._requests
-            if requests_module is None:
-                raise RuntimeError("OpenRouter support not initialised; requests missing")
+    def _generate_openrouter(
+        self,
+        prompt: str,
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+        log_metadata: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> str:
+        """Generate using OpenRouter API with structured logging."""
 
-            # Prepare messages in OpenAI chat format
+        provider_label = "OpenRouter"
+        meta = dict(log_metadata or {})
+        meta.setdefault("provider", provider_label)
+        logger = get_logger()
+        request_id = logger.log_llm_request(provider_label, prompt, meta)
+
+        requests_module = self._requests
+        start_time = time.time()
+
+        if requests_module is None:
+            error_msg = "OpenRouter support not initialised; requests missing"
+            self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            logger.log_llm_response(provider_label, request_id, f"ERROR: {error_msg}", meta, duration_ms=0.0, tokens_used=0)
+            raise RuntimeError(error_msg)
+
+        try:
             messages = [{"role": "user", "content": prompt}]
-            
-            # Add JSON instruction if needed
+
             if json_mode:
                 messages[0]["content"] += "\n\nRespond only with valid JSON."
-            
-            # Prepare request payload
+
             payload = {
                 "model": self.model_name,
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "top_p": kwargs.get('top_p', 0.9),
+                "top_p": kwargs.get("top_p", 0.9),
             }
-            
-            # Add response format for JSON mode (if supported by model)
+
             if json_mode and "gpt" in self.model_name.lower():
                 payload["response_format"] = {"type": "json_object"}
-            
-            # Make API request
+
             response = requests_module.post(
                 self.base_url,
                 headers=self.headers,
                 json=payload,
-                timeout=30
+                timeout=30,
             )
-            
-            # Check for HTTP errors
+
             response.raise_for_status()
-            
-            # Parse response
             response_data = response.json()
-            
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                text = response_data['choices'][0]['message']['content']
+
+            if response_data.get("choices"):
+                text = response_data["choices"][0]["message"]["content"]
             else:
                 text = ""
-            
-            # Update metrics
+
             duration = time.time() - start_time
             self.total_calls += 1
             self.total_time += duration
-            
-            # Use actual token counts if provided
-            usage = response_data.get('usage', {})
-            if usage:
-                tokens = usage.get('total_tokens', 0)
-                if tokens > 0:
-                    self.total_tokens += tokens
-                else:
-                    # Fallback to estimation
-                    estimated_tokens = len(prompt.split()) + len(text.split())
-                    self.total_tokens += estimated_tokens
+
+            usage = response_data.get("usage", {})
+            tokens = usage.get("total_tokens", 0) if isinstance(usage, dict) else 0
+            if tokens and tokens > 0:
+                self.total_tokens += tokens
             else:
-                # Fallback to estimation
-                estimated_tokens = len(prompt.split()) + len(text.split())
-                self.total_tokens += estimated_tokens
-            
+                tokens = len(prompt.split()) + len(text.split())
+                self.total_tokens += tokens
+
+            logger.log_llm_response(
+                provider_label,
+                request_id,
+                text.strip(),
+                meta,
+                duration_ms=duration * 1000,
+                tokens_used=tokens,
+            )
+
             return text.strip()
-            
+
         except requests_module.exceptions.RequestException as e:  # type: ignore[union-attr]
+            duration = time.time() - start_time
             error_msg = f"OpenRouter API request error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            logger.log_llm_response(
+                provider_label,
+                request_id,
+                f"ERROR: {error_msg}",
+                meta,
+                duration_ms=duration * 1000,
+                tokens_used=0,
+            )
             return f"ERROR: {error_msg}"
         except Exception as e:
+            duration = time.time() - start_time
             error_msg = f"OpenRouter API error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            logger.log_llm_response(
+                provider_label,
+                request_id,
+                f"ERROR: {error_msg}",
+                meta,
+                duration_ms=duration * 1000,
+                tokens_used=0,
+            )
             return f"ERROR: {error_msg}"
-    
-    def _generate_direct(self, prompt: str, temperature: float, max_tokens: int, 
-                        json_mode: bool, start_time: float, **kwargs) -> str:
-        """Generate using direct Gemini API"""
+
+    def _generate_direct(
+        self,
+        prompt: str,
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+        log_metadata: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> str:
+        """Generate using direct Gemini API with structured logging."""
+
+        provider_label = "Gemini SDK"
+        meta = dict(log_metadata or {})
+        meta.setdefault("provider", provider_label)
+        logger = get_logger()
+        request_id = logger.log_llm_request(provider_label, prompt, meta)
+        start_time = time.time()
+
         try:
             if self._genai is None or self.model is None:
                 raise RuntimeError("Gemini SDK not initialised; google-generativeai missing")
 
-            # Configure generation
             generation_config = self._genai.types.GenerationConfig(
                 temperature=temperature,
-                top_p=kwargs.get('top_p', 0.9),
-                top_k=kwargs.get('top_k', 40),
+                top_p=kwargs.get("top_p", 0.9),
+                top_k=kwargs.get("top_k", 40),
                 max_output_tokens=max_tokens,
             )
-            
-            # Add JSON instruction if needed
-            if json_mode:
-                prompt += "\n\nRespond only with valid JSON."
-            
-            # Generate response
+
+            prompt_payload = prompt + "\n\nRespond only with valid JSON." if json_mode else prompt
+
             response = self.model.generate_content(
-                prompt,
-                generation_config=generation_config
+                prompt_payload,
+                generation_config=generation_config,
             )
-            
-            # Extract text
+
             if response.candidates:
                 text = response.candidates[0].content.parts[0].text
             else:
                 text = ""
-            
-            # Update metrics
+
             duration = time.time() - start_time
             self.total_calls += 1
             self.total_time += duration
-            
-            # Estimate tokens (rough approximation)
-            estimated_tokens = len(prompt.split()) + len(text.split())
+
+            estimated_tokens = len(prompt_payload.split()) + len(text.split())
             self.total_tokens += estimated_tokens
-            
+
+            logger.log_llm_response(
+                provider_label,
+                request_id,
+                text.strip(),
+                meta,
+                duration_ms=duration * 1000,
+                tokens_used=estimated_tokens,
+            )
+
             return text.strip()
-            
+
         except Exception as e:
+            duration = time.time() - start_time
             error_msg = f"Gemini API error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            logger.log_llm_response(
+                provider_label,
+                request_id,
+                f"ERROR: {error_msg}",
+                meta,
+                duration_ms=duration * 1000,
+                tokens_used=0,
+            )
             return f"ERROR: {error_msg}"
     
     def get_model_info(self) -> Dict[str, Any]:
@@ -383,54 +446,98 @@ class MockLLMProvider(LLMProvider):
         self.call_count = 0
         self.last_prompt = ""
     
-    def generate(self, prompt: str, temperature: float = 0.7, 
-                max_tokens: int = 512, **kwargs) -> str:
-        """Generate mock response"""
+    def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        **kwargs,
+    ) -> str:
+        """Generate mock response with structured logging."""
+
+        log_metadata = kwargs.pop("log_metadata", None)
+        meta = dict(log_metadata or {})
+        meta.setdefault("model_name", "mock-llm")
+        provider_label = "MockLLM"
+
+        logger = get_logger()
+        request_id = logger.log_llm_request(provider_label, prompt, meta)
+        start_time = time.time()
+
         self.call_count += 1
         self.last_prompt = prompt
-        
-        
+
+        response_text = self._generate_mock_response(prompt, temperature, max_tokens, **kwargs)
+
+        duration = time.time() - start_time
+        estimated_tokens = len(prompt.split()) + len(response_text.split())
+
+        logger.log_llm_response(
+            provider_label,
+            request_id,
+            response_text,
+            meta,
+            duration_ms=duration * 1000,
+            tokens_used=estimated_tokens,
+        )
+
+        return response_text
+
+    def _generate_mock_response(
+        self,
+        prompt: str,
+        temperature: float,
+        max_tokens: int,
+        **kwargs,
+    ) -> str:
+        """Internal helper implementing the mock response heuristics."""
+
         # Check for predefined responses
         for key, response in self.responses.items():
             if key.lower() in prompt.lower():
                 return response
-        
-        # Default responses based on prompt content (check most specific first)
-        if "available actions" in prompt.lower():
-            # This is the action phase - need to return proper action format
-            
-            # Check if this is a final recommendation step (has analysis in context or scratchpad)
-            if ("\"analysis\":" in prompt.lower() and ("tech accessories" in prompt.lower() or "user shows" in prompt.lower())) or \
-               ("scratchpad" in prompt.lower() and "analyse[user" in prompt.lower() and "analysis" in prompt.lower()):
-                # Final recommendation step - recommend the best item for tech sequence  
+
+        lower_prompt = prompt.lower()
+
+        if "available actions" in lower_prompt:
+            if (
+                "\"analysis\":" in lower_prompt
+                and ("tech accessories" in lower_prompt or "user shows" in lower_prompt)
+            ) or (
+                "scratchpad" in lower_prompt
+                and "analyse[user" in lower_prompt
+                and "analysis" in lower_prompt
+            ):
                 return "Finish[wireless_mouse]"
-            
+
             if "demo_user" in prompt:
-                # For demo scenarios with specific candidates  
                 if "gaming_laptop" in prompt or "mechanical_keyboard" in prompt:
-                    return "Finish[monitor]"  # Good recommendation for tech sequence
-                elif "foundation" in prompt or "concealer" in prompt or "lipstick" in prompt:
-                    return "Finish[mascara]"  # Good recommendation for beauty sequence  
-                elif "fiction_book" in prompt or "bookmark" in prompt:
-                    return "Finish[notebook]"  # Good recommendation for book sequence
-                else:
-                    return "Analyse[user, demo_user]"
-            else:
-                # Extract user_id from context if possible
-                import re
-                user_match = re.search(r'"user_id":\s*"([^"]+)"', prompt)
-                if user_match:
-                    user_id = user_match.group(1)
-                    return f"Analyse[user, {user_id}]"
-                else:
-                    return "Finish[wireless_mouse]"  # Default recommendation for tech sequence
-        elif "analyze this user's preferences" in prompt.lower() or "user information:" in prompt.lower():
-            # This is an analyst analysis request
-            return "User shows strong preference for tech accessories and complementary items. Sequential pattern: laptop → peripherals → productivity tools. Likely to want wireless_mouse next based on tech workflow completion."
-        elif "think" in prompt.lower() or "analyze" in prompt.lower():
+                    return "Finish[monitor]"
+                if "foundation" in prompt or "concealer" in prompt or "lipstick" in prompt:
+                    return "Finish[mascara]"
+                if "fiction_book" in prompt or "bookmark" in prompt:
+                    return "Finish[notebook]"
+                return "Analyse[user, demo_user]"
+
+            import re
+
+            user_match = re.search(r'"user_id":\s*"([^"]+)"', prompt)
+            if user_match:
+                user_id = user_match.group(1)
+                return f"Analyse[user, {user_id}]"
+            return "Finish[wireless_mouse]"
+
+        if "analyze this user's preferences" in lower_prompt or "user information:" in lower_prompt:
+            return (
+                "User shows strong preference for tech accessories and complementary items. "
+                "Sequential pattern: laptop → peripherals → productivity tools. Likely to want "
+                "wireless_mouse next based on tech workflow completion."
+            )
+
+        if "think" in lower_prompt or "analyze" in lower_prompt:
             return "I need to analyze the user's sequential behavior to make a good recommendation."
-        else:
-            return "Mock LLM response"
+
+        return "Mock LLM response"
     
     def get_model_info(self) -> Dict[str, Any]:
         return {

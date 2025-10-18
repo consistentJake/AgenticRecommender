@@ -65,13 +65,24 @@ class Manager(Agent):
         start_time = time.time()
         
         # Build thinking prompt
-        prompt = self._build_thinking_prompt(task_context)
+        prompt_text, prompt_template, template_vars = self._build_thinking_prompt(task_context)
+        model_info = self.thought_llm.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'thought',
+            'step_number': self.step_count + 1,
+            'template_variables': template_vars,
+            'prompt_template': prompt_template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
         
         # Generate thought using thought LLM
         thought = self.thought_llm.generate(
-            prompt, 
+            prompt_text,
             temperature=0.8,  # Higher temperature for creative reasoning
-            max_tokens=256
+            max_tokens=256,
+            log_metadata=log_metadata,
         )
         
         # Update scratchpad
@@ -102,15 +113,27 @@ class Manager(Agent):
         """
         start_time = time.time()
         
-        # Build action prompt
-        prompt = self._build_action_prompt(task_context or {})
+        build_context = task_context or {}
+        prompt_text, prompt_template, template_vars = self._build_action_prompt(build_context)
+        model_info = self.action_llm.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'action',
+            'step_number': self.step_count + 1,
+            'template_variables': template_vars,
+            'prompt_template': prompt_template,
+            'context': build_context,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
         
         # Generate action using action LLM
         action_text = self.action_llm.generate(
-            prompt,
+            prompt_text,
             temperature=0.3,  # Lower temperature for structured output
             max_tokens=128,
-            json_mode=False  # Start with text format
+            json_mode=False,  # Start with text format
+            log_metadata=log_metadata,
         )
         
         # Parse action
@@ -154,60 +177,71 @@ class Manager(Agent):
             action_type, argument = self.act(kwargs)
             return f"Thought: {thought}\nAction: {action_type}[{argument}]"
     
-    def _build_thinking_prompt(self, task_context: Dict[str, Any]) -> str:
-        """
-        Build prompt for thinking phase.
-        
-        Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
-        Based on MACRec manager_prompt template for thought generation.
-        """
-        context_str = json.dumps(task_context, indent=2) if task_context else "No context"
-        
-        prompt = f"""You are a Manager agent in a sequential recommendation system.
+    def _build_thinking_prompt(self, task_context: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
+        """Build prompt text, template, and variables for the thinking phase."""
 
-CURRENT SITUATION:
-{context_str}
+        context_str = (
+            json.dumps(task_context, indent=2, default=str)
+            if task_context
+            else "No context provided."
+        )
+        scratchpad_text = self.scratchpad.strip() or "No prior thoughts recorded."
 
-SCRATCHPAD (previous thoughts and actions):
-{self.scratchpad}
+        template = (
+            "You are a Manager agent in a sequential recommendation system.\n\n"
+            "CURRENT SITUATION:\n"
+            "{context}\n\n"
+            "SCRATCHPAD (previous thoughts and actions):\n"
+            "{scratchpad}\n\n"
+            "TASK: Analyze the current situation and think about what information you need to make a good sequential recommendation.\n\n"
+            "Consider:\n"
+            "1. What do we know about the user's sequential behavior?\n"
+            "2. What additional information might be helpful?\n"
+            "3. What should be our next step?\n\n"
+            "Think step by step about the reasoning process."
+        )
 
-TASK: Analyze the current situation and think about what information you need to make a good sequential recommendation.
+        variables = {
+            'context': context_str,
+            'scratchpad': scratchpad_text,
+        }
 
-Consider:
-1. What do we know about the user's sequential behavior?
-2. What additional information might be helpful?
-3. What should be our next step?
-
-Think step by step about the reasoning process."""
-        
-        return prompt
+        prompt_text = template.format(**variables)
+        return prompt_text, template, variables
     
-    def _build_action_prompt(self, task_context: Dict[str, Any]) -> str:
-        """
-        Build prompt for action phase.
-        
-        Template reference: previousWorks/MACRec/config/prompts/manager_prompt/analyse.json
-        Uses MACRec manager_prompt template with AVAILABLE ACTIONS format.
-        """
-        prompt = f"""Based on your thinking, choose the most appropriate action:
+    def _build_action_prompt(self, task_context: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
+        """Build prompt text, template, and variables for the action phase."""
 
-AVAILABLE ACTIONS:
-- Analyse[user, user_id] - analyze user preferences and sequential patterns
-- Analyse[item, item_id] - analyze specific item characteristics
-- Search[query] - search for external information
-- Finish[result] - return final recommendation result
+        context_str = (
+            json.dumps(task_context, indent=2, default=str)
+            if task_context
+            else "No context provided."
+        )
+        scratchpad_text = self.scratchpad.strip() or "No prior thoughts recorded."
 
-CURRENT CONTEXT:
-{json.dumps(task_context, indent=2) if task_context else "No context"}
+        template = (
+            "Based on your thinking, choose the most appropriate action:\n\n"
+            "AVAILABLE ACTIONS:\n"
+            "- Analyse[user, user_id] - analyze user preferences and sequential patterns\n"
+            "- Analyse[item, item_id] - analyze specific item characteristics\n"
+            "- Search[query] - search for external information\n"
+            "- Finish[result] - return final recommendation result\n\n"
+            "CURRENT CONTEXT:\n"
+            "{context}\n\n"
+            "SCRATCHPAD:\n"
+            "{scratchpad}\n\n"
+            "Choose ONE action and return it in the exact format shown above.\n"
+            "If you have enough information to make a recommendation, use Finish[result].\n"
+            "Otherwise, choose the most useful analysis or search action."
+        )
 
-SCRATCHPAD:
-{self.scratchpad}
+        variables = {
+            'context': context_str,
+            'scratchpad': scratchpad_text,
+        }
 
-Choose ONE action and return it in the exact format shown above.
-If you have enough information to make a recommendation, use Finish[result].
-Otherwise, choose the most useful analysis or search action."""
-        
-        return prompt
+        prompt_text = template.format(**variables)
+        return prompt_text, template, variables
     
     def _parse_action(self, action_text: str) -> Tuple[str, Any]:
         """

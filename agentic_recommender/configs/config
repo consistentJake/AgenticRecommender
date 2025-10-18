@@ -1,12 +1,33 @@
 {
   "logging": {
-    "base_log_dir": "logs"
+    "base_log_dir": "logs",
+    "console_enabled": true,
+    "file_enabled": true,
+    "console_level": "INFO",
+    "max_line_width": 110,
+    "colors": {
+      "default": "white",
+      "prompt_template": "bright_black",
+      "prompt_variable": "bright_cyan",
+      "llm_request": "bright_blue",
+      "llm_response": "bright_green",
+      "error": "bright_red"
+    },
+    "agent_colors": {
+      "Manager": "magenta",
+      "Analyst": "blue",
+      "Reflector": "yellow",
+      "Searcher": "green",
+      "Interpreter": "cyan",
+      "Orchestrator": "white",
+      "System": "white"
+    }
   },
   "llm": {
     "mode": "openrouter",
     "gemini": {
       "api_key": null,
-      "model_name": "gemini-2.0-flash-exp"
+      "model_name": "google/gemini-2.0-flash-001"
     },
     "openrouter": {
       "api_key": "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",

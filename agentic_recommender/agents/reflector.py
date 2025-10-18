@@ -106,13 +106,27 @@ Use this context to improve your next attempt."""
         start_time = time.time()
         
         # Build reflection prompt
-        prompt = self._build_reflection_prompt(input_task, scratchpad, first_attempt, ground_truth)
+        prompt_text, prompt_template, template_vars = self._build_reflection_prompt(
+            input_task, scratchpad, first_attempt, ground_truth
+        )
+
+        model_info = self.llm_provider.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'reflection',
+            'template_variables': template_vars,
+            'prompt_template': prompt_template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+            'input_task': input_task,
+        }
         
         # Generate reflection
         reflection = self.llm_provider.generate(
-            prompt, 
+            prompt_text, 
             temperature=0.7,
-            json_mode=True  # Encourage JSON output for structured feedback
+            json_mode=True,  # Encourage JSON output for structured feedback
+            log_metadata=log_metadata,
         )
         
         # Try to parse as JSON for structured feedback
@@ -169,8 +183,13 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
         self.reflections_str = combined_reflection
         return combined_reflection
     
-    def _build_reflection_prompt(self, input_task: str, scratchpad: str,
-                               first_attempt: Any = None, ground_truth: Any = None) -> str:
+    def _build_reflection_prompt(
+        self,
+        input_task: str,
+        scratchpad: str,
+        first_attempt: Any = None,
+        ground_truth: Any = None,
+    ) -> Tuple[str, str, Dict[str, Any]]:
         """
         Build prompt for LLM-based reflection.
         
@@ -178,44 +197,43 @@ Improvement: {reflection_data.get('improvement', 'No improvement suggested')}"""
         Uses MACRec reflect_prompt_json template for structured self-reflection.
         Reference: MACRec_Analysis.md:153-163
         """
-        base_prompt = """You are an advanced reasoning agent that can improve based on self reflection.
-You will be given a previous reasoning trial in which you were given a task to complete.
+        template = (
+            "You are an advanced reasoning agent that can improve based on self reflection.\n"
+            "You will be given a previous reasoning trial in which you were given a task to complete.\n\n"
+            "Firstly, you should determine if the given answer is correct.\n"
+            "Then, provide reasons for your judgement.\n"
+            "Possible reasons for failure may be:\n"
+            "- Guessing the wrong answer\n"
+            "- Using wrong format for action\n"
+            "- Insufficient analysis of user sequential patterns\n"
+            "- Ignoring important contextual information\n\n"
+            "In a few sentences, discover the potential problems in your previous reasoning trial\n"
+            "and devise a new, concise, high level plan that aims to mitigate the same failure.\n\n"
+            "Return JSON format: {{\"correctness\": boolean, \"reason\": \"detailed explanation\", \"improvement\": \"suggested improvement plan\"}}\n\n"
+            "ORIGINAL TASK:\n"
+            "{task}\n\n"
+            "PREVIOUS ATTEMPT (scratchpad):\n"
+            "{scratchpad}\n"
+            "{first_section}{ground_section}"
+        )
 
-Firstly, you should determine if the given answer is correct.
-Then, provide reasons for your judgement.
-Possible reasons for failure may be:
-- Guessing the wrong answer
-- Using wrong format for action
-- Insufficient analysis of user sequential patterns
-- Ignoring important contextual information
-
-In a few sentences, discover the potential problems in your previous reasoning trial
-and devise a new, concise, high level plan that aims to mitigate the same failure.
-
-Return JSON format: {"correctness": boolean, "reason": "detailed explanation", "improvement": "suggested improvement plan"}
-"""
-        
-        task_info = f"""
-ORIGINAL TASK:
-{input_task}
-
-PREVIOUS ATTEMPT (scratchpad):
-{scratchpad}
-"""
-        
+        first_section = ""
         if first_attempt is not None:
-            task_info += f"""
-FIRST PREDICTION:
-{first_attempt}
-"""
-        
+            first_section = f"\nFIRST PREDICTION:\n{first_attempt}\n"
+
+        ground_section = ""
         if ground_truth is not None:
-            task_info += f"""
-CORRECT ANSWER:
-{ground_truth}
-"""
-        
-        return base_prompt + task_info
+            ground_section = f"\nCORRECT ANSWER:\n{ground_truth}\n"
+
+        variables = {
+            'task': input_task or "",
+            'scratchpad': scratchpad or "",
+            'first_section': first_section,
+            'ground_section': ground_section,
+        }
+
+        prompt_text = template.format(**variables)
+        return prompt_text, template, variables
     
     def reflect_and_retry(self, task_context: Dict[str, Any], 
                          first_attempt: Any) -> Tuple[str, Dict[str, Any]]:

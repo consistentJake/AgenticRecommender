@@ -90,25 +90,51 @@ class Analyst(ToolAgent):
         user_info = self._get_user_info([user_id])
         user_history = self._get_user_history([user_id, "10"])  # Last 10 interactions
         
-        # Build analysis prompt
-        prompt = f"""Analyze this user's preferences for sequential recommendation:
+        instruction = (
+            "Return analysis in JSON format with keys: patterns, sequential_behavior, recent_trends, recommendations"
+            if json_mode
+            else "Provide detailed analysis."
+        )
 
-USER INFORMATION:
-{user_info}
+        template = (
+            "Analyze this user's preferences for sequential recommendation:\n\n"
+            "USER INFORMATION:\n"
+            "{user_info}\n\n"
+            "RECENT INTERACTION HISTORY:\n"
+            "{user_history}\n\n"
+            "TASK: Provide insights about:\n"
+            "1. User's preference patterns\n"
+            "2. Sequential behavior (what they tend to buy after what)\n"
+            "3. Recent trends or shifts in preferences\n"
+            "4. Recommendations for next item\n\n"
+            "{instruction}"
+        )
 
-RECENT INTERACTION HISTORY:
-{user_history}
+        variables = {
+            'user_info': user_info,
+            'user_history': user_history,
+            'instruction': instruction,
+        }
 
-TASK: Provide insights about:
-1. User's preference patterns
-2. Sequential behavior (what they tend to buy after what)
-3. Recent trends or shifts in preferences
-4. Recommendations for next item
+        prompt_text = template.format(**variables)
 
-{"Return analysis in JSON format with keys: patterns, sequential_behavior, recent_trends, recommendations" if json_mode else "Provide detailed analysis."}
-"""
-        
-        analysis = self.llm_provider.generate(prompt, temperature=0.7)
+        model_info = self.llm_provider.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'user_analysis',
+            'target_id': user_id,
+            'template_variables': variables,
+            'prompt_template': template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
+
+        analysis = self.llm_provider.generate(
+            prompt_text,
+            temperature=0.7,
+            json_mode=json_mode,
+            log_metadata=log_metadata,
+        )
         
         # Log the analysis
         self.logger.log_agent_action(
@@ -132,25 +158,51 @@ TASK: Provide insights about:
         item_info = self._get_item_info([item_id])
         item_history = self._get_item_history([item_id, "5"])  # Recent interactions
         
-        # Build analysis prompt
-        prompt = f"""Analyze this item for recommendation purposes:
+        instruction = (
+            "Return analysis in JSON format with keys: characteristics, typical_users, related_items, popularity"
+            if json_mode
+            else "Provide detailed analysis."
+        )
 
-ITEM INFORMATION:
-{item_info}
+        template = (
+            "Analyze this item for recommendation purposes:\n\n"
+            "ITEM INFORMATION:\n"
+            "{item_info}\n\n"
+            "INTERACTION HISTORY:\n"
+            "{item_history}\n\n"
+            "TASK: Provide insights about:\n"
+            "1. Item characteristics and features\n"
+            "2. Who typically interacts with this item\n"
+            "3. What items are commonly purchased with/after this item\n"
+            "4. Item's popularity and trends\n\n"
+            "{instruction}"
+        )
 
-INTERACTION HISTORY:
-{item_history}
+        variables = {
+            'item_info': item_info,
+            'item_history': item_history,
+            'instruction': instruction,
+        }
 
-TASK: Provide insights about:
-1. Item characteristics and features
-2. Who typically interacts with this item
-3. What items are commonly purchased with/after this item
-4. Item's popularity and trends
+        prompt_text = template.format(**variables)
 
-{"Return analysis in JSON format with keys: characteristics, typical_users, related_items, popularity" if json_mode else "Provide detailed analysis."}
-"""
-        
-        analysis = self.llm_provider.generate(prompt, temperature=0.7)
+        model_info = self.llm_provider.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'item_analysis',
+            'target_id': item_id,
+            'template_variables': variables,
+            'prompt_template': template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
+
+        analysis = self.llm_provider.generate(
+            prompt_text,
+            temperature=0.7,
+            json_mode=json_mode,
+            log_metadata=log_metadata,
+        )
         
         # Log the analysis
         self.logger.log_agent_action(
@@ -164,17 +216,45 @@ TASK: Provide insights about:
     
     def _analyze_general(self, argument: Any, json_mode: bool = False, **kwargs) -> str:
         """Handle general analysis requests"""
-        prompt = f"""You are an Analyst agent. Analyze the following:
+        request_repr = (
+            json.dumps(argument, indent=2, default=str)
+            if not isinstance(argument, str)
+            else str(argument)
+        )
+        context_repr = json.dumps(kwargs, indent=2, default=str) if kwargs else "{}"
+        instruction = "Return in JSON format." if json_mode else "Provide thorough analysis based on the request."
 
-REQUEST: {argument}
+        template = (
+            "You are an Analyst agent. Analyze the following:\n\n"
+            "REQUEST: {request}\n\n"
+            "CONTEXT: {context}\n\n"
+            "{instruction}"
+        )
 
-CONTEXT: {kwargs}
+        variables = {
+            'request': request_repr,
+            'context': context_repr,
+            'instruction': instruction,
+        }
 
-Provide thorough analysis based on the request.
-{"Return in JSON format." if json_mode else ""}
-"""
-        
-        return self.llm_provider.generate(prompt, temperature=0.7)
+        prompt_text = template.format(**variables)
+
+        model_info = self.llm_provider.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'general_analysis',
+            'template_variables': variables,
+            'prompt_template': template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
+
+        return self.llm_provider.generate(
+            prompt_text,
+            temperature=0.7,
+            json_mode=json_mode,
+            log_metadata=log_metadata,
+        )
     
     def _get_user_info(self, args: List[str]) -> str:
         """Get user profile information"""
@@ -239,21 +319,44 @@ Provide thorough analysis based on the request.
         
         sequence = args[0] if isinstance(args[0], list) else args
         
-        # Build sequence analysis prompt
-        prompt = f"""Analyze this sequence of items for patterns:
+        sequence_repr = (
+            json.dumps(sequence, indent=2, default=str)
+            if not isinstance(sequence, str)
+            else str(sequence)
+        )
 
-SEQUENCE: {sequence}
+        template = (
+            "Analyze this sequence of items for patterns:\n\n"
+            "SEQUENCE: {sequence}\n\n"
+            "Identify:\n"
+            "1. Category patterns (are items from similar categories?)\n"
+            "2. Temporal patterns (buying frequency, seasonality)\n"
+            "3. Progression patterns (starter items → advanced items)\n"
+            "4. Complementary patterns (items that go together)\n\n"
+            "Provide insights about what the user might want next."
+        )
 
-Identify:
-1. Category patterns (are items from similar categories?)
-2. Temporal patterns (buying frequency, seasonality)
-3. Progression patterns (starter items → advanced items)
-4. Complementary patterns (items that go together)
+        variables = {
+            'sequence': sequence_repr,
+        }
 
-Provide insights about what the user might want next.
-"""
-        
-        return self.llm_provider.generate(prompt, temperature=0.7)
+        prompt_text = template.format(**variables)
+
+        model_info = self.llm_provider.get_model_info()
+        log_metadata = {
+            'agent': self.agent_type.value,
+            'stage': 'sequence_analysis',
+            'template_variables': variables,
+            'prompt_template': template,
+            'model_name': model_info.get('model_name'),
+            'provider': model_info.get('provider'),
+        }
+
+        return self.llm_provider.generate(
+            prompt_text,
+            temperature=0.7,
+            log_metadata=log_metadata,
+        )
     
     def _finish_analysis(self, args: List[str]) -> str:
         """Finish analysis and return result"""
