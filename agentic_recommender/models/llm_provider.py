@@ -249,6 +249,7 @@ class GeminiProvider(LLMProvider):
         meta = dict(log_metadata or {})
         meta.setdefault("provider", provider_label)
         logger = get_logger()
+        # LLM_LOG: record outbound OpenRouter request with colour-aware prompt rendering
         request_id = logger.log_llm_request(provider_label, prompt, meta)
 
         requests_module = self._requests
@@ -304,6 +305,7 @@ class GeminiProvider(LLMProvider):
                 tokens = len(prompt.split()) + len(text.split())
                 self.total_tokens += tokens
 
+            # LLM_LOG: capture successful OpenRouter response with timing/token stats
             logger.log_llm_response(
                 provider_label,
                 request_id,
@@ -319,6 +321,7 @@ class GeminiProvider(LLMProvider):
             duration = time.time() - start_time
             error_msg = f"OpenRouter API request error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            # LLM_LOG: capture OpenRouter transport error details for analysis
             logger.log_llm_response(
                 provider_label,
                 request_id,
@@ -332,6 +335,7 @@ class GeminiProvider(LLMProvider):
             duration = time.time() - start_time
             error_msg = f"OpenRouter API error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            # LLM_LOG: capture unexpected OpenRouter error payloads
             logger.log_llm_response(
                 provider_label,
                 request_id,
@@ -357,6 +361,7 @@ class GeminiProvider(LLMProvider):
         meta = dict(log_metadata or {})
         meta.setdefault("provider", provider_label)
         logger = get_logger()
+        # LLM_LOG: record outbound Gemini SDK request with colour-aware prompt rendering
         request_id = logger.log_llm_request(provider_label, prompt, meta)
         start_time = time.time()
 
@@ -390,6 +395,7 @@ class GeminiProvider(LLMProvider):
             estimated_tokens = len(prompt_payload.split()) + len(text.split())
             self.total_tokens += estimated_tokens
 
+            # LLM_LOG: capture successful Gemini SDK response with timing/token stats
             logger.log_llm_response(
                 provider_label,
                 request_id,
@@ -405,6 +411,7 @@ class GeminiProvider(LLMProvider):
             duration = time.time() - start_time
             error_msg = f"Gemini API error: {str(e)}"
             self._log_event(f"❌ {error_msg}", level=logging.ERROR)
+            # LLM_LOG: capture Gemini SDK error responses for analysis
             logger.log_llm_response(
                 provider_label,
                 request_id,
@@ -461,6 +468,7 @@ class MockLLMProvider(LLMProvider):
         provider_label = "MockLLM"
 
         logger = get_logger()
+        # LLM_LOG: record outbound mock request to mirror production logging behaviour
         request_id = logger.log_llm_request(provider_label, prompt, meta)
         start_time = time.time()
 
@@ -472,6 +480,7 @@ class MockLLMProvider(LLMProvider):
         duration = time.time() - start_time
         estimated_tokens = len(prompt.split()) + len(response_text.split())
 
+        # LLM_LOG: capture mock response so test runs produce comparable logs
         logger.log_llm_response(
             provider_label,
             request_id,

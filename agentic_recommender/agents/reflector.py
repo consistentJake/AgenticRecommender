@@ -111,6 +111,7 @@ Use this context to improve your next attempt."""
         )
 
         model_info = self.llm_provider.get_model_info()
+        # LLM_LOG: reflection request metadata to log prompt template with colour-coded variable highlights
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'reflection',

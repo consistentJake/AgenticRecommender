@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import sys
 import textwrap
 import time
 from collections import defaultdict
@@ -90,6 +92,14 @@ DEFAULT_GENERAL_COLOURS: Dict[str, str] = {
     "llm_response": "bright_green",
     "error": "bright_red",
 }
+
+
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text for plain log storage."""
+    return ANSI_ESCAPE_PATTERN.sub("", text)
 
 
 @dataclass
@@ -394,7 +404,7 @@ class AgenticLogger:
         self.session_start = time.time()
         self.session_id = session_id or f"session_{RUN_TIMESTAMP}"
         self.json_log_path = SESSION_JSON_LOG_FILE
-        self.runtime_logger = get_component_logger("logging.session")
+        self.runtime_logger: Optional[logging.Logger] = None
 
         self.metrics: Dict[str, Any] = {
             "think_times": [],
@@ -403,6 +413,31 @@ class AgenticLogger:
             "total_tokens": 0,
             "session_start": self.session_start,
         }
+
+        if self.settings.file_enabled:
+            _ensure_component_logging()
+            base_logger = logging.getLogger("agentic_recommender")
+            file_handler: Optional[logging.FileHandler] = None
+            for handler in base_logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    file_handler = handler
+                    break
+
+            self.runtime_logger = logging.getLogger("agentic_recommender.logging.session")
+            self.runtime_logger.setLevel(getattr(logging, self.settings.console_level, logging.INFO))
+            self.runtime_logger.propagate = False
+
+            for handler in list(self.runtime_logger.handlers):
+                self.runtime_logger.removeHandler(handler)
+
+            if file_handler is not None:
+                self.runtime_logger.addHandler(file_handler)
+            else:
+                fallback_handler = logging.FileHandler(GENERAL_LOG_FILE, encoding="utf-8")
+                fallback_handler.setFormatter(
+                    logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+                )
+                self.runtime_logger.addHandler(fallback_handler)
 
     # Public API -----------------------------------------------------------
 
@@ -441,6 +476,7 @@ class AgenticLogger:
         prompt: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
+        """LLM_LOG: central hook for recording every outbound LLM request."""
         meta = dict(metadata or {})
         request_id = meta.get("request_id") or str(uuid4())
         meta.setdefault("request_id", request_id)
@@ -472,6 +508,7 @@ class AgenticLogger:
         duration_ms: Optional[float] = None,
         tokens_used: Optional[int] = None,
     ) -> None:
+        """LLM_LOG: central hook for recording every inbound LLM response."""
         meta = dict(metadata or {})
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -557,7 +594,15 @@ class AgenticLogger:
     def _emit_console(self, rendered: str) -> None:
         if not rendered:
             return
-        self.runtime_logger.info(rendered)
+
+        if self.settings.console_enabled:
+            sys.stdout.write(rendered + os.linesep)
+            sys.stdout.flush()
+
+        if self.settings.file_enabled and self.runtime_logger is not None:
+            plain_text = _strip_ansi(rendered)
+            if plain_text:
+                self.runtime_logger.info(plain_text)
 
     def _update_metrics_for_action(
         self,

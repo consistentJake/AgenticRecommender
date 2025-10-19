@@ -67,6 +67,7 @@ class Manager(Agent):
         # Build thinking prompt
         prompt_text, prompt_template, template_vars = self._build_thinking_prompt(task_context)
         model_info = self.thought_llm.get_model_info()
+        # LLM_LOG: capture metadata for thought-stage request logging with colour-coded template output
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'thought',
@@ -116,6 +117,7 @@ class Manager(Agent):
         build_context = task_context or {}
         prompt_text, prompt_template, template_vars = self._build_action_prompt(build_context)
         model_info = self.action_llm.get_model_info()
+        # LLM_LOG: capture metadata for action-stage request logging with colour-coded template output
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'action',

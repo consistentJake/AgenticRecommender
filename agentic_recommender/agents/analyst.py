@@ -119,6 +119,7 @@ class Analyst(ToolAgent):
         prompt_text = template.format(**variables)
 
         model_info = self.llm_provider.get_model_info()
+        # LLM_LOG: user-analysis request metadata ensures prompt template logging stays colour-coded and structured
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'user_analysis',
@@ -187,6 +188,7 @@ class Analyst(ToolAgent):
         prompt_text = template.format(**variables)
 
         model_info = self.llm_provider.get_model_info()
+        # LLM_LOG: item-analysis request metadata ensures prompt template logging stays colour-coded and structured
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'item_analysis',
@@ -240,6 +242,7 @@ class Analyst(ToolAgent):
         prompt_text = template.format(**variables)
 
         model_info = self.llm_provider.get_model_info()
+        # LLM_LOG: general-analysis request metadata for downstream coloured prompt logging
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'general_analysis',
@@ -343,6 +346,7 @@ class Analyst(ToolAgent):
         prompt_text = template.format(**variables)
 
         model_info = self.llm_provider.get_model_info()
+        # LLM_LOG: sequence-analysis request metadata for coloured prompt logging
         log_metadata = {
             'agent': self.agent_type.value,
             'stage': 'sequence_analysis',
