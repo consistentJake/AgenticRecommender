@@ -94,6 +94,13 @@ DEFAULT_GENERAL_COLOURS: Dict[str, str] = {
 }
 
 
+AGENT_FILE_MAP: Dict[str, str] = {
+    "manager": "manager.log",
+    "analyst": "analyst.log",
+    "reflector": "reflector.log",
+}
+
+
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 
 
@@ -163,8 +170,11 @@ SETTINGS = LoggingSettings.from_config(RAW_CONFIG)
 SETTINGS.base_log_dir.mkdir(parents=True, exist_ok=True)
 
 RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
-GENERAL_LOG_FILE = SETTINGS.base_log_dir / f"agentic_recommender_{RUN_TIMESTAMP}.log"
-SESSION_JSON_LOG_FILE = SETTINGS.base_log_dir / f"session_{RUN_TIMESTAMP}.jsonl"
+RUN_DIRECTORY = SETTINGS.base_log_dir / RUN_TIMESTAMP
+RUN_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+GENERAL_LOG_FILE = RUN_DIRECTORY / "main.log"
+SESSION_JSON_LOG_FILE = RUN_DIRECTORY / "session.jsonl"
 
 
 # ---------------------------------------------------------------------------
@@ -184,8 +194,18 @@ def _ensure_component_logging() -> None:
     base_logger.setLevel(getattr(logging, SETTINGS.console_level, logging.INFO))
     base_logger.propagate = False
 
-    if not base_logger.handlers:
-        if SETTINGS.file_enabled:
+    desired_level = getattr(logging, SETTINGS.console_level, logging.INFO)
+
+    if SETTINGS.file_enabled:
+        desired_path = str(GENERAL_LOG_FILE)
+        has_desired_file_handler = False
+        for handler in list(base_logger.handlers):
+            if isinstance(handler, logging.FileHandler):
+                if handler.baseFilename != desired_path:
+                    base_logger.removeHandler(handler)
+                else:
+                    has_desired_file_handler = True
+        if not has_desired_file_handler:
             file_handler = logging.FileHandler(GENERAL_LOG_FILE, encoding="utf-8")
             file_handler.setLevel(logging.DEBUG)
             file_handler.setFormatter(
@@ -193,9 +213,14 @@ def _ensure_component_logging() -> None:
             )
             base_logger.addHandler(file_handler)
 
-        if SETTINGS.console_enabled:
+    if SETTINGS.console_enabled:
+        has_console_handler = any(
+            isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler)
+            for handler in base_logger.handlers
+        )
+        if not has_console_handler:
             console_handler = logging.StreamHandler()
-            console_handler.setLevel(getattr(logging, SETTINGS.console_level, logging.INFO))
+            console_handler.setLevel(desired_level)
             console_handler.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
             base_logger.addHandler(console_handler)
 
@@ -405,8 +430,7 @@ class AgenticLogger:
         self.session_id = session_id or f"session_{RUN_TIMESTAMP}"
         self.json_log_path = SESSION_JSON_LOG_FILE
         self.runtime_logger: Optional[logging.Logger] = None
-        self.agent_log_dir = self.settings.base_log_dir / "agents"
-        self.agent_log_dir.mkdir(parents=True, exist_ok=True)
+        self.agent_log_dir = RUN_DIRECTORY
         self.agent_message_cache: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
         self.metrics: Dict[str, Any] = {
@@ -647,8 +671,11 @@ class AgenticLogger:
         }
         self.agent_message_cache[agent_name].append(cache_entry)
 
-        safe_name = self._normalise_agent_name(agent_name)
-        file_path = self.agent_log_dir / f"{safe_name}.log"
+        lowercase_name = agent_name.lower()
+        file_name = AGENT_FILE_MAP.get(lowercase_name)
+        if file_name is None:
+            file_name = f"{self._normalise_agent_name(agent_name)}.log"
+        file_path = self.agent_log_dir / file_name
 
         lines: List[str] = [f"{timestamp} {agent_name} {event_type.upper()}"]
 
