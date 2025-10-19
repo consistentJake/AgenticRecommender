@@ -312,16 +312,18 @@ class AgentOrchestrator:
             'iteration': iteration,
             'timestamp': time.time()
         }
-        
+
         self.conversation_history.append(comm_entry)
-        
-        # Also log through main logger
-        self.logger.log_agent_action(
-            agent_name=agent_name,
-            action_type=f"communication_{message_type}",
-            message=content[:100] + "..." if len(content) > 100 else content,
-            context={'iteration': iteration, 'session_id': self.current_session_id}
+
+        # Avoid duplicating detailed LLM logging; use component logger for high-level trace if needed
+        preview = content[:120] + "..." if len(content) > 120 else content
+        self.component_logger.info(
+            "[%s] %s%s",
+            agent_name,
+            message_type,
+            f" (iteration={iteration})" if iteration is not None else "",
         )
+        self.component_logger.debug("%s", preview)
     
     def update_agent_data(self, user_data: Dict[str, Any] = None,
                          item_data: Dict[str, Any] = None,

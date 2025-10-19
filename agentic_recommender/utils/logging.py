@@ -405,6 +405,9 @@ class AgenticLogger:
         self.session_id = session_id or f"session_{RUN_TIMESTAMP}"
         self.json_log_path = SESSION_JSON_LOG_FILE
         self.runtime_logger: Optional[logging.Logger] = None
+        self.agent_log_dir = self.settings.base_log_dir / "agents"
+        self.agent_log_dir.mkdir(parents=True, exist_ok=True)
+        self.agent_message_cache: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
         self.metrics: Dict[str, Any] = {
             "think_times": [],
@@ -497,6 +500,18 @@ class AgenticLogger:
 
         self._write_structured_entry(entry)
         self._emit_console(self.renderer.render_llm_request(entry))
+        self._record_agent_event(
+            meta.get("agent"),
+            "llm_request",
+            {
+                "request_id": request_id,
+                "provider": provider,
+                "model_name": meta.get("model_name"),
+                "stage": meta.get("stage"),
+                "prompt": prompt,
+                "template_variables": meta.get("template_variables"),
+            },
+        )
         return request_id
 
     def log_llm_response(
@@ -529,6 +544,19 @@ class AgenticLogger:
 
         self._write_structured_entry(entry)
         self._emit_console(self.renderer.render_llm_response(entry))
+        self._record_agent_event(
+            meta.get("agent"),
+            "llm_response",
+            {
+                "request_id": request_id,
+                "provider": provider,
+                "model_name": meta.get("model_name"),
+                "stage": meta.get("stage"),
+                "response": response_text,
+                "duration_ms": duration_ms,
+                "tokens_used": tokens_used,
+            },
+        )
 
         if isinstance(tokens_used, (int, float)):
             self.metrics["total_tokens"] += int(tokens_used)
@@ -603,6 +631,74 @@ class AgenticLogger:
             plain_text = _strip_ansi(rendered)
             if plain_text:
                 self.runtime_logger.info(plain_text)
+
+    @staticmethod
+    def _normalise_agent_name(agent_name: str) -> str:
+        safe = re.sub(r"[^a-z0-9]+", "_", agent_name.lower()).strip("_")
+        return safe or "agent"
+
+    def _record_agent_event(self, agent: Optional[str], event_type: str, payload: Dict[str, Any]) -> None:
+        agent_name = agent or "Unknown"
+        timestamp = datetime.utcnow().isoformat()
+        cache_entry = {
+            "timestamp": timestamp,
+            "event": event_type,
+            **payload,
+        }
+        self.agent_message_cache[agent_name].append(cache_entry)
+
+        safe_name = self._normalise_agent_name(agent_name)
+        file_path = self.agent_log_dir / f"{safe_name}.log"
+
+        lines: List[str] = [f"{timestamp} {agent_name} {event_type.upper()}"]
+
+        for key in ("request_id", "provider", "model_name", "stage"):
+            value = payload.get(key)
+            if value is not None:
+                lines.append(f"  {key}: {value}")
+
+        duration_ms = payload.get("duration_ms")
+        if isinstance(duration_ms, (int, float)):
+            lines.append(f"  duration_ms: {duration_ms:.1f}")
+
+        tokens_used = payload.get("tokens_used")
+        if isinstance(tokens_used, (int, float)):
+            lines.append(f"  tokens_used: {int(tokens_used)}")
+
+        template_vars = payload.get("template_variables")
+        if template_vars:
+            try:
+                variables_repr = json.dumps(template_vars, indent=2, default=str)
+            except TypeError:
+                variables_repr = str(template_vars)
+            lines.append("  template_variables:")
+            for line in variables_repr.splitlines():
+                lines.append(f"    {line}")
+
+        prompt_text = payload.get("prompt")
+        if prompt_text:
+            lines.append("  prompt:")
+            cleaned_prompt = _strip_ansi(str(prompt_text))
+            for line in cleaned_prompt.splitlines() or [""]:
+                lines.append(f"    {line}")
+
+        response_text = payload.get("response")
+        if response_text:
+            lines.append("  response:")
+            cleaned_response = _strip_ansi(str(response_text))
+            for line in cleaned_response.splitlines() or [""]:
+                lines.append(f"    {line}")
+
+        lines.append("")
+
+        try:
+            with file_path.open("a", encoding="utf-8") as fp:
+                fp.write("\n".join(lines))
+        except OSError:
+            pass
+
+    def get_agent_history(self, agent_name: str) -> List[Dict[str, Any]]:
+        return list(self.agent_message_cache.get(agent_name, []))
 
     def _update_metrics_for_action(
         self,

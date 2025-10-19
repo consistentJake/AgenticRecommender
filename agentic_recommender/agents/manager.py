@@ -94,8 +94,11 @@ class Manager(Agent):
         self.logger.log_agent_action(
             agent_name=self.agent_type.value,
             action_type="thought",
-            message=thought,
-            context=task_context,
+            message="Thought generated",
+            context={
+                'task_context': task_context,
+                'thought_preview': thought[:120] + ("..." if len(thought) > 120 else "")
+            },
             step_number=self.step_count + 1,
             duration_ms=duration * 1000
         )
@@ -149,7 +152,7 @@ class Manager(Agent):
         self.logger.log_agent_action(
             agent_name=self.agent_type.value,
             action_type="action",
-            message=f"{action_type}[{argument}]",
+            message=f"Action decided: {action_type}[{argument}]",
             context={'parsed_action': action_type, 'argument': argument},
             step_number=self.step_count + 1,
             duration_ms=duration * 1000
