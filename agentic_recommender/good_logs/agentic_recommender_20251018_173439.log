@@ -290,13 +290,13 @@ Response:
 Prompt:
   Based on your thinking, choose the most appropriate action:
   
-  AVAILABLE ACTIONS:
+  ## AVAILABLE ACTIONS:
   - Analyse[user, user_id] - analyze user preferences and sequential patterns
   - Analyse[item, item_id] - analyze specific item characteristics
   - Search[query] - search for external information
   - Finish[result] - return final recommendation result
   
-  CURRENT CONTEXT:
+  ## CURRENT CONTEXT:
   {
     "user_id": "demo_user",
     "user_sequence": [
@@ -329,7 +329,7 @@ Prompt:
   different categories to help the user establish preferences.\"\n}\n```"
   }
   
-  SCRATCHPAD:
+  ## SCRATCHPAD:
   Thought 1: Okay, let's analyze the current situation.
   
   1.  **User's Sequential Behavior:** The user has a clear interest in gaming peripherals. Their sequence shows
