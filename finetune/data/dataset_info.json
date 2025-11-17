@@ -1,0 +1,14 @@
+{
+  "movielens_qwen3": {
+    "file_name": "movielens_qwen3/train.json",
+    "file_name_eval": "movielens_qwen3/eval.json",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "history": "history",
+      "system": "system"
+    }
+  }
+}

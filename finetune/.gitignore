@@ -1,0 +1,5 @@
+# Ignore processed datasets and checkpoints
+data/movielens_qwen3/
+output/
+.venv/
+__pycache__/
