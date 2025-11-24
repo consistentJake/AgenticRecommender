@@ -53,24 +53,48 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_command(args: argparse.Namespace) -> List[str]:
-    cmd = [
-        sys.executable,
-        "-m",
-        "llamafactory.train",
-        "--config_file",
+    argv = [
+        "llamafactory-cli",
+        "train",
         str(args.config.resolve()),
     ]
     if args.run_name:
-        cmd += ["--run_name", args.run_name]
+        argv += ["--run_name", args.run_name]
     if args.output_dir:
-        cmd += ["--output_dir", str(args.output_dir)]
+        argv += ["--output_dir", str(args.output_dir)]
     for item in args.override:
         if "=" not in item:
             raise ValueError(f"Invalid override string: {item}")
         key, value = item.split("=", 1)
         flag = f"--{key.lstrip('-')}"
-        cmd += [flag, value]
-    return cmd
+        argv += [flag, value]
+
+    # We need to guard against torch builds lacking torch.mps.* attributes (common on CPU installs).
+    patch = """
+import sys
+import types
+import torch
+if not hasattr(torch, "mps"):
+    torch.mps = types.SimpleNamespace()
+if not hasattr(torch.mps, "device_count"):
+    torch.mps.device_count = staticmethod(lambda: 0)
+if not hasattr(torch.mps, "current_allocated_memory"):
+    torch.mps.current_allocated_memory = staticmethod(lambda: 0)
+if not hasattr(torch.mps, "recommended_max_memory"):
+    torch.mps.recommended_max_memory = staticmethod(lambda: 0)
+if not hasattr(torch, "backends"):
+    torch.backends = types.SimpleNamespace()
+if not hasattr(torch.backends, "mps"):
+    torch.backends.mps = types.SimpleNamespace()
+if not hasattr(torch.backends.mps, "is_macos_or_newer"):
+    torch.backends.mps.is_macos_or_newer = staticmethod(lambda *args, **kwargs: False)
+if not hasattr(torch.backends.mps, "is_macos13_or_newer"):
+    torch.backends.mps.is_macos13_or_newer = staticmethod(lambda: False)
+from llamafactory.cli import main as _main
+sys.argv = {argv}
+_main()
+""".strip().format(argv=repr(argv))
+    return [sys.executable, "-c", patch]
 
 
 def main() -> None:

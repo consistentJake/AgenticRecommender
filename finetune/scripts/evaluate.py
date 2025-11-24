@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
         "--base-model",
         type=str,
         required=True,
-        help="Base model id (e.g., Qwen/Qwen3-8B-Instruct).",
+        help="Base model id (e.g., Qwen/Qwen3-0.6B-Instruct).",
     )
     parser.add_argument(
         "--lora-output",

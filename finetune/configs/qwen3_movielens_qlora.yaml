@@ -1,11 +1,11 @@
-# Base LLaMA-Factory config for Qwen3-8B MovieLens LoRA (rank=16, 4-bit).
+# Base LLaMA-Factory config for Qwen3-0.6B MovieLens LoRA (rank=16, 4-bit).
 #
 # Usage:
 #   python scripts/train_llamafactory.py --config configs/qwen3_movielens_qlora.yaml
 
 stage: sft
 do_train: true
-model_name_or_path: Qwen/Qwen3-8B-Instruct
+model_name_or_path: Qwen/Qwen3-0.6B-Instruct
 template: qwen
 finetuning_type: lora
 dataset_dir: data
