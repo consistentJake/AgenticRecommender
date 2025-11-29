@@ -21,6 +21,17 @@ pip install -r requirements.txt
 
 ## 1. Prepare MovieLens
 
+The dataset will auto-download if `--source` is not provided:
+
+```
+python scripts/prepare_movielens.py \
+  --output-dir data/movielens_qwen3 \
+  --history-len 15 \
+  --rating-threshold 4.0
+```
+
+Or use a local copy if you already have it:
+
 ```
 python scripts/prepare_movielens.py \
   --source /path/to/ml-latest-small \
@@ -29,7 +40,7 @@ python scripts/prepare_movielens.py \
   --rating-threshold 4.0
 ```
 
-Optional flags: `--download` (auto fetch & unzip MovieLens), `--max-per-user`, `--seed`, `--val-ratio`, `--test-ratio`.  
+Optional flags: `--max-per-user`, `--seed`, `--val-ratio`, `--test-ratio`.  
 Artifacts:
 
 - `train.json` / `eval.json`: Alpaca format for LLaMA-Factory.

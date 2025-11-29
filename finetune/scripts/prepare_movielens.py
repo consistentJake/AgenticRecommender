@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--download",
         action="store_true",
-        help="Download ml-latest-small.zip to a temp folder automatically.",
+        help="(Deprecated: auto-downloads when --source is not provided) Download ml-latest-small.zip to a temp folder automatically.",
     )
     parser.add_argument(
         "--output-dir",
@@ -259,13 +259,14 @@ def main() -> None:
     args = parse_args()
     random.seed(args.seed)
 
-    if args.download:
-        tmp_dir = Path(tempfile.mkdtemp(prefix="movielens_"))
-        source_dir = maybe_download_movielens(tmp_dir)
-    elif args.source:
+    if args.source:
+        # Use provided source directory
         source_dir = args.source
     else:
-        raise ValueError("Provide --source path or enable --download.")
+        # Auto-download to temp directory when --source is not provided
+        print("[info] No --source provided, auto-downloading MovieLens dataset...")
+        tmp_dir = Path(tempfile.mkdtemp(prefix="movielens_"))
+        source_dir = maybe_download_movielens(tmp_dir)
 
     ratings, movie_map = load_movielens(source_dir)
     samples = build_samples(
