@@ -297,3 +297,7 @@ Each checkpoint includes:
 *Document generated: 2025-12-05*
 *Training run: gpu-run*
 *Config: qwen3_movielens_qlora.yaml*
+
+
+### packing the code
+git archive --format=zip HEAD:finetune -o finetune.zip
