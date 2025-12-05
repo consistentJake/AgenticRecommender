@@ -1,15 +1,23 @@
 #!/usr/bin/env python
-"""
-Compare base Qwen vs LoRA-finetuned adapter on a test prompt.
-"""
+"""Run inference comparing base Qwen3-0.6B vs MovieLens LoRA adapter."""
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+)
 
-BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
-ADAPTER_DIR = "./qwen2_5_0_5b_lora_simplifier"
-MAX_NEW_TOKENS = 100
+BASE_MODEL = "Qwen/Qwen3-0.6B"
+ADAPTER_DIR = "output/qwen3-movielens-qlora"
+MAX_NEW_TOKENS = 64
+TEMPERATURE = 0.7
+TOP_P = 0.9
+SYSTEM_PROMPT = (
+    "You are a movie recommendation assistant. Given a user's recent history and "
+    "a candidate movie, respond with exactly one word: Yes or No."
+)
 
 
 def get_device():
@@ -22,7 +30,7 @@ def get_device():
 
 def generate(prompt: str, model, tokenizer, device: str):
     messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
     ]
 
@@ -47,8 +55,8 @@ def generate(prompt: str, model, tokenizer, device: str):
             input_ids=input_ids,
             attention_mask=attn_mask,
             max_new_tokens=MAX_NEW_TOKENS,
-            temperature=0.7,
-            top_p=0.9,
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
             do_sample=True,
         )
 
@@ -64,10 +72,28 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
+    quantization_config = None
+    device_map = None
+    torch_dtype = None
+    if torch.cuda.is_available():
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+        device_map = "auto"
+        torch_dtype = torch.bfloat16
+
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
+        quantization_config=quantization_config,
+        device_map=device_map,
+        torch_dtype=torch_dtype,
         trust_remote_code=True,
-    ).to(device)
+    )
+    if device_map is None:
+        base_model = base_model.to(device)
 
     # Load LoRA adapter and merge into base
     peft_model = PeftModel.from_pretrained(
@@ -77,7 +103,16 @@ def main():
     )
     merged_model = peft_model.merge_and_unload()
 
-    test_prompt = "Rewrite in simpler terms: 'There is a growing consensus on the issue.'"
+    test_prompt = (
+        "User's last 15 watched movies:\n"
+        "1. The Matrix (1999) (rating ≈ 5.0)\n"
+        "2. Terminator 2: Judgment Day (1991) (rating ≈ 4.5)\n"
+        "3. Blade Runner (1982) (rating ≈ 4.0)\n"
+        "...\n\n"
+        "Candidate movie:\n"
+        "Aliens (1986)\n\n"
+        "Should we recommend this movie to the user? Answer Yes or No."
+    )
 
     print("=== Base model ===")
     print(generate(test_prompt, base_model, tokenizer, device))
