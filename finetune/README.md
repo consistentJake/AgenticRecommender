@@ -80,6 +80,17 @@ Our training configuration follows these optimized guidelines:
   ```
 - Open http://localhost:6006 to view loss curves, accuracy/F1, and eval checkpoints. Point `--logdir` to a parent folder (e.g., `output`) to compare multiple runs.
 
+## Quick sequence-length audit
+- Token-based (uses the same tokenizer as training):
+  ```bash
+  python finetune/scripts/check_seq_len.py --config finetune/configs/qwen3_movielens_qlora.yaml --max-samples 2000
+  ```
+- Char-only (no model/tokenizer download):
+  ```bash
+  python finetune/scripts/check_seq_len.py --config finetune/configs/qwen3_movielens_qlora.yaml --char-only --max-samples 2000
+  ```
+- Reports min/max/mean and percentiles (p50/p90/p95/p99/p100) for the train split using the same chat template formatting. Use this to set `cutoff_len` near your p95 length.
+
 ## Tuning for Your Hardware
 - **Low VRAM (8GB)**: Keep `per_device_train_batch_size = 1-2`, enable `gradient_checkpointing = true`
 - **Medium VRAM (16GB)**: Use `per_device_train_batch_size = 2-4`, can disable gradient checkpointing
