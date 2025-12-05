@@ -101,12 +101,28 @@ def _strip_split_suffix(name: str) -> str:
     return name
 
 
-def resolve_dataset_paths(cfg: Dict[str, Any]) -> Tuple[Path, Path]:
-    dataset_dir = Path(cfg.get("dataset_dir", "data"))
+def resolve_dataset_dir(raw_dir: Path, config_path: Path) -> Path:
+    if raw_dir.is_absolute() or raw_dir.exists():
+        return raw_dir
+    cfg_root = config_path.parent.parent  # e.g., finetune/ from finetune/configs/...
+    candidate = cfg_root / raw_dir
+    if candidate.exists():
+        return candidate
+    return raw_dir
+
+
+def resolve_dataset_paths(cfg: Dict[str, Any], config_path: Path) -> Tuple[Path, Path]:
+    dataset_dir = resolve_dataset_dir(Path(cfg.get("dataset_dir", "data")), config_path)
 
     # Explicit overrides win.
     if "train_file" in cfg and "eval_file" in cfg:
-        return Path(cfg["train_file"]), Path(cfg["eval_file"])
+        train_file = Path(cfg["train_file"])
+        eval_file = Path(cfg["eval_file"])
+        if not train_file.is_absolute():
+            train_file = dataset_dir / train_file
+        if not eval_file.is_absolute():
+            eval_file = dataset_dir / eval_file
+        return train_file, eval_file
 
     dataset_key = cfg.get("dataset", "movielens_qwen3_train")
     base_key = _strip_split_suffix(dataset_key)
@@ -238,7 +254,7 @@ def main():
     tokenizer.padding_side = "left"
 
     # Build datasets
-    train_path, eval_path = resolve_dataset_paths(cfg)
+    train_path, eval_path = resolve_dataset_paths(cfg, args.config)
     train_ds, eval_ds = build_datasets(str(train_path), str(eval_path))
     eval_ds = maybe_shrink_eval(eval_ds, cfg.get("max_eval_samples", MAX_EVAL_SAMPLES))
 
