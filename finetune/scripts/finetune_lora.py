@@ -109,7 +109,6 @@ def resolve_dataset_paths(cfg: Dict[str, Any]) -> Tuple[Path, Path]:
         return Path(cfg["train_file"]), Path(cfg["eval_file"])
 
     dataset_key = cfg.get("dataset", "movielens_qwen3_train")
-    eval_dataset_key = cfg.get("eval_dataset", "movielens_qwen3_eval")
     base_key = _strip_split_suffix(dataset_key)
 
     info_path = dataset_dir / "dataset_info.json"
@@ -136,6 +135,32 @@ def resolve_lora_targets(cfg_value: Any) -> List[str]:
     if isinstance(cfg_value, list):
         return [str(x) for x in cfg_value]
     return LORA_TARGET_MODULES
+
+
+def resolve_attention_impl(cfg: Dict[str, Any]) -> Optional[str]:
+    attn_val = cfg.get("flash_attn")
+    if attn_val is None:
+        return None
+    if isinstance(attn_val, str):
+        attn_val = attn_val.lower()
+        if attn_val == "auto":
+            return "flash_attention_2"
+        if attn_val in {"flash_attention_2", "sdpa", "eager"}:
+            return attn_val
+        if attn_val in {"false", "none", "off"}:
+            return None
+    return None
+
+
+def resolve_report_to(cfg: Dict[str, Any]) -> List[str]:
+    value = cfg.get("report_to")
+    if value is None:
+        return ["tensorboard"]
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return ["tensorboard"]
 
 
 def to_chat_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -181,6 +206,8 @@ def main():
     quantization_config = None
     device_map = None
     torch_dtype = None
+    attn_impl = resolve_attention_impl(cfg)
+    attn_kwargs = {"attn_implementation": attn_impl} if attn_impl else {}
     if torch.cuda.is_available():
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -197,6 +224,7 @@ def main():
         device_map=device_map,
         torch_dtype=torch_dtype,
         trust_remote_code=True,
+        **attn_kwargs,
     )
     if device_map is None:
         model = model.to(device)
@@ -261,7 +289,7 @@ def main():
         bf16=cfg.get("bf16", torch.cuda.is_available()),
         fp16=cfg.get("fp16", False),
         gradient_checkpointing=cfg.get("gradient_checkpointing", False),
-        report_to=["tensorboard"],
+        report_to=resolve_report_to(cfg),
     )
 
     def formatting_func(batch: Dict[str, List[Any]]) -> List[str]:
