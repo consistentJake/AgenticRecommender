@@ -3,8 +3,9 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import torch
 from datasets import Dataset
 from peft import LoraConfig
@@ -12,6 +13,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    EarlyStoppingCallback,
     TrainingArguments,
 )
 from trl import SFTTrainer
@@ -22,15 +24,17 @@ OUTPUT_DIR = "output/qwen3-movielens-qlora"
 DATA_DIR = Path("data/movielens_qwen3")
 TRAIN_PATH = DATA_DIR / "train.json"
 EVAL_PATH = DATA_DIR / "eval.json"
-MAX_SEQ_LEN = 2048
+MAX_SEQ_LEN = 1024
+MAX_EVAL_SAMPLES: Optional[int] = 1000
 
-PER_DEVICE_BATCH_SIZE = 1
+PER_DEVICE_TRAIN_BATCH_SIZE = 2
+PER_DEVICE_EVAL_BATCH_SIZE = 16
 GRADIENT_ACCUMULATION_STEPS = 8
 NUM_TRAIN_EPOCHS = 3
 LEARNING_RATE = 1.5e-4
 WARMUP_RATIO = 0.03
 LOGGING_STEPS = 10
-SAVE_EVAL_STEPS = 200
+SAVE_EVAL_STEPS = 2000
 
 LORA_RANK = 16
 LORA_ALPHA = 64
@@ -71,6 +75,12 @@ def build_datasets(train_path: str, eval_path: str):
     return train_ds, eval_ds
 
 
+def maybe_shrink_eval(eval_ds: Dataset, max_samples: Optional[int]) -> Dataset:
+    if max_samples is None:
+        return eval_ds
+    return eval_ds.select(range(min(len(eval_ds), max_samples)))
+
+
 def to_chat_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
     """Convert supervised sample to chat-style messages expected by Qwen."""
     messages: List[Dict[str, str]] = []
@@ -100,6 +110,7 @@ def main():
     device = get_device()
     print(f"Using device: {device}")
 
+    # Enable 4-bit QLoRA on CUDA; otherwise fall back to full precision.
     quantization_config = None
     device_map = None
     torch_dtype = None
@@ -133,6 +144,7 @@ def main():
 
     # Build datasets
     train_ds, eval_ds = build_datasets(TRAIN_PATH, EVAL_PATH)
+    eval_ds = maybe_shrink_eval(eval_ds, MAX_EVAL_SAMPLES)
 
     # LoRA configuration (PEFT)
     lora_config = LoraConfig(
@@ -149,8 +161,8 @@ def main():
         output_dir=OUTPUT_DIR,
         logging_dir=f"{OUTPUT_DIR}/logs",
 
-        per_device_train_batch_size=PER_DEVICE_BATCH_SIZE,
-        per_device_eval_batch_size=PER_DEVICE_BATCH_SIZE,
+        per_device_train_batch_size=PER_DEVICE_TRAIN_BATCH_SIZE,
+        per_device_eval_batch_size=PER_DEVICE_EVAL_BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
 
         num_train_epochs=NUM_TRAIN_EPOCHS,
@@ -168,10 +180,13 @@ def main():
         save_total_limit=2,
         evaluation_strategy="steps",
         eval_steps=SAVE_EVAL_STEPS,
+        predict_with_generate=True,
+        generation_max_length=MAX_SEQ_LEN,
+        remove_unused_columns=False,
 
         bf16=torch.cuda.is_available(),
         fp16=False,
-        gradient_checkpointing=True,
+        gradient_checkpointing=False,
         report_to=["tensorboard"],
     )
 
@@ -188,6 +203,47 @@ def main():
             )
         return prompts
 
+    def _normalize_label(text: str) -> Optional[int]:
+        cleaned = text.strip().lower()
+        if cleaned.startswith("yes"):
+            return 1
+        if cleaned.startswith("no"):
+            return 0
+        return None
+
+    def compute_metrics(eval_preds: Tuple[Any, Any]) -> Dict[str, float]:
+        preds, labels = eval_preds
+        if isinstance(preds, tuple):
+            preds = preds[0]
+
+        pred_texts = tokenizer.batch_decode(preds, skip_special_tokens=True)
+        label_ids = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        label_texts = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
+
+        pairs = []
+        for pred_text, label_text in zip(pred_texts, label_texts):
+            p = _normalize_label(pred_text)
+            t = _normalize_label(label_text)
+            if p is not None and t is not None:
+                pairs.append((p, t))
+
+        if not pairs:
+            return {"accuracy": 0.0, "f1": 0.0}
+
+        y_pred, y_true = zip(*pairs)
+        y_pred_arr = np.array(y_pred)
+        y_true_arr = np.array(y_true)
+
+        accuracy = float((y_pred_arr == y_true_arr).mean())
+
+        tp = float(((y_pred_arr == 1) & (y_true_arr == 1)).sum())
+        fp = float(((y_pred_arr == 1) & (y_true_arr == 0)).sum())
+        fn = float(((y_pred_arr == 0) & (y_true_arr == 1)).sum())
+        denom = (2 * tp + fp + fn)
+        f1 = float(0.0 if denom == 0 else (2 * tp) / denom)
+
+        return {"accuracy": accuracy, "f1": f1}
+
     # TRL SFTTrainer handles PEFT integration
     trainer = SFTTrainer(
         model=model,
@@ -198,6 +254,8 @@ def main():
         args=training_args,
         max_seq_length=MAX_SEQ_LEN,
         formatting_func=formatting_func,
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
     )
 
     trainer.train()
