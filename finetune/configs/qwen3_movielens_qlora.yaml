@@ -1,7 +1,15 @@
-# Base LLaMA-Factory config for Qwen3-0.6B MovieLens LoRA (rank=16, 4-bit).
+# Optimized config for Qwen3-0.6B MovieLens LoRA (rank=16, 4-bit).
+#
+# Training follows best practices:
+# - Moderate eval frequency (2000 steps) to reduce overhead
+# - Larger batch sizes for stability (train=2, eval=16)
+# - Sequence length matched to p95 data length (1024)
+# - Gradient checkpointing disabled for faster training (if VRAM allows)
+# - Metrics: accuracy, F1 score on Yes/No predictions
+# - Early stopping to prevent overfitting
 #
 # Usage:
-#   python scripts/train_llamafactory.py --config configs/qwen3_movielens_qlora.yaml
+#   python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml
 
 stage: sft
 do_train: true
@@ -12,17 +20,18 @@ finetuning_type: lora
 dataset_dir: data
 dataset: movielens_qwen3_train
 eval_dataset: movielens_qwen3_eval
-cutoff_len: 2048
+cutoff_len: 1024
 max_samples: null
+max_eval_samples: 1000
 
 output_dir: output/qwen3-movielens-qlora
 logging_steps: 10
-save_steps: 200
-eval_steps: 200
+save_steps: 2000
+eval_steps: 2000
 save_total_limit: 2
 
-per_device_train_batch_size: 1
-per_device_eval_batch_size: 1
+per_device_train_batch_size: 2
+per_device_eval_batch_size: 16
 gradient_accumulation_steps: 8
 learning_rate: 1.5e-4
 num_train_epochs: 3
@@ -40,7 +49,8 @@ lora_alpha: 64
 lora_dropout: 0.05
 use_rslora: false
 
-gradient_checkpointing: true
+gradient_checkpointing: false
+early_stopping_patience: 3
 ddp_timeout: 180000000
 flash_attn: auto
 

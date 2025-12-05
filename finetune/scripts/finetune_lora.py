@@ -84,7 +84,7 @@ def build_datasets(train_path: str, eval_path: str):
 def maybe_shrink_eval(eval_ds: Dataset, max_samples: Optional[int]) -> Dataset:
     if max_samples is None:
         return eval_ds
-        return eval_ds.select(range(min(len(eval_ds), max_samples)))
+    return eval_ds.select(range(min(len(eval_ds), max_samples)))
 
 
 def load_yaml_config(path: Path) -> Dict[str, Any]:
