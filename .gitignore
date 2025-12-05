@@ -7,12 +7,14 @@ previousWorks/
 # Claude files
 .claude/
 
-# data 
+# data
 agentic_recommender/data/inputs
 agentic_recommender/data/outputs
+finetune/data/
 
 # Python virtual environment
 venv/
+.venv/
 
 # Python cache files
 __pycache__/

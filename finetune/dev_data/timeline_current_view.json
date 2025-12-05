@@ -1,0 +1,1161 @@
+{
+  "extracted_at": "2025-11-30T01:55:39.374225+00:00",
+  "tweet_count": 59,
+  "source": "chrome-mcp-current-view",
+  "method": "Extracts tweets already loaded in Chrome (manual scroll recommended first)",
+  "detected_url": "https://x.com/home",
+  "tab_id": 55128362,
+  "tweets": [
+    {
+      "id": "1994828561874915699",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "Fully agree, this is what we are working on \n\nDemand supply algo and market makers GEX \n\nCutting off noise very easily",
+      "timestamp": "2025-11-29T17:59:25.000Z",
+      "metrics": {
+        "replies": 3,
+        "retweets": 3,
+        "likes": 16,
+        "views": 4754,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994828561874915699",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.451977+00:00"
+    },
+    {
+      "id": "1986342793736864251",
+      "username": "fabletics_men",
+      "displayName": "FABLETICS MEN",
+      "text": "Our biggest sale of the season is here - click to shop this limited time introductory offer.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 23,
+        "retweets": 23,
+        "likes": 310,
+        "views": 3168156,
+        "bookmarks": 88
+      },
+      "media": [],
+      "url": "https://x.com/fabletics_men/status/1986342793736864251",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.454714+00:00"
+    },
+    {
+      "id": "1994819680297714106",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "AI-guided shopping? \n\n$NVDA $AMD $AMZN $GOOGL",
+      "timestamp": "2025-11-29T17:24:08.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 4,
+        "views": 806,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994819680297714106",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.459139+00:00"
+    },
+    {
+      "id": "1994761419410096287",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "U.S. President Donald Trump announced that Venezuela’s airspace should be considered completely closed, warning airlines, pilots, drug traffickers, and human smugglers to stay away.\nPosting on Truth Social, he declared the airspace “CLOSED IN ITS ENTIRETY,” though only",
+      "timestamp": "2025-11-29T13:32:37.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 1,
+        "likes": 10,
+        "views": 4416,
+        "bookmarks": 1
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994761419410096287",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.470331+00:00"
+    },
+    {
+      "id": "1994699082733174845",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "Options Flow Meets Supply & Demand: The Real Signals Behind the Crypto Move",
+      "timestamp": "2025-11-29T09:24:55.000Z",
+      "metrics": {
+        "replies": 4,
+        "retweets": 6,
+        "likes": 25,
+        "views": 8642,
+        "bookmarks": 4
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994699082733174845",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.472326+00:00"
+    },
+    {
+      "id": "1994593307624985022",
+      "username": "Noahpinion",
+      "displayName": "Noah Smith [SVG Image: 🐇][SVG Image: 🇺🇸][SVG Image: 🇺🇦][SVG Image: 🇹🇼]",
+      "text": "India is really kicking ass these days. [SVG Image: 🇮🇳][SVG Image: 🇮🇳][SVG Image: 🇮🇳]",
+      "timestamp": "2025-11-29T02:24:36.000Z",
+      "metrics": {
+        "replies": 153,
+        "retweets": 505,
+        "likes": 6000,
+        "views": 355624,
+        "bookmarks": 367
+      },
+      "media": [],
+      "url": "https://x.com/Noahpinion/status/1994593307624985022",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.476445+00:00"
+    },
+    {
+      "id": "1991299230154256623",
+      "username": "caffeineai",
+      "displayName": "caffeine",
+      "text": "No dev team? No problem.\n\nCaffeine turns your ideas into launch-ready apps — just by chatting.\n\nStart for free →",
+      "timestamp": "",
+      "metrics": {
+        "replies": 0,
+        "retweets": 32,
+        "likes": 164,
+        "views": 327160,
+        "bookmarks": 23
+      },
+      "media": [
+        {
+          "type": "video",
+          "url": "",
+          "poster": "https://pbs.twimg.com/amplify_video_thumb/1983021965125529601/img/C0UU1GGnByCj7H2q.jpg"
+        }
+      ],
+      "url": "https://x.com/caffeineai/status/1991299230154256623",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.478668+00:00"
+    },
+    {
+      "id": "1994697220281471328",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Did $meta deliberately leak the $GOOG TPU story?\n\nMakes sense, but we may never know",
+      "timestamp": "2025-11-29T09:17:31.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 2,
+        "likes": 28,
+        "views": 22908,
+        "bookmarks": 4
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994697220281471328",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.481590+00:00"
+    },
+    {
+      "id": "1994689394167747053",
+      "username": "wquguru",
+      "displayName": "WquGuru[SVG Image: 🦀]",
+      "text": "That's really great, balancing practicality and open source.",
+      "timestamp": "2025-11-29T08:46:25.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 6,
+        "views": 2921,
+        "bookmarks": 7
+      },
+      "media": [],
+      "url": "https://x.com/wquguru/status/1994689394167747053",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.484878+00:00"
+    },
+    {
+      "id": "1965087485203239291",
+      "username": "XDevelopers",
+      "displayName": "Developers",
+      "text": "Calling all developers! \n\nInnovate with our real-time and historical data on the X API.\n\nGet started with Pro",
+      "timestamp": "",
+      "metrics": {
+        "replies": 171,
+        "retweets": 706,
+        "likes": 2159,
+        "views": 5499311,
+        "bookmarks": 81
+      },
+      "media": [],
+      "url": "https://x.com/XDevelopers/status/1965087485203239291",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:52.486571+00:00"
+    },
+    {
+      "id": "1994612019044257964",
+      "username": "wquguru",
+      "displayName": "WquGuru[SVG Image: 🦀]",
+      "text": "今天去看望了突发脑梗的姑奶奶，感慨良多，生老病死，人生无常亦有常\n\n忽然觉得，用人的生命周期来映射金融市场，尤其是Crypto的牛熊轮回，极其精准且残酷\n\n市场孕育期如婴儿，虽然脆弱，一点风吹草动就大哭大闹，但那是纯粹的增量，代表着无限的可能性和最旺盛的生命力",
+      "timestamp": "2025-11-29T03:38:58.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 4,
+        "views": 1358,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/wquguru/status/1994612019044257964",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:54.247587+00:00"
+    },
+    {
+      "id": "1994596390777815495",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "Funny that $GOOGL TPU was never at center of discussion when it was first made known to the public…. Now with $META deal, everyone assumes that TPU is absolutely THE game changer, despite Nvidia $NVDA statement that Blackwell is a whole generation ahead in terms of technology….",
+      "timestamp": "2025-11-29T02:36:52.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 7,
+        "views": 3284,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994596390777815495",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:54.250929+00:00"
+    },
+    {
+      "id": "1994540547118436701",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "The CEO and CFO of Ricks $RICK have resigned",
+      "timestamp": "2025-11-28T22:54:57.000Z",
+      "metrics": {
+        "replies": 2,
+        "retweets": 3,
+        "likes": 36,
+        "views": 11925,
+        "bookmarks": 4
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994540547118436701",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:56.262699+00:00"
+    },
+    {
+      "id": "1994540144414921219",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "$wmt membership and advertising streams making it more like $cost and $amzn",
+      "timestamp": "2025-11-28T22:53:21.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 14,
+        "views": 9089,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994540144414921219",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:56.266071+00:00"
+    },
+    {
+      "id": "1964052450182066197",
+      "username": "X",
+      "displayName": "X",
+      "text": "Originals are undefeated. Shop the Core Trucker Hat today.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1804,
+        "likes": 13655,
+        "views": 18685774,
+        "bookmarks": 1416
+      },
+      "media": [
+        {
+          "type": "video",
+          "url": "",
+          "poster": "https://pbs.twimg.com/amplify_video_thumb/1964052183051096064/img/UMXCFUxRnbhTey9H.jpg"
+        }
+      ],
+      "url": "https://x.com/X/status/1964052450182066197",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:56.268192+00:00"
+    },
+    {
+      "id": "1994539195319423450",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Multi year tailwinds for copper",
+      "timestamp": "2025-11-28T22:49:35.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 4,
+        "likes": 26,
+        "views": 19431,
+        "bookmarks": 9
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994539195319423450",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:54:58.898568+00:00"
+    },
+    {
+      "id": "1994509855185416436",
+      "username": "elerianm",
+      "displayName": "Mohamed A. El-Erian",
+      "text": "Today's two notable data releases:\nINDIA: GDP quarterly growth surged to an unexpected 8.2%, beating forecasts and reinforcing the country's status as the world's fastest-growing major economy. Manufacturing and domestic consumption are booming.\nGERMANY: Inflation hit a 9-month",
+      "timestamp": "2025-11-28T20:53:00.000Z",
+      "metrics": {
+        "replies": 68,
+        "retweets": 262,
+        "likes": 1625,
+        "views": 147442,
+        "bookmarks": 143
+      },
+      "media": [],
+      "url": "https://x.com/elerianm/status/1994509855185416436",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:01.164463+00:00"
+    },
+    {
+      "id": "1994538925025554900",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "After one bearish month and recovery, Yardeni calling for the roaring 20s\n\nEd Yardeni says the global economy is on track to continue the “Roaring 2020s” in 2026, driven by strong productivity, resilient consumer demand, and solid earnings growth.\n\nYardeni highlights rising GDP",
+      "timestamp": "2025-11-28T22:48:31.000Z",
+      "metrics": {
+        "replies": 2,
+        "retweets": 2,
+        "likes": 20,
+        "views": 6012,
+        "bookmarks": 7
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994538925025554900",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:01.166711+00:00"
+    },
+    {
+      "id": "1994537324634648816",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Very interesting revision upward in oil production $uso $uco $bno",
+      "timestamp": "2025-11-28T22:42:09.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 10,
+        "views": 7448,
+        "bookmarks": 1
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994537324634648816",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:01.170161+00:00"
+    },
+    {
+      "id": "1994537056660525400",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Trump doesn’t believe in drinking alcohol…",
+      "timestamp": "2025-11-28T22:41:05.000Z",
+      "metrics": {
+        "replies": 6,
+        "retweets": 1,
+        "likes": 19,
+        "views": 7961,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994537056660525400",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:03.269533+00:00"
+    },
+    {
+      "id": "1994531610075828401",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "We have repositioning in a handful of healthcare names this fall as well",
+      "timestamp": "2025-11-28T22:19:27.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 2,
+        "likes": 16,
+        "views": 8861,
+        "bookmarks": 11
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994531610075828401",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:03.272343+00:00"
+    },
+    {
+      "id": "1991059484983373970",
+      "username": "RaananTz",
+      "displayName": "Raanan Tzory",
+      "text": "Been vibe-coding something small:\n\n- Studied 2,000+ tech brand logos\n- Turned patterns into ready-to-use logos\n- All human-designed\n- $59 for a full brand kit\n\nStarted as a weekend project.\nNow hundreds of founders are using it to launch.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 2,
+        "retweets": 1,
+        "likes": 21,
+        "views": 68588,
+        "bookmarks": 22
+      },
+      "media": [],
+      "url": "https://x.com/RaananTz/status/1991059484983373970",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:06.674042+00:00"
+    },
+    {
+      "id": "1994521756779123136",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "$meta ai for business",
+      "timestamp": "2025-11-28T21:40:17.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 6,
+        "likes": 41,
+        "views": 24456,
+        "bookmarks": 28
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994521756779123136",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:09.664953+00:00"
+    },
+    {
+      "id": "1994518554822283664",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "Tough month for chips & AI $NVDA $AMD $MSFT $META $ORCL $PLTR\n\nbut hell of a month for $GOOGL",
+      "timestamp": "2025-11-28T21:27:34.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 0,
+        "likes": 9,
+        "views": 2015,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994518554822283664",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:09.667279+00:00"
+    },
+    {
+      "id": "1994505803689033857",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Gold $gld, Silver $silver, and natural gas $ung at local highs",
+      "timestamp": "2025-11-28T20:36:54.000Z",
+      "metrics": {
+        "replies": 4,
+        "retweets": 2,
+        "likes": 35,
+        "views": 4894,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994505803689033857",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:11.338648+00:00"
+    },
+    {
+      "id": "1994379410359845034",
+      "username": "narendramodi",
+      "displayName": "Narendra Modi",
+      "text": "The 8.2% GDP growth in Q2 of 2025-26 is very encouraging. It reflects the impact of our pro-growth policies and reforms. It also reflects the hard work and enterprise of our people. Our government will continue to advance reforms and strengthen Ease of Living for every citizen.",
+      "timestamp": "2025-11-28T12:14:39.000Z",
+      "metrics": {
+        "replies": 3128,
+        "retweets": 13784,
+        "likes": 83135,
+        "views": 10218705,
+        "bookmarks": 1538
+      },
+      "media": [],
+      "url": "https://x.com/narendramodi/status/1994379410359845034",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:11.340384+00:00"
+    },
+    {
+      "id": "1992419329661403647",
+      "username": "Starlink",
+      "displayName": "Starlink",
+      "text": "Starlink Mini offers fast, reliable internet on the go—great for traveling, camping, exploring, boating, RVing, and more.\n\nStay connected without dead zones or slow speeds.\n\nOrder online in under 2 minutes.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 161,
+        "retweets": 416,
+        "likes": 3097,
+        "views": 17820841,
+        "bookmarks": 366
+      },
+      "media": [],
+      "url": "https://x.com/Starlink/status/1992419329661403647",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:14.028050+00:00"
+    },
+    {
+      "id": "1994452287654146378",
+      "username": "Beth_Kindig",
+      "displayName": "Beth Kindig",
+      "text": "If 2025 was the year for scale-up architecture with Nvidia’s $NVDA Blackwell racks, then 2026 will be the year that AI energy makes its importance known.   \n\nJoin today with one of our Black Friday deals to find out what we’re watching in the AI energy market. [SVG Image: ⬇️]",
+      "timestamp": "2025-11-28T17:04:15.000Z",
+      "metrics": {
+        "replies": 30,
+        "retweets": 24,
+        "likes": 264,
+        "views": 51688,
+        "bookmarks": 49
+      },
+      "media": [],
+      "url": "https://x.com/Beth_Kindig/status/1994452287654146378",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:14.030086+00:00"
+    },
+    {
+      "id": "1994501429126693047",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Powell speaks Monday night",
+      "timestamp": "2025-11-28T20:19:31.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 5,
+        "likes": 21,
+        "views": 8965,
+        "bookmarks": 3
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994501429126693047",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:16.994477+00:00"
+    },
+    {
+      "id": "1994496755476697477",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$NVDA has been ridiculed lately…. Wouldn’t be surprised for another 50-60% year of growth….",
+      "timestamp": "2025-11-28T20:00:57.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 8,
+        "views": 3521,
+        "bookmarks": 1
+      },
+      "media": [
+        {
+          "type": "video",
+          "url": "",
+          "poster": "https://pbs.twimg.com/amplify_video_thumb/1994475988726497280/img/pKEBc-cwrrch527I.jpg"
+        }
+      ],
+      "url": "https://x.com/MentoviaX/status/1994496755476697477",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:16.999773+00:00"
+    },
+    {
+      "id": "1994480828727144517",
+      "username": "tbpn",
+      "displayName": "TBPN",
+      "text": "[SVG Image: 🟢] Black Friday Gigastream with Shopify",
+      "timestamp": "2025-11-28T18:57:39.000Z",
+      "metrics": {
+        "replies": 3,
+        "retweets": 15,
+        "likes": 70,
+        "views": 166119,
+        "bookmarks": 9
+      },
+      "media": [],
+      "url": "https://x.com/tbpn/status/1994480828727144517",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:19.087195+00:00"
+    },
+    {
+      "id": "1994466493896044625",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$SPY gap filled…..",
+      "timestamp": "2025-11-28T18:00:42.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 6,
+        "views": 2643,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994466493896044625",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:22.932929+00:00"
+    },
+    {
+      "id": "1994463593769599094",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "2023 was year of $META\n2024 was year of $NVDA\n2025 has been year of $GOOGL\n \n2026 could be year of $TSLA",
+      "timestamp": "2025-11-28T17:49:10.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 0,
+        "likes": 19,
+        "views": 1928,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994463593769599094",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:22.934703+00:00"
+    },
+    {
+      "id": "1994501535334555879",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "BESSENT: U.S. TO CUT BENEFITS FOR ILLEGAL ALIENS\n\nTreasury Secretary Scott Bessent said the Trump administration is moving to block federal benefits and key tax credits for undocumented immigrants, keeping them only for U.S. citizens. The announcement came after a shooting near",
+      "timestamp": "2025-11-28T20:19:56.000Z",
+      "metrics": {
+        "replies": 2,
+        "retweets": 2,
+        "likes": 35,
+        "views": 8506,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994501535334555879",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:22.936574+00:00"
+    },
+    {
+      "id": "1994457462057980264",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "They are about to go all in AI and you are bearish",
+      "timestamp": "2025-11-28T17:24:48.000Z",
+      "metrics": {
+        "replies": 9,
+        "retweets": 5,
+        "likes": 71,
+        "views": 9589,
+        "bookmarks": 3
+      },
+      "media": [
+        {
+          "type": "video",
+          "url": "",
+          "poster": "https://pbs.twimg.com/media/G62bo84WIAIB3rj.jpg"
+        }
+      ],
+      "url": "https://x.com/AlessioTMAD/status/1994457462057980264",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:24.599165+00:00"
+    },
+    {
+      "id": "1994434766943260692",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$NVDA bulls waiting for import restriction updates.... maybe news out this weekend..... let's see.....",
+      "timestamp": "2025-11-28T15:54:37.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 8,
+        "views": 4627,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994434766943260692",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:24.601735+00:00"
+    },
+    {
+      "id": "1994434581542351221",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$SPY gap fill 683.4 incoming....",
+      "timestamp": "2025-11-28T15:53:53.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 1,
+        "likes": 9,
+        "views": 4617,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994434581542351221",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:27.885441+00:00"
+    },
+    {
+      "id": "1994424504370581726",
+      "username": "ilyasut",
+      "displayName": "Ilya Sutskever",
+      "text": "One point I made that didn’t come across:\n- Scaling the current thing will keep leading to improvements.  In particular, it won’t stall.\n- But something important will continue to be missing.",
+      "timestamp": "2025-11-28T15:13:51.000Z",
+      "metrics": {
+        "replies": 487,
+        "retweets": 866,
+        "likes": 8356,
+        "views": 1600023,
+        "bookmarks": 1629
+      },
+      "media": [],
+      "url": "https://x.com/ilyasut/status/1994424504370581726",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:30.385998+00:00"
+    },
+    {
+      "id": "1973863668959096848",
+      "username": "TMobile",
+      "displayName": "T-Mobile",
+      "text": "$0 down and FREE phones, like the motorola edge? It’s giving zero stress.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 177,
+        "retweets": 348,
+        "likes": 1807,
+        "views": 9540168,
+        "bookmarks": 226
+      },
+      "media": [],
+      "url": "https://x.com/TMobile/status/1973863668959096848",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:30.387667+00:00"
+    },
+    {
+      "id": "1994429873700442380",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "Scanner update in discord \n\nCOIN +5% CRCL +10% MSTR +6% \n\nORCL down 1% [SVG Image: 🤣]",
+      "timestamp": "2025-11-28T15:35:11.000Z",
+      "metrics": {
+        "replies": 5,
+        "retweets": 2,
+        "likes": 27,
+        "views": 4165,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994429873700442380",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:32.700073+00:00"
+    },
+    {
+      "id": "1994428937225527529",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "Someone sending a note to Michael Burry..... \n\n$SPY $QQQ",
+      "timestamp": "2025-11-28T15:31:27.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 5,
+        "views": 2991,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994428937225527529",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:32.702742+00:00"
+    },
+    {
+      "id": "1994428614155145589",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$BTC Bitcoin near major resistance levels",
+      "timestamp": "2025-11-28T15:30:10.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 0,
+        "likes": 7,
+        "views": 1812,
+        "bookmarks": 1
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994428614155145589",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:35.338371+00:00"
+    },
+    {
+      "id": "1994428534786273454",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "$NVDA looking like most likely it's gonna leave a huge bearish engulfing candle on monthly chart as we move into December.....",
+      "timestamp": "2025-11-28T15:29:52.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 11,
+        "views": 7036,
+        "bookmarks": 1
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994428534786273454",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:35.339941+00:00"
+    },
+    {
+      "id": "1994168226733809922",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "Yesterday closing on our scanner",
+      "timestamp": "2025-11-27T22:15:29.000Z",
+      "metrics": {
+        "replies": 7,
+        "retweets": 2,
+        "likes": 62,
+        "views": 15103,
+        "bookmarks": 3
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994168226733809922",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:37.475988+00:00"
+    },
+    {
+      "id": "1994427224418562071",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "[SVG Image: 🚀]",
+      "timestamp": "2025-11-28T15:24:39.000Z",
+      "metrics": {
+        "replies": 2,
+        "retweets": 0,
+        "likes": 7,
+        "views": 1981,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994427224418562071",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:37.477990+00:00"
+    },
+    {
+      "id": "1994414056514425008",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "$SLV silver is ripping \n\n+5% since our post, C47 ITM \n\nCommodities are all about options \n\nhttps://tmad.net/p/commodities-report?utm_source=publication-search…",
+      "timestamp": "2025-11-28T14:32:20.000Z",
+      "metrics": {
+        "replies": 5,
+        "retweets": 2,
+        "likes": 27,
+        "views": 3987,
+        "bookmarks": 3
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994414056514425008",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:37.479881+00:00"
+    },
+    {
+      "id": "1994056899461849578",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Bank holdings of treasuries would skyrocket, crowding out business lending…\n\nBut it would help the USA finance never ending deficit spending…",
+      "timestamp": "2025-11-27T14:53:07.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 2,
+        "likes": 25,
+        "views": 11828,
+        "bookmarks": 4
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994056899461849578",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.348504+00:00"
+    },
+    {
+      "id": "1994056493830648148",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "On one-month time frame, $GOOGL absolutely shines in the most incredible way…. \n\n$NVDA $MSFT $AMD $META all suffered badly…. \n\n$TSLA actually fairly ok given its always volatile nature….",
+      "timestamp": "2025-11-27T14:51:30.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 1,
+        "likes": 10,
+        "views": 2171,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994056493830648148",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.350686+00:00"
+    },
+    {
+      "id": "1994054958472122613",
+      "username": "MentoviaX",
+      "displayName": "MentoviaX",
+      "text": "Thankful for the two incredible chips leaders whose vision, execution, and advocation for AI have sure advanced the entire humanity! \n\n$NVDA $AMD",
+      "timestamp": "2025-11-27T14:45:24.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 10,
+        "views": 1832,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/MentoviaX/status/1994054958472122613",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.352615+00:00"
+    },
+    {
+      "id": "1994050210784333945",
+      "username": "ProfitFry",
+      "displayName": "pete",
+      "text": "Jensen needs China",
+      "timestamp": "2025-11-27T14:26:32.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 1,
+        "likes": 6,
+        "views": 4911,
+        "bookmarks": 1
+      },
+      "media": [],
+      "url": "https://x.com/ProfitFry/status/1994050210784333945",
+      "isRetweet": true,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.355308+00:00"
+    },
+    {
+      "id": "1994035276402839585",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Happy Thanksgiving and blessings for all from Istanbul",
+      "timestamp": "2025-11-27T13:27:11.000Z",
+      "metrics": {
+        "replies": 3,
+        "retweets": 3,
+        "likes": 73,
+        "views": 8117,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994035276402839585",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.357282+00:00"
+    },
+    {
+      "id": "1994044089772462244",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "",
+      "timestamp": "2025-11-27T14:02:13.000Z",
+      "metrics": {
+        "replies": 1,
+        "retweets": 0,
+        "likes": 13,
+        "views": 3910,
+        "bookmarks": 0
+      },
+      "media": [
+        {
+          "type": "video",
+          "url": "",
+          "poster": "https://pbs.twimg.com/amplify_video_thumb/1994043872792465408/img/zGQchEF7YP-E2KHX.jpg"
+        }
+      ],
+      "url": "https://x.com/SpecialSitsNews/status/1994044089772462244",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.359791+00:00"
+    },
+    {
+      "id": "1994047901581103433",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "",
+      "timestamp": "2025-11-27T14:17:22.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 16,
+        "views": 3106,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994047901581103433",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.362162+00:00"
+    },
+    {
+      "id": "1994047481307365755",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "$ETHZ could be pressured into reversing this egregious comp plan awarded after dismal performance and struck at a 40pct discount to nav right after a reverse split. The plan should have been 80pct smaller.\n\nThey will also be pressured into a share buyback",
+      "timestamp": "2025-11-27T14:15:41.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 5,
+        "likes": 26,
+        "views": 7983,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1994047481307365755",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.364772+00:00"
+    },
+    {
+      "id": "1994041980339540213",
+      "username": "wquguru",
+      "displayName": "WquGuru[SVG Image: 🦀]",
+      "text": "Holy shit!!! I was just messing around with this \"AI Decision Committee,\" casually throwing out a super super super super super stupid question:\n\n\"I grew up watching *Nezha of the Legends*, *Journey to the West* cartoon, and *My Fair Princess*. Guess how old I am?\"\n\nAnd these AIs",
+      "timestamp": "2025-11-27T13:53:50.000Z",
+      "metrics": {
+        "replies": 14,
+        "retweets": 68,
+        "likes": 427,
+        "views": 151670,
+        "bookmarks": 464
+      },
+      "media": [],
+      "url": "https://x.com/wquguru/status/1994041980339540213",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.367565+00:00"
+    },
+    {
+      "id": "1994042262746218507",
+      "username": "wquguru",
+      "displayName": "WquGuru[SVG Image: 🦀]",
+      "text": "Give the \"holy sh*t\" style a try—though it's genuinely mind-blowing, right up there with those street fortune-tellers [SVG Image: 🤣]",
+      "timestamp": "2025-11-27T13:54:57.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 0,
+        "likes": 3,
+        "views": 4080,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/wquguru/status/1994042262746218507",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.369276+00:00"
+    },
+    {
+      "id": "1973700583048814855",
+      "username": "AnkerOfficial",
+      "displayName": "Anker",
+      "text": "The World's First 25W Wireless Charger with Active Cooling System and Built‑In Display.",
+      "timestamp": "",
+      "metrics": {
+        "replies": 5,
+        "retweets": 2,
+        "likes": 61,
+        "views": 250980,
+        "bookmarks": 17
+      },
+      "media": [],
+      "url": "https://x.com/AnkerOfficial/status/1973700583048814855",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.370711+00:00"
+    },
+    {
+      "id": "1994033013848514721",
+      "username": "AlessioTMAD",
+      "displayName": "Alessio",
+      "text": "It has been funny watching everyone turning bearish and then market rallying back at the highs",
+      "timestamp": "2025-11-27T13:18:12.000Z",
+      "metrics": {
+        "replies": 14,
+        "retweets": 1,
+        "likes": 91,
+        "views": 8212,
+        "bookmarks": 2
+      },
+      "media": [],
+      "url": "https://x.com/AlessioTMAD/status/1994033013848514721",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.371832+00:00"
+    },
+    {
+      "id": "1993994628836532335",
+      "username": "SpecialSitsNews",
+      "displayName": "Special Situations [SVG Image: 🌐] Research Newsletter (Jay)",
+      "text": "Alibaba $baba, ByteDance Train AI Models Overseas to Access Nvidia $nvda Chips Despite U.S. Curbs\n\nVia @Sino_Market",
+      "timestamp": "2025-11-27T10:45:40.000Z",
+      "metrics": {
+        "replies": 0,
+        "retweets": 2,
+        "likes": 18,
+        "views": 10643,
+        "bookmarks": 0
+      },
+      "media": [],
+      "url": "https://x.com/SpecialSitsNews/status/1993994628836532335",
+      "isRetweet": false,
+      "source": "chrome-mcp-html-parser",
+      "capturedAt": "2025-11-30T01:55:39.373643+00:00"
+    }
+  ]
+}

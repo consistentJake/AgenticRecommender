@@ -9,3 +9,4 @@ tqdm>=4.66.0
 transformers>=4.39.0
 peft>=0.10.0
 scikit-learn>=1.4.0
+tensorboard>=2.20.0

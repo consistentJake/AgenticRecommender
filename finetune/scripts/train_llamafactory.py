@@ -7,6 +7,8 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
+import yaml
 from pathlib import Path
 from typing import List
 
@@ -52,22 +54,43 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_command(args: argparse.Namespace) -> List[str]:
-    argv = [
-        "llamafactory-cli",
-        "train",
-        str(args.config.resolve()),
-    ]
+def build_command(args: argparse.Namespace) -> tuple[List[str], Path]:
+    # Load the original config
+    with open(args.config, "r") as f:
+        config = yaml.safe_load(f)
+
+    # Merge in run_name and output_dir if provided
     if args.run_name:
-        argv += ["--run_name", args.run_name]
+        config["run_name"] = args.run_name
     if args.output_dir:
-        argv += ["--output_dir", str(args.output_dir)]
+        config["output_dir"] = str(args.output_dir)
+
+    # Merge in any additional overrides
     for item in args.override:
         if "=" not in item:
             raise ValueError(f"Invalid override string: {item}")
         key, value = item.split("=", 1)
-        flag = f"--{key.lstrip('-')}"
-        argv += [flag, value]
+        # Try to parse value as int/float/bool, otherwise keep as string
+        try:
+            if value.lower() in ("true", "false"):
+                config[key] = value.lower() == "true"
+            elif "." in value:
+                config[key] = float(value)
+            else:
+                config[key] = int(value)
+        except ValueError:
+            config[key] = value
+
+    # Write merged config to a temporary file
+    temp_config = Path(tempfile.mktemp(suffix=".yaml", prefix="llamafactory_"))
+    with open(temp_config, "w") as f:
+        yaml.dump(config, f)
+
+    argv = [
+        "llamafactory-cli",
+        "train",
+        str(temp_config),
+    ]
 
     # We need to guard against torch builds lacking torch.mps.* attributes (common on CPU installs).
     patch = """
@@ -94,12 +117,12 @@ from llamafactory.cli import main as _main
 sys.argv = {argv}
 _main()
 """.strip().format(argv=repr(argv))
-    return [sys.executable, "-c", patch]
+    return [sys.executable, "-c", patch], temp_config
 
 
 def main() -> None:
     args = parse_args()
-    cmd = build_command(args)
+    cmd, temp_config = build_command(args)
     env = os.environ.copy()
     if args.device == "cpu":
         env["CUDA_VISIBLE_DEVICES"] = ""
@@ -110,8 +133,15 @@ def main() -> None:
             pass
     print(f"[llamafactory] {' '.join(shlex.quote(part) for part in cmd)}")
     if args.dry_run:
+        print(f"[llamafactory] Temporary config: {temp_config}")
+        temp_config.unlink()
         return
-    subprocess.run(cmd, check=True, env=env)
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    finally:
+        # Clean up temporary config file
+        if temp_config.exists():
+            temp_config.unlink()
 
 
 if __name__ == "__main__":
