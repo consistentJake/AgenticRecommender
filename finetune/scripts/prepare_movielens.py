@@ -95,6 +95,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional cap on examples per user (after history warmup).",
     )
     parser.add_argument(
+        "--max-eval",
+        type=int,
+        default=None,
+        help="Optional cap on total eval records after splitting (uses shuffled order).",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=13,
@@ -308,6 +314,10 @@ def main() -> None:
             "Some splits are empty. Adjust val/test ratios or history requirements."
         )
 
+    if args.max_eval and len(val_records) > args.max_eval:
+        # Shuffle already applied to samples; slicing keeps determinism under the same seed.
+        val_records = val_records[: args.max_eval]
+
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(output_dir / "train.json", train_records)
@@ -319,6 +329,7 @@ def main() -> None:
         "rating_threshold": args.rating_threshold,
         "val_ratio": args.val_ratio,
         "test_ratio": args.test_ratio,
+        "max_eval": args.max_eval,
         "num_train": len(train_records),
         "num_eval": len(val_records),
         "num_test": len(test_rows),

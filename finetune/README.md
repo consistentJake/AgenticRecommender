@@ -3,8 +3,44 @@
 This directory contains scripts and configs for LoRA (QLoRA on CUDA) finetuning of `Qwen/Qwen3-0.6B` on the MovieLens-style binary recommendation task.
 
 ## Prerequisites
-- Install deps: `pip install -r finetune/requirements_llamafactory.txt` (or ensure `transformers`, `trl`, `peft`, `bitsandbytes`, `datasets`, `tensorboard` are available).
-- Data: `finetune/data/movielens_qwen3/train.json` and `eval.json` (paths are resolved via `dataset_info.json` or the YAML config).
+
+### Basic Installation
+Install core dependencies:
+```bash
+pip install -r finetune/requirements_sft.txt
+```
+
+This includes: `transformers`, `trl`, `peft`, `bitsandbytes`, `datasets`, `tensorboard`, `accelerate`, and other required packages.
+
+### Flash Attention 2 (Recommended for Speed)
+
+Flash Attention 2 provides **2-4x faster training** with lower memory usage. The config is set to `flash_attn: auto` by default.
+
+**Requirements:**
+- NVIDIA GPU with compute capability 8.0+ (Ampere, Ada, Hopper: A100, RTX 3090/4090, H100, etc.)
+- CUDA 11.6 or higher
+- PyTorch with CUDA support
+
+**Installation:**
+```bash
+# Option 1: Install from pre-built wheels (fastest, recommended)
+pip install flash-attn --no-build-isolation
+
+# Option 2: If pre-built wheels fail, install build dependencies first
+pip install packaging ninja
+pip install flash-attn --no-build-isolation
+```
+
+**Verify installation:**
+```python
+python -c "import flash_attn; print(flash_attn.__version__)"
+```
+
+**Fallback:** If Flash Attention fails to install or your GPU doesn't support it, the training will automatically fall back to PyTorch's native SDPA (Scaled Dot Product Attention), which is still efficient on modern GPUs.
+
+### Data
+- Ensure `finetune/data/movielens_qwen3/train.json` and `eval.json` exist
+- Paths are resolved via `dataset_info.json` or the YAML config
 
 ## Config
 - Main config: `finetune/configs/qwen3_movielens_qlora.yaml`.
@@ -57,6 +93,12 @@ Our training configuration follows these optimized guidelines:
 - **Alpha**: `lora_alpha = 64` (4x rank for stable training)
 - **Dropout**: `lora_dropout = 0.05` (light regularization)
 - **Target modules**: All linear layers (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`)
+
+### 7. Flash Attention Configuration
+- **Setting**: `flash_attn: auto` enables Flash Attention 2 automatically when available
+- **Performance**: 2-4x faster training with 30-50% lower memory usage
+- **Automatic fallback**: If Flash Attention 2 is not installed or GPU doesn't support it, falls back to PyTorch SDPA
+- **Manual control**: Set to `flash_attention_2`, `sdpa`, `eager`, or `false` to override auto-detection
 
 ## Training
 - Run:
