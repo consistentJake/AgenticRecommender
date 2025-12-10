@@ -42,11 +42,12 @@ adam_epsilon: 1.0e-8
 max_grad_norm: 1.0
 
 # ==== LORA ====
-lora_target: all
+lora_target: fn
 lora_rank: 16
 lora_alpha: 64
 lora_dropout: 0.05
 use_rslora: false
+use_qlora: true
 
 # ==== MEMORY / STABILITY ====
 gradient_checkpointing: true
