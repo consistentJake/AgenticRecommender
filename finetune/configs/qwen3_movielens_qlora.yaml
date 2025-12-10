@@ -45,11 +45,12 @@ adam_beta2: 0.999
 adam_epsilon: 1.0e-8
 max_grad_norm: 1.0
 
-lora_target: all
+lora_target: fn
 lora_rank: 16
 lora_alpha: 64
 lora_dropout: 0.05
 use_rslora: false
+use_qlora: true
 
 gradient_checkpointing: false
 early_stopping_patience: 3

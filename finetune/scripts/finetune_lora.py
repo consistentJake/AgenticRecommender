@@ -50,6 +50,7 @@ SAVE_EVAL_STEPS = 2000
 LORA_RANK = 16
 LORA_ALPHA = 64
 LORA_DROPOUT = 0.05
+FN_LORA_TARGET_MODULES = ["gate_proj", "up_proj", "down_proj"]
 LORA_TARGET_MODULES = [
     "q_proj",
     "k_proj",
@@ -151,6 +152,8 @@ def resolve_dataset_paths(cfg: Dict[str, Any], config_path: Path) -> Tuple[Path,
 def resolve_lora_targets(cfg_value: Any) -> List[str]:
     if cfg_value is None or cfg_value == "all":
         return LORA_TARGET_MODULES
+    if isinstance(cfg_value, str) and cfg_value.lower() == "fn":
+        return FN_LORA_TARGET_MODULES
     if isinstance(cfg_value, str):
         return [part.strip() for part in cfg_value.split(",") if part.strip()]
     if isinstance(cfg_value, list):
@@ -584,6 +587,7 @@ def main():
     print(f"  flash_attn: {cfg.get('flash_attn', 'auto')}")
     print(f"  bf16: {cfg.get('bf16', torch.cuda.is_available())}")
     print(f"  fp16: {cfg.get('fp16', False)}")
+    print(f"  use_qlora: {cfg.get('use_qlora', torch.cuda.is_available())}")
     print()
 
     # Dataset configuration
@@ -647,13 +651,13 @@ def main():
     print("=" * 80)
     print()
 
-    # Enable 4-bit QLoRA on CUDA; otherwise fall back to full precision.
+    # Enable 4-bit QLoRA on CUDA when requested; otherwise fall back to full precision.
     quantization_config = None
     device_map = None
     torch_dtype = None
     attn_impl = resolve_attention_impl(cfg)
     attn_kwargs = {"attn_implementation": attn_impl} if attn_impl else {}
-    if torch.cuda.is_available():
+    if cfg.get("use_qlora", torch.cuda.is_available()) and torch.cuda.is_available():
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
@@ -662,6 +666,8 @@ def main():
         )
         device_map = "auto"
         torch_dtype = torch.bfloat16
+    else:
+        print("QLoRA disabled or CUDA unavailable; loading model without 4-bit quantization.")
 
     model = AutoModelForCausalLM.from_pretrained(
         cfg.get("model_name_or_path", BASE_MODEL),
