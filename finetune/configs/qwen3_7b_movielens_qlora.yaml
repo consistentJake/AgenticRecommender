@@ -1,41 +1,37 @@
-# Optimized config for Qwen3-0.6B MovieLens LoRA (rank=16, 4-bit).
-#
-# Training follows best practices:
-# - Moderate eval frequency (200 steps) to monitor progress
-# - Low eval_accumulation_steps (2) to prevent OOM by moving predictions to CPU frequently
-# - Batch sizes tuned for 24GB GPU (train=2, eval=1)
-# - Sequence length matched to p95 data length (1024)
-# - Gradient checkpointing disabled for faster training (if VRAM allows)
-# - Metrics: accuracy, F1 score on Yes/No predictions
-# - Early stopping to prevent overfitting
-#
-# Usage:
-#   python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml
-
 stage: sft
 do_train: true
 do_eval: true
-model_name_or_path: Qwen/Qwen3-0.6B
+
+# ==== MODEL ====
+model_name_or_path: Qwen/Qwen3-8B
 template: qwen
 finetuning_type: lora
+
+# ==== DATA ====
 dataset_dir: data
 dataset: movielens_qwen3_train
 eval_dataset: movielens_qwen3_eval
 cutoff_len: 1024
 max_samples: null
-max_eval_samples: 25
+max_eval_samples: 100  # Increased from 25 for more reliable eval metrics
 
-output_dir: output/qwen3-movielens-qlora
+# ==== OUTPUT & LOGGING ====
+output_dir: output/qwen3-7b-movielens-qlora
 logging_steps: 10
 save_steps: 500
-eval_steps: 10
-eval_accumulation_steps: 1
+eval_steps: 100  # Reduced eval frequency (was 10) since eval is more expensive now
+eval_accumulation_steps: 5
 save_total_limit: 2
 
+# ==== BATCHING (24GB-FRIENDLY) ====
+# 7B QLoRA fits comfortably on 24GB at seq=1024 with bs=2
+# when using gradient checkpointing. :contentReference[oaicite:2]{index=2}
 per_device_train_batch_size: 2
 per_device_eval_batch_size: 1
 gradient_accumulation_steps: 8
-learning_rate: 1.5e-4
+
+# ==== OPTIMIZER / LR ====
+learning_rate: 1.0e-4
 num_train_epochs: 3
 lr_scheduler_type: cosine
 warmup_ratio: 0.03
@@ -45,23 +41,28 @@ adam_beta2: 0.999
 adam_epsilon: 1.0e-8
 max_grad_norm: 1.0
 
+# ==== LORA ====
 lora_target: all
 lora_rank: 16
 lora_alpha: 64
 lora_dropout: 0.05
 use_rslora: false
 
-gradient_checkpointing: false
-early_stopping_patience: 3
-loss_plateau_patience: 3
-loss_plateau_min_delta: 0.002
-ddp_timeout: 180000000
+# ==== MEMORY / STABILITY ====
+gradient_checkpointing: true
 flash_attn: auto
+ddp_timeout: 180000000
 
+# ==== EARLY STOPPING / LOSS PLATEAU ====
+early_stopping_patience: 5  # Increased from 3 to allow more training
+loss_plateau_patience: 5    # Increased from 3 to allow more training
+loss_plateau_min_delta: 0.002
+
+# ==== PRECISION ====
+fp16: false
+bf16: true    # keep bf16; works great on 4090-class GPUs
 eval_strategy: steps
 prediction_loss_only: false
-fp16: false
-bf16: true
 
 report_to:
   - tensorboard

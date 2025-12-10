@@ -28,7 +28,7 @@ MOVIELENS_URL = (
 )
 DEFAULT_SYSTEM_PROMPT = (
     "You are a movie recommendation assistant. Given a user's recent history "
-    "and a candidate movie, respond with exactly one word: Yes or No."
+    "and a candidate movie. Please begin your analysis with 'Yes' or 'No'."
 )
 DEFAULT_INSTRUCTION = (
     "Predict whether the user will like the candidate movie. Answer only "

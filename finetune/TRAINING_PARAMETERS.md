@@ -61,7 +61,8 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | **Dataset** | MovieLens 25M |
 | **Task** | Binary movie recommendation |
 | **Training Examples** | 78,271 |
-| **Evaluation Examples** | 4,450 |
+| **Evaluation Examples** | 25 (max_eval_samples) |
+| **Cutoff Length** | 1024 tokens |
 | **Dataset Directory** | data |
 | **Training Split** | movielens_qwen3_train |
 | **Eval Split** | movielens_qwen3_eval |
@@ -75,12 +76,10 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| **Per Device Train Batch Size** | 1 | Batch size per GPU |
+| **Per Device Train Batch Size** | 2 | Batch size per GPU |
 | **Per Device Eval Batch Size** | 1 | Eval batch size per GPU |
-| **Gradient Accumulation Steps** | 1 (override) | Steps to accumulate before update |
-| **Effective Batch Size** | 1 | per_device_batch_size × accumulation_steps × num_gpus |
-
-**Note**: Original config had `gradient_accumulation_steps=8`, but was overridden to `1` for this run.
+| **Gradient Accumulation Steps** | 8 | Steps to accumulate before update |
+| **Effective Batch Size** | 16 | per_device_batch_size × accumulation_steps × num_gpus |
 
 ### Learning Rate and Schedule
 
@@ -89,7 +88,7 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | **Learning Rate** | 1.5e-4 (0.00015) |
 | **LR Scheduler Type** | cosine |
 | **Warmup Ratio** | 0.03 (3% of total steps) |
-| **Warmup Steps** | ~7,044 steps |
+| **Warmup Steps** | ~880 steps |
 
 ### Optimization
 
@@ -107,11 +106,12 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | Parameter | Value |
 |-----------|-------|
 | **Number of Epochs** | 3 |
-| **Total Training Steps** | 234,813 |
+| **Total Training Steps** | ~29,352 (calculated: 78,271 samples / 16 effective batch × 3 epochs) |
 | **Logging Steps** | 10 |
-| **Evaluation Steps** | 200 |
-| **Save Steps** | 200 |
+| **Evaluation Steps** | 2000 |
+| **Save Steps** | 4000 |
 | **Save Total Limit** | 2 (keep only last 2 checkpoints) |
+| **Early Stopping Patience** | 3 evaluations |
 
 ---
 
@@ -124,14 +124,14 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | **FP16** | false |
 | **BF16** | true |
 | **Compute Dtype** | torch.bfloat16 |
-| **Gradient Checkpointing** | true |
+| **Gradient Checkpointing** | false |
 | **Flash Attention** | auto (torch SDPA used) |
 
 ### Memory Optimization
 
 | Feature | Status |
 |---------|--------|
-| **Gradient Checkpointing** | ✅ Enabled |
+| **Gradient Checkpointing** | ❌ Disabled (for faster training) |
 | **KV Cache** | ❌ Disabled during training |
 | **4-bit Quantization (QLoRA)** | ✅ Enabled (bfloat16 base) |
 | **Trainable Params Upcasting** | ✅ Upcasted to float32 |
@@ -167,18 +167,18 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 
 | Metric | Value |
 |--------|-------|
-| **Eval Samples per Second** | 7.86-8.82 samples/s |
-| **Eval Steps per Second** | 7.86-8.82 steps/s |
-| **Eval Runtime** | 504-565 seconds (~8-9 minutes per eval) |
+| **Eval Samples per Second** | ~8-9 samples/s (estimated) |
+| **Eval Steps per Second** | ~8-9 steps/s (estimated) |
+| **Eval Runtime** | ~3-4 seconds per eval (25 samples) |
 
 ### Time Estimates
 
 | Metric | Value |
 |--------|-------|
-| **Time per Step** | ~0.43-0.50 seconds |
+| **Time per Step** | ~0.42-0.50 seconds |
 | **Steps per Hour** | ~7,200-8,640 steps |
-| **Estimated Total Time** | 27-33 hours (at 2.0-2.4 it/s) |
-| **Estimated Time per Epoch** | 9-11 hours |
+| **Estimated Total Time** | 3.4-4.1 hours (at 2.0-2.4 it/s) |
+| **Estimated Time per Epoch** | 1.1-1.4 hours |
 | **Time per 1000 Steps** | ~7-8 minutes |
 
 ### Training Progress (as of latest checkpoint)
@@ -186,9 +186,11 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | Metric | Value |
 |--------|-------|
 | **Steps Completed** | 800+ |
-| **Progress** | 0.34% |
-| **Checkpoints Saved** | 4 (200, 400, 600, 800) |
+| **Progress** | ~2.7% (based on config: ~29,352 total steps) |
+| **Checkpoints Saved** | 4 (from previous run with different save_steps) |
 | **Latest Checkpoint** | checkpoint-800 |
+
+**Note**: The progress metrics above are from a previous training run. With current config (save_steps=4000), checkpoints will be saved at steps 4000, 8000, etc.
 
 ---
 
@@ -203,7 +205,7 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 | 400 | 0.01 | 0.3735 |
 | 600 | 0.01 | 0.5317 |
 
-**Note**: Evaluation loss varies between 0.37-0.61, suggesting the model is learning but may need more training to stabilize.
+**Note**: The evaluation metrics above are from a previous training run with eval_steps=200. With current config (eval_steps=2000), evaluations will occur at steps 2000, 4000, 6000, etc.
 
 ---
 
@@ -226,12 +228,7 @@ v_proj, gate_proj, k_proj, down_proj, o_proj, q_proj, up_proj
 ## Command Used
 
 ```bash
-python scripts/train_llamafactory.py \
-  --config configs/qwen3_movielens_qlora.yaml \
-  --run-name gpu-run \
-  --device cuda \
-  --override per_device_train_batch_size=1 \
-  --override gradient_accumulation_steps=1
+python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml
 ```
 
 ---
@@ -242,13 +239,14 @@ python scripts/train_llamafactory.py \
 1. **Training Speed**: Stable at ~2.2-2.3 it/s after initial warmup
 2. **Memory Efficiency**: 4-bit quantization enables training on 24GB GPU
 3. **Parameter Efficiency**: Only 1.67% of parameters are trainable
-4. **Evaluation Time**: ~8-9 minutes per evaluation (4,450 samples)
+4. **Evaluation Time**: Fast evaluation with max_eval_samples limited to 25
 
 ### Optimization Notes
-- **Gradient Accumulation**: Reduced from 8 to 1 for this run (faster iteration but smaller effective batch)
+- **Gradient Accumulation**: Set to 8 for effective batch size of 16
 - **BF16 Training**: Using bfloat16 for stability with large learning rates
-- **Gradient Checkpointing**: Reduces memory at cost of ~20% slower training
+- **Gradient Checkpointing**: Disabled for faster training (VRAM allows it)
 - **Flash Attention**: Using PyTorch SDPA for optimized attention computation
+- **Eval Accumulation Steps**: Set to 1 to prevent OOM by moving predictions to CPU frequently
 
 ### Resource Utilization
 - **GPU Memory Usage**: ~16-18GB out of 24GB
@@ -261,10 +259,9 @@ python scripts/train_llamafactory.py \
 
 To reproduce this training run:
 
-1. Use the same config file: `configs/qwen3_movielens_qlora.yaml`
-2. Apply the same overrides: `per_device_train_batch_size=1`, `gradient_accumulation_steps=1`
-3. Use CUDA device with at least 18GB memory
-4. Set random seed if deterministic results are needed
+1. Use the config file: `configs/qwen3_movielens_qlora.yaml`
+2. Use CUDA device with at least 18GB memory (24GB recommended)
+3. Set random seed if deterministic results are needed
 
 ### Environment
 - **Python**: 3.11
