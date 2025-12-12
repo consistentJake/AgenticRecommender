@@ -6,11 +6,18 @@ Quick setup/run cheat sheet for the Qwen3 LoRA/QLoRA finetuning pipeline. Run al
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r finetune/requirements_sft.txt
 
+
+curl -fsSL https://claude.ai/install.sh | bash
+pip install -r finetune/requirements_sft.txt
 # (Optional) Flash Attention 2 for faster training
 pip install flash-attn --no-build-isolation
 ```
+
+## Compress
+
+git archive --format=tar -o finetune.tar HEAD:finetune
+
 
 ## Data
 ```bash

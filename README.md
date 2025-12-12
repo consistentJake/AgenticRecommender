@@ -345,3 +345,12 @@ This implementation combines insights from three cutting-edge research papers:
 - Performance monitoring
 
 The system is **ready for research and production use** with full test coverage and comprehensive documentation.
+
+## 📝 Session Notes: LoRA Finetuning Data Flow
+
+Context from `finetune/scripts/finetune_lora.py` on how supervised JSON samples are fed to Qwen during LoRA finetuning:
+- Each JSON record provides `system`, `history`, `instruction`, `input`, and `output`; the script turns this into chat turns via `to_chat_messages`.
+- The user turn is `instruction` plus `input` (if present); the assistant turn is exactly `output`. Optional `system` and any `history` are prepended.
+- `tokenizer.apply_chat_template` renders those turns into Qwen chat text (e.g., `<|im_start|>system ... <|im_end|>`, `<|im_start|>user ...`, `<|im_start|>assistant\nNo<|im_end|>`), no generation prompt added.
+- `preprocess_datasets_parallel` appends EOS, tokenizes, and masks all prompt tokens with `-100`, keeping labels only on the assistant response tokens.
+- SFTTrainer then trains on these token/label pairs; metrics extract Yes/No from decoded assistant responses to compute accuracy/F1.

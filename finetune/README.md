@@ -6,7 +6,8 @@ This directory contains scripts and configs for LoRA (QLoRA on CUDA) finetuning 
 
 ### Basic Installation
 Install core dependencies:
-```bash
+```
+
 pip install -r finetune/requirements_sft.txt
 ```
 

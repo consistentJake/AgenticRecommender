@@ -50,6 +50,7 @@ SAVE_EVAL_STEPS = 2000
 LORA_RANK = 16
 LORA_ALPHA = 64
 LORA_DROPOUT = 0.05
+QV_LORA_TARGET_MODULES = ["q_proj", "v_proj"]  # Query and value only
 FN_LORA_TARGET_MODULES = ["gate_proj", "up_proj", "down_proj"]
 LORA_TARGET_MODULES = [
     "q_proj",
@@ -152,6 +153,8 @@ def resolve_dataset_paths(cfg: Dict[str, Any], config_path: Path) -> Tuple[Path,
 def resolve_lora_targets(cfg_value: Any) -> List[str]:
     if cfg_value is None or cfg_value == "all":
         return LORA_TARGET_MODULES
+    if isinstance(cfg_value, str) and cfg_value.lower() == "qv":
+        return QV_LORA_TARGET_MODULES
     if isinstance(cfg_value, str) and cfg_value.lower() == "fn":
         return FN_LORA_TARGET_MODULES
     if isinstance(cfg_value, str):

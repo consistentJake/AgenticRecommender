@@ -42,7 +42,7 @@ adam_epsilon: 1.0e-8
 max_grad_norm: 1.0
 
 # ==== LORA ====
-lora_target: fn
+lora_target: qv  # Query and value only (skips key, output proj, and MLP)
 lora_rank: 16
 lora_alpha: 64
 lora_dropout: 0.05
