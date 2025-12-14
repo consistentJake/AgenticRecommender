@@ -68,6 +68,54 @@ python -c "import flash_attn; print(f'flash-attn version: {flash_attn.__version_
 - Ensure `finetune/data/movielens_qwen3/train.json` and `eval.json` exist
 - Paths are resolved via `dataset_info.json` or the YAML config
 
+## Code Architecture
+
+### Shared Utilities (`scripts/utils.py`)
+All common functions and constants are centralized in `scripts/utils.py` to eliminate duplication and ensure consistency:
+
+**Constants:**
+- `BASE_MODEL = "Qwen/Qwen3-0.6B"` - Model identifier used across all scripts
+- `ADAPTER_DIR = "output/qwen3-movielens-qlora"` - Default LoRA adapter location
+- `MAX_NEW_TOKENS`, `TEMPERATURE`, `TOP_P` - Generation parameters
+- `DEFAULT_SYSTEM_PROMPT` - System prompt for movie recommendations
+
+**Core Functions:**
+- `get_device()` - Device detection (MPS/CUDA/CPU)
+- `load_yaml_config()`, `load_json()`, `load_data()` - Configuration and data loading
+- `format_prompt()`, `to_chat_messages()` - Data formatting for chat templates
+- `build_datasets()`, `tokenize_func()`, `preprocess_datasets_parallel()` - Dataset preparation
+- `generate()` - Model inference with configurable parameters
+- `extract_answer()`, `compute_metrics()` - Evaluation utilities
+
+### Unified Inference Script (`scripts/infer_lora.py`)
+Single script supporting two modes:
+
+**Demo Mode** (no arguments):
+```bash
+python scripts/infer_lora.py
+```
+Runs hardcoded example comparing base vs LoRA models.
+
+**Batch Mode** (with `--output_dir`):
+```bash
+python scripts/infer_lora.py --test_file data/test.jsonl --output_dir output/results
+```
+Processes test files, computes metrics, saves detailed results.
+
+Options: `--adapter_dir`, `--max_samples`, `--compare_base`
+
+### Testing
+Comprehensive unit tests in `tests/test_utils.py`:
+```bash
+pytest tests/test_utils.py -v
+```
+Tests cover all utility functions with special focus on `tokenize_func()` for training consistency.
+
+Integration smoke tests now also cover:
+- Left-side truncation preserving assistant labels under `cutoff_len`
+- Loss masking with `ignore_index=-100`
+- Prompt → generate → extract → metrics pipeline (mocked model)
+
 ## Config
 - Main config: `finetune/configs/qwen3_movielens_qlora.yaml`.
 - Most knobs (model path, output_dir, batch sizes, cutoff_len, LoRA params, eval/save steps, gradient checkpointing, early stopping, etc.) are read from this YAML. Override or supply a different config via `--config`.
@@ -130,8 +178,19 @@ Our training configuration follows these optimized guidelines:
 
 ### Standard Training (Foreground)
 ```bash
-python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml
+python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml --clear-cache
 ```
+
+#### With lightweight generative eval
+Add to your YAML (e.g., `configs/qwen3_movielens_qlora.yaml`):
+```yaml
+gen_eval_samples: 32
+```
+Then run:
+```bash
+python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml --clear-cache
+```
+This runs a small greedy generation eval (max_new_tokens=8) after training to mirror inference behavior.
 
 ### Background Training (Survives SSH Disconnection)
 
@@ -139,7 +198,7 @@ For remote servers where you need to disconnect SSH, use `nohup`:
 
 ```bash
 # Start training in background
-nohup python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml > training.log 2>&1 &
+nohup python scripts/finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml > training.log 2>&1 &
 
 # Get the process ID
 echo "Training started with PID: $!"
@@ -175,6 +234,49 @@ nvidia-smi
 tail -100 training.log | grep "{'loss"
 ```
 
+## Inference (Deterministic Yes/No)
+
+- Demo mode (prints base vs LoRA on a canned prompt):
+```bash
+python scripts/infer_lora.py --adapter_dir output/qwen3-movielens-qlora
+```
+
+- Batch mode on MovieLens test split with greedy decoding (max_new_tokens=8):
+```bash
+python scripts/infer_lora.py \
+  --test_file data/movielens_qwen3/test_raw.jsonl \
+  --output_dir output/infer \
+  --adapter_dir output/qwen3-movielens-qlora
+```
+Outputs `lora_predictions.jsonl` and `metrics_summary.json`.
+
+- Quick check on the first eval sample (training-format JSON):
+```bash
+python scripts/infer_lora.py \
+  --test_file data/movielens_qwen3/eval.json \
+  --max_samples 1 \
+  --output_dir output/infer_eval1 \
+  --adapter_dir output/qwen3-movielens-qlora
+```
+
+## Integration Test (optional real model)
+
+Use the same loader/config as training. Either pass a model id/path directly:
+```bash
+pytest tests/test_integration_model.py --integration-model-path Qwen/Qwen3-8B -v -s
+```
+or point to a config that contains `model_name_or_path` (default: `configs/qwen3_7b_movielens_qlora.yaml`):
+```bash
+pytest tests/test_integration_model.py --integration-config-path configs/qwen3_7b_movielens_qlora.yaml -v -s
+```
+Add `-s` to surface the logged raw input JSON, templated text, and model response. This uses the shared model/tokenizer loader (quantization, flash attention, padding) and runs a forward pass with masked labels plus a short greedy generation. Skips if no model can be resolved.
+
+
+### pack the files
+git archive --format=tar.gz -o committed-code.tar.gz HEAD
+
+
+
 ### Alternative: Using tmux (More Interactive)
 ```bash
 # Start tmux session
@@ -199,7 +301,48 @@ tmux kill-session -t training
 ### Training Output
 - Outputs (adapter + tokenizer + logs) land in `output/qwen3-movielens-qlora` by default.
 - Training/eval metrics include loss, accuracy, and F1 on the Yes/No labels. Early stopping patience is configurable in the YAML.
-- Preprocessed datasets are cached in `.cache/preprocessed/` for faster subsequent runs (instant loading vs ~13 seconds of tokenization)
+
+### Preprocessing Cache
+
+The training script automatically caches preprocessed datasets to dramatically speed up subsequent training runs:
+
+**What gets cached:**
+- Chat template formatting (applying `tokenizer.apply_chat_template`)
+- EOS token addition
+- Full tokenization (converting text to token IDs)
+- Label masking (setting prompt tokens to -100)
+
+**Cache location:**
+- Default: `.cache/preprocessed/train_preprocessed` and `.cache/preprocessed/eval_preprocessed`
+- Configurable via `preprocessing_cache_dir` in the YAML config
+
+**Time savings:**
+- **First run**: ~2-3 minutes for formatting and tokenizing 78k examples
+- **Subsequent runs**: ~1-2 seconds to load from cache (near instant)
+
+**Cache behavior:**
+- On first training run, the script preprocesses datasets and saves them to cache
+- On subsequent runs, if cache exists, it loads directly from disk and **skips all preprocessing steps**
+- You'll see `"Loading preprocessed datasets from cache..."` instead of `"Applying formatting function to train dataset..."`
+
+**When to clear cache:**
+- Changed `max_eval_samples` (eval dataset size changed)
+- Modified dataset files (`train.json` or `eval.json`)
+- Changed tokenizer or chat template
+- Changed `cutoff_len` (max sequence length)
+- Modified any preprocessing logic
+
+**Clear cache and regenerate:**
+```bash
+python scripts/finetune_lora.py --config configs/qwen3_movielens_qlora.yaml --clear-cache
+```
+
+**Manual cache deletion:**
+```bash
+rm -rf .cache/preprocessed/
+```
+
+**Note:** The cache is dataset-specific but not config-specific. If you switch between different configs that use the same dataset files, they'll share the same cache.
 
 ### Checkpointing & Model Saving
 
@@ -393,6 +536,10 @@ Once training begins, you'll see step output with loss values:
 - Training logs are written to `<output_dir>/logs`. Start TensorBoard:
   ```bash
   tensorboard --logdir output/qwen3-movielens-qlora/logs --port 6006
+    tensorboard --logdir output/qwen3-7b-movielens-qlora/logs --port 6007
+        tensorboard --logdir output/qwen3-7b-movielens-qlora-2/logs --port 6007
+
+
   ```
 - Open http://localhost:6006 to view loss curves, accuracy/F1, and eval checkpoints. Point `--logdir` to a parent folder (e.g., `output`) to compare multiple runs.
 
@@ -436,6 +583,13 @@ Once training begins, you'll see step output with loss values:
     --test_file data/movielens_qwen3/train.json \
     --output_dir infer/train_comparison \
     --max_samples 100
+
+
+    python scripts/compare_base_vs_lora.py \
+    --test_file data/movielens_qwen3/train.json \
+    --output_dir infer/train_comparison \
+    --max_samples 100
+
 
   On test data (existing behavior):
   python scripts/compare_base_vs_lora.py \
@@ -529,3 +683,127 @@ When implementing custom metrics for generative models, ensure your metric calcu
 - Decoding full sequences vs. generated portions only
 - Models use special tokens or reasoning tags (like `<think>`)
 - Looking for specific answer formats in generated text
+
+
+### Memory calculation
+
+Let me give you the detailed VRAM breakdown for Qwen3-8B with QLoRA, batch_size=2, seq_len=1024, gradient_checkpointing=True:
+
+  Memory Breakdown
+
+  1. Base Model (4-bit Quantized): ~4.5 GiB
+
+  8B parameters × 0.5 bytes/param (4-bit) = 4.0 GiB
+  + Quantization metadata (scales, zeros)  = 0.5 GiB
+  ────────────────────────────────────────────────
+  Total: 4.5 GiB
+
+  2. LoRA Adapters (trainable): ~0.03 GiB
+
+  With lora_target: qv (only q_proj and v_proj):
+  Per layer: 2 projections × (4096 × rank + rank × 4096)
+           = 2 × (4096 × 16 + 16 × 4096)
+           = 2 × 131,072 params
+
+  32 layers: 32 × 262,144 = 8,388,608 params
+  In bf16: 8.4M × 2 bytes = 16.8 MB ≈ 0.017 GiB
+
+  (Note: If you used lora_target: all, this would be ~0.1 GiB)
+
+  3. Optimizer States (AdamW for LoRA only): ~0.10 GiB
+
+  AdamW stores 3 copies (params + momentum + variance):
+  - Gradients:      8.4M × 4 bytes = 33.6 MB
+  - First moment:   8.4M × 4 bytes = 33.6 MB
+  - Second moment:  8.4M × 4 bytes = 33.6 MB
+  ────────────────────────────────────────────────
+  Total: 100.8 MB ≈ 0.10 GiB
+
+  4. Activations (WITH gradient checkpointing): ~0.6 GiB
+
+
+    5. Logits Tensor (forward pass peak): ~2.5 GiB
+
+  Logits: batch × seq × vocab_size
+        = 2 × 1024 × 151,643 × 4 bytes (fp32)
+        = 1.24 GiB
+
+  During loss computation in SFTTrainer:
+    shift_logits = logits[..., :-1, :].contiguous()  # Creates copy
+    shift_labels = labels[..., 1:]
+    
+    Peak: Original (1.24 GB) + Shifted contiguous copy (1.24 GB)
+  ────────────────────────────────────────────────
+  Peak during loss: ~2.5 GiB
+
+  6. CUDA Context & Overhead: ~1.5 GiB
+
+  - CUDA runtime context:         500 MB
+  - cuBLAS workspace:              300 MB
+  - Flash Attention workspace:     200 MB
+  - PyTorch allocator fragmentation: 500 MB
+  ────────────────────────────────────────────────
+  Total: ~1.5 GiB
+
+  Total Memory Usage
+
+  | Component                     | Memory     |
+  |-------------------------------|------------|
+  | 1. Base Model (4-bit)         | 4.5 GiB    |
+  | 2. LoRA Adapters              | 0.03 GiB   |
+  | 3. Optimizer States           | 0.10 GiB   |
+  | 4. Activations (checkpointed) | 0.6 GiB    |
+  | 5. Logits (peak)              | 2.5 GiB    |
+  | 6. CUDA Overhead              | 1.5 GiB    |
+  | Subtotal                      | 9.2 GiB    |
+  | + Safety margin (10%)         | 0.9 GiB    |
+  | Total Estimate                | ~10-11 GiB |
+
+  Verification from Your Log
+
+  Your training log with bs=16, no checkpointing showed:
+  22.39 GiB allocated by PyTorch
+
+  Let's verify the scaling:
+
+  | Config                | Logits   | Activations | Model+LoRA | Total         |
+  |-----------------------|----------|-------------|------------|---------------|
+  | bs=16, no checkpoint  | 9.9 GiB  | ~8 GiB      | 4.6 GiB    | ~22.5 GiB ✅  |
+  | bs=2, with checkpoint | 1.24 GiB | ~0.6 GiB    | 4.6 GiB    | ~10-11 GiB ✅ |
+
+  Memory savings:
+  - Logits: 8x reduction (16→2 batch)
+  - Activations: 13x reduction (gradient checkpointing)
+  - Total: 2.2x reduction
+
+  Why Gradient Checkpointing Saves So Much Memory
+
+  Forward Pass Activations for 36 layers:
+
+  WITHOUT checkpointing:
+  ┌─────────────────────────────────────┐
+  │ Layer 1  → Store 16.8 MB            │
+  │ Layer 2  → Store 16.8 MB            │
+  │ ...                                 │
+  │ Layer 36 → Store 16.8 MB            │
+  │ Total: 605 MB STORED IN VRAM        │ ❌
+  │ + MLP intermediates: +1.8 GiB       │
+  └─────────────────────────────────────┘
+
+  WITH checkpointing (saves every 6th layer):
+  ┌─────────────────────────────────────┐
+  │ Layer 1  → Discard                  │
+  │ Layer 6  → CHECKPOINT (16.8 MB)     │
+  │ Layer 12 → CHECKPOINT (16.8 MB)     │
+  │ Layer 18 → CHECKPOINT (16.8 MB)     │
+  │ Layer 24 → CHECKPOINT (16.8 MB)     │
+  │ Layer 30 → CHECKPOINT (16.8 MB)     │
+  │ Layer 36 → CHECKPOINT (16.8 MB)     │
+  │ Total: 100 MB STORED IN VRAM        │ ✅
+  │ (Recompute others during backward)  │
+  └─────────────────────────────────────┘
+
+  During backward pass, PyTorch recomputes the discarded activations on-the-fly, which:
+  - Saves ~2 GiB of VRAM
+  - Costs ~25% more computation time
+  - But allows 2x bigger batch size = net speedup!

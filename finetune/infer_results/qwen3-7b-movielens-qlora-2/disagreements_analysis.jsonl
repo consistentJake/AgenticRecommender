@@ -1,0 +1,66 @@
+{"index": 5, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 89, "candidate_title": "Eddie Izzard: Glorious (1997)"}
+{"index": 7, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 210, "candidate_title": "Black Panther (2017)"}
+{"index": 8, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 474, "candidate_title": "Cat Returns, The (Neko no ongaeshi) (2002)"}
+{"index": 9, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 18, "candidate_title": "All the President's Men (1976)"}
+{"index": 12, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 524, "candidate_title": "Rumble in the Bronx (Hont faan kui) (1995)"}
+{"index": 14, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 484, "candidate_title": "Super High Me (2007)"}
+{"index": 15, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 163, "candidate_title": "Object of My Affection, The (1998)"}
+{"index": 16, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 232, "candidate_title": "Hannah Montana: The Movie (2009)"}
+{"index": 18, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 270, "candidate_title": "Primal Fear (1996)"}
+{"index": 19, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 606, "candidate_title": "Toy Story (1995)"}
+{"index": 20, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 66, "candidate_title": "Mighty Morphin Power Rangers: The Movie (1995)"}
+{"index": 21, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 354, "candidate_title": "Devil Wears Prada, The (2006)"}
+{"index": 23, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 591, "candidate_title": "Maverick (1994)"}
+{"index": 24, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 202, "candidate_title": "Stand and Deliver (1988)"}
+{"index": 25, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 603, "candidate_title": "Sweet Smell of Success (1957)"}
+{"index": 26, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 184, "candidate_title": "Jumanji: Welcome to the Jungle (2017)"}
+{"index": 28, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 510, "candidate_title": "Lord of the Rings: The Fellowship of the Ring, The (2001)"}
+{"index": 29, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 414, "candidate_title": "Inception (2010)"}
+{"index": 30, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 563, "candidate_title": "Babe: Pig in the City (1998)"}
+{"index": 31, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 381, "candidate_title": "Br\u00fcno (Bruno) (2009)"}
+{"index": 32, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 453, "candidate_title": "Lord of the Rings: The Fellowship of the Ring, The (2001)"}
+{"index": 33, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 247, "candidate_title": "101 Dalmatians (One Hundred and One Dalmatians) (1961)"}
+{"index": 36, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 187, "candidate_title": "Traffic (2000)"}
+{"index": 37, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 474, "candidate_title": "Looking for Comedy in the Muslim World (2005)"}
+{"index": 38, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 592, "candidate_title": "Disclosure (1994)"}
+{"index": 39, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 280, "candidate_title": "Girl with the Dragon Tattoo, The (M\u00e4n som hatar kvinnor) (2009)"}
+{"index": 40, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 156, "candidate_title": "About a Boy (2002)"}
+{"index": 41, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 537, "candidate_title": "Hangover Part II, The (2011)"}
+{"index": 42, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 105, "candidate_title": "Travels of an Ant (1983)"}
+{"index": 43, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 64, "candidate_title": "Carrie (1976)"}
+{"index": 46, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 328, "candidate_title": "Sound of Music, The (1965)"}
+{"index": 47, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 473, "candidate_title": "SLC Punk! (1998)"}
+{"index": 48, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 227, "candidate_title": "Wave, The (Welle, Die) (2008)"}
+{"index": 49, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 586, "candidate_title": "Rio (2011)"}
+{"index": 50, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 570, "candidate_title": "Cast Away (2000)"}
+{"index": 52, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 156, "candidate_title": "Good Girl, The (2002)"}
+{"index": 54, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 462, "candidate_title": "Breakfast Club, The (1985)"}
+{"index": 55, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 177, "candidate_title": "Men in Black (a.k.a. MIB) (1997)"}
+{"index": 59, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 226, "candidate_title": "Mr. Brooks (2007)"}
+{"index": 60, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 138, "candidate_title": "Twin Dragons (Shuang long hui) (1992)"}
+{"index": 61, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 256, "candidate_title": "Borat: Cultural Learnings of America for Make Benefit Glorious Nation of Kazakhstan (2006)"}
+{"index": 62, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 64, "candidate_title": "Pay It Forward (2000)"}
+{"index": 64, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 71, "candidate_title": "Terminator, The (1984)"}
+{"index": 65, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 98, "candidate_title": "Godfather, The (1972)"}
+{"index": 67, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 111, "candidate_title": "Austin Powers: International Man of Mystery (1997)"}
+{"index": 69, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 466, "candidate_title": "Cloverfield (2008)"}
+{"index": 70, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 352, "candidate_title": "Life of Pi (2012)"}
+{"index": 73, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 282, "candidate_title": "Zoolander (2001)"}
+{"index": 74, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 514, "candidate_title": "Inglourious Basterds (2009)"}
+{"index": 75, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 610, "candidate_title": "Exorcism of Emily Rose, The (2005)"}
+{"index": 77, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 312, "candidate_title": "Casino (1995)"}
+{"index": 78, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 246, "candidate_title": "Charlie and the Chocolate Factory (2005)"}
+{"index": 79, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 414, "candidate_title": "Semi-Pro (2008)"}
+{"index": 80, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 573, "candidate_title": "Louis C.K.: Hilarious (2010)"}
+{"index": 84, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 21, "candidate_title": "Satanic (2016)"}
+{"index": 86, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 381, "candidate_title": "Last Airbender, The (2010)"}
+{"index": 87, "label": "Yes", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": false, "user_id": 318, "candidate_title": "Fantastic Beasts and Where to Find Them (2016)"}
+{"index": 88, "label": "No", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": true, "lora_correct": false, "user_id": 428, "candidate_title": "Star Wars: Episode VI - Return of the Jedi (1983)"}
+{"index": 90, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 187, "candidate_title": "Edmond (2005)"}
+{"index": 91, "label": "No", "base_prediction": "Yes", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 436, "candidate_title": "Getting Even with Dad (1994)"}
+{"index": 93, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 524, "candidate_title": "Crow: City of Angels, The (1996)"}
+{"index": 94, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 448, "candidate_title": "Sisters (2015)"}
+{"index": 95, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 186, "candidate_title": "True Lies (1994)"}
+{"index": 97, "label": "No", "base_prediction": "Unknown", "lora_prediction": "Yes", "base_correct": false, "lora_correct": false, "user_id": 495, "candidate_title": "Hostel (2005)"}
+{"index": 98, "label": "No", "base_prediction": "Unknown", "lora_prediction": "No", "base_correct": false, "lora_correct": true, "user_id": 222, "candidate_title": "Tropic Thunder (2008)"}
+{"index": 99, "label": "Yes", "base_prediction": "No", "lora_prediction": "Yes", "base_correct": false, "lora_correct": true, "user_id": 42, "candidate_title": "For Love of the Game (1999)"}

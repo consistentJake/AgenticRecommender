@@ -12,15 +12,15 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Set PyTorch CUDA memory allocator config to reduce fragmentation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import numpy as np
 import torch
 from datasets import Dataset
 from peft import LoraConfig
 import yaml
 from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
     EarlyStoppingCallback,
     TrainerCallback,
     TrainerControl,
@@ -29,8 +29,22 @@ from transformers import (
 )
 from trl import SFTTrainer
 
+# Import shared utilities
+from utils import (
+    BASE_MODEL as UTILS_BASE_MODEL,
+    load_model_and_tokenizer,
+    get_device,
+    load_yaml_config,
+    load_json,
+    build_datasets,
+    to_chat_messages,
+    to_generation_messages,
+    tokenize_func,
+    preprocess_datasets_parallel,
+)
 
-BASE_MODEL = "Qwen/Qwen3-0.6B"
+
+BASE_MODEL = UTILS_BASE_MODEL  # Import from utils to ensure consistency
 OUTPUT_DIR = "output/qwen3-movielens-qlora"
 DATA_DIR = Path("data/movielens_qwen3")
 TRAIN_PATH = DATA_DIR / "train.json"
@@ -63,29 +77,7 @@ LORA_TARGET_MODULES = [
 ]  # mirrors `lora_target: all` from the config
 
 
-def get_device() -> str:
-    if torch.backends.mps.is_available():
-        return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
-
-
-def load_json(path: str):
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def build_datasets(train_path: str, eval_path: str):
-    train_data = load_json(train_path)
-    eval_data = load_json(eval_path)
-
-    train_ds = Dataset.from_list(train_data)
-    eval_ds = Dataset.from_list(eval_data)
-    return train_ds, eval_ds
+# get_device, load_json, build_datasets imported from utils
 
 
 def maybe_shrink_eval(eval_ds: Dataset, max_samples: Optional[int]) -> Dataset:
@@ -94,11 +86,7 @@ def maybe_shrink_eval(eval_ds: Dataset, max_samples: Optional[int]) -> Dataset:
     return eval_ds.select(range(min(len(eval_ds), max_samples)))
 
 
-def load_yaml_config(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+# load_yaml_config imported from utils
 
 
 def _strip_split_suffix(name: str) -> str:
@@ -164,21 +152,6 @@ def resolve_lora_targets(cfg_value: Any) -> List[str]:
     return LORA_TARGET_MODULES
 
 
-def resolve_attention_impl(cfg: Dict[str, Any]) -> Optional[str]:
-    attn_val = cfg.get("flash_attn")
-    if attn_val is None:
-        return None
-    if isinstance(attn_val, str):
-        attn_val = attn_val.lower()
-        if attn_val == "auto":
-            return "flash_attention_2"
-        if attn_val in {"flash_attention_2", "sdpa", "eager"}:
-            return attn_val
-        if attn_val in {"false", "none", "off"}:
-            return None
-    return None
-
-
 def resolve_report_to(cfg: Dict[str, Any]) -> List[str]:
     value = cfg.get("report_to")
     if value is None:
@@ -190,203 +163,7 @@ def resolve_report_to(cfg: Dict[str, Any]) -> List[str]:
     return ["tensorboard"]
 
 
-def to_chat_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Convert supervised sample to chat-style messages expected by Qwen."""
-    messages: List[Dict[str, str]] = []
-
-    system_prompt = example.get("system")
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-
-    # History is present but empty in current data; keep for forward compatibility.
-    for turn in example.get("history") or []:
-        role = turn.get("role")
-        content = turn.get("content")
-        if role and content:
-            messages.append({"role": role, "content": content})
-
-    user_content = example.get("instruction", "")
-    example_input = example.get("input")
-    if example_input:
-        user_content = f"{user_content}\n\n{example_input}"
-    messages.append({"role": "user", "content": user_content})
-    messages.append({"role": "assistant", "content": example.get("output", "")})
-
-    return messages
-
-
-def preprocess_datasets_parallel(
-    train_ds: Dataset,
-    eval_ds: Dataset,
-    tokenizer: Any,
-    formatting_func: Any,
-    cutoff_len: int,
-    cache_dir: Optional[Path] = None,
-    num_proc: Optional[int] = None,
-    clear_cache: bool = False,
-) -> Tuple[Dataset, Dataset]:
-    """Preprocess datasets with multiprocessing for faster tokenization.
-
-    Args:
-        train_ds: Training dataset
-        eval_ds: Evaluation dataset
-        tokenizer: Tokenizer instance
-        formatting_func: Function to format examples into chat template
-        cutoff_len: Maximum sequence length
-        cache_dir: Directory to cache preprocessed datasets (None = no caching)
-        num_proc: Number of processes to use (defaults to CPU count)
-        clear_cache: If True, delete existing cache and regenerate datasets
-
-    Returns:
-        Preprocessed (train_ds, eval_ds) tuple
-    """
-    if num_proc is None:
-        num_proc = mp.cpu_count()
-
-    # Check if cached preprocessed datasets exist
-    if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        train_cache = cache_dir / "train_preprocessed"
-        eval_cache = cache_dir / "eval_preprocessed"
-
-        # Clear cache if requested
-        if clear_cache:
-            import shutil
-            if train_cache.exists():
-                print(f"\nClearing train cache: {train_cache}")
-                shutil.rmtree(train_cache)
-            if eval_cache.exists():
-                print(f"Clearing eval cache: {eval_cache}")
-                shutil.rmtree(eval_cache)
-            print("Cache cleared successfully!\n")
-
-        if train_cache.exists() and eval_cache.exists():
-            print(f"\nLoading preprocessed datasets from cache: {cache_dir}")
-            print(f"  Train samples: checking cached dataset...")
-            print(f"  Eval samples: checking cached dataset...")
-            from datasets import load_from_disk
-            train_ds = load_from_disk(str(train_cache))
-            eval_ds = load_from_disk(str(eval_cache))
-            print(f"  Train samples loaded: {len(train_ds)}")
-            print(f"  Eval samples loaded: {len(eval_ds)}")
-            print("Cached datasets loaded successfully!\n")
-            return train_ds, eval_ds
-
-    print(f"\nPreprocessing datasets with {num_proc} processes for faster tokenization...")
-
-    # Apply formatting function to convert to chat template format
-    print("Applying formatting function to train dataset...")
-    train_ds = train_ds.map(
-        lambda example: {"text": formatting_func(example)},
-        num_proc=num_proc,
-        desc="Formatting train dataset"
-    )
-
-    print("Applying formatting function to eval dataset...")
-    eval_ds = eval_ds.map(
-        lambda example: {"text": formatting_func(example)},
-        num_proc=num_proc,
-        desc="Formatting eval dataset"
-    )
-
-    # Add EOS token
-    print("Adding EOS tokens to train dataset...")
-    train_ds = train_ds.map(
-        lambda example: {"text": example["text"] + tokenizer.eos_token},
-        num_proc=num_proc,
-        desc="Adding EOS to train"
-    )
-
-    print("Adding EOS tokens to eval dataset...")
-    eval_ds = eval_ds.map(
-        lambda example: {"text": example["text"] + tokenizer.eos_token},
-        num_proc=num_proc,
-        desc="Adding EOS to eval"
-    )
-
-    # Tokenize with multiprocessing and properly mask labels
-    def tokenize_func(example):
-        # Tokenize the full text (prompt + response)
-        full_tokens = tokenizer(
-            example["text"],
-            truncation=True,
-            max_length=cutoff_len,
-            padding=False,
-        )
-
-        # Find where the assistant's response starts
-        # The chat template includes the prompt + assistant response
-        # We need to mask (set to -100) all tokens before the assistant's actual response
-
-        # Get the text before and after assistant marker
-        text = example["text"]
-
-        # For Qwen chat template, find where assistant content starts
-        # The format is: <|im_start|>system\n...<|im_end|>\n<|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n
-        assistant_marker = "<|im_start|>assistant\n"
-
-        if assistant_marker in text:
-            # Split at the assistant marker
-            before_assistant = text.split(assistant_marker)[0] + assistant_marker
-
-            # Tokenize just the prompt part to know how many tokens to mask
-            prompt_tokens = tokenizer(
-                before_assistant,
-                truncation=False,
-                padding=False,
-            )
-            prompt_len = len(prompt_tokens["input_ids"])
-
-            # Create labels: -100 for prompt, actual token IDs for response
-            labels = [-100] * prompt_len + full_tokens["input_ids"][prompt_len:]
-
-            # Ensure labels and input_ids have same length
-            if len(labels) > len(full_tokens["input_ids"]):
-                labels = labels[:len(full_tokens["input_ids"])]
-            elif len(labels) < len(full_tokens["input_ids"]):
-                # Shouldn't happen, but pad with actual tokens if needed
-                labels = labels + full_tokens["input_ids"][len(labels):]
-        else:
-            # Fallback: use all tokens (shouldn't happen with proper chat template)
-            labels = full_tokens["input_ids"].copy()
-
-        return {
-            "input_ids": full_tokens["input_ids"],
-            "attention_mask": full_tokens["attention_mask"],
-            "labels": labels
-        }
-
-    print("Tokenizing train dataset...")
-    train_ds = train_ds.map(
-        tokenize_func,
-        num_proc=num_proc,
-        remove_columns=train_ds.column_names,
-        desc="Tokenizing train dataset"
-    )
-
-    print("Tokenizing eval dataset...")
-    eval_ds = eval_ds.map(
-        tokenize_func,
-        num_proc=num_proc,
-        remove_columns=eval_ds.column_names,
-        desc="Tokenizing eval dataset"
-    )
-
-    print("Dataset preprocessing complete!\n")
-
-    # Save preprocessed datasets to cache for future runs
-    if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        train_cache = cache_dir / "train_preprocessed"
-        eval_cache = cache_dir / "eval_preprocessed"
-
-        print(f"Saving preprocessed datasets to cache: {cache_dir}")
-        train_ds.save_to_disk(str(train_cache))
-        eval_ds.save_to_disk(str(eval_cache))
-        print("Cache saved successfully!\n")
-
-    return train_ds, eval_ds
+# to_chat_messages, tokenize_func, preprocess_datasets_parallel imported from utils
 
 
 class TrainingLossPlateauCallback(TrainerCallback):
@@ -538,13 +315,13 @@ class MultiMetricEarlyStoppingCallback(TrainerCallback):
         print(f"  - Accuracy:      {self.accuracy_no_improvement_count}/{self.patience}")
         print(f"  - F1:            {self.f1_no_improvement_count}/{self.patience}")
         print(f"[MultiMetric] Current values:")
-        print(f"  - Training Loss: {self.current_train_loss:.4f}")
-        print(f"  - Accuracy:      {current_accuracy:.4f}")
-        print(f"  - F1:            {current_f1:.4f}")
+        print(f"  - Training Loss: {self.current_train_loss:.4f}" if self.current_train_loss is not None else "  - Training Loss: N/A")
+        print(f"  - Accuracy:      {current_accuracy:.4f}" if current_accuracy is not None else "  - Accuracy:      N/A")
+        print(f"  - F1:            {current_f1:.4f}" if current_f1 is not None else "  - F1:            N/A")
         print(f"[MultiMetric] Best values:")
-        print(f"  - Training Loss: {self.best_train_loss:.4f}")
-        print(f"  - Accuracy:      {self.best_accuracy:.4f}")
-        print(f"  - F1:            {self.best_f1:.4f}")
+        print(f"  - Training Loss: {self.best_train_loss:.4f}" if self.best_train_loss is not None else "  - Training Loss: N/A")
+        print(f"  - Accuracy:      {self.best_accuracy:.4f}" if self.best_accuracy is not None else "  - Accuracy:      N/A")
+        print(f"  - F1:            {self.best_f1:.4f}" if self.best_f1 is not None else "  - F1:            N/A")
         print(f"[MultiMetric] ================================\n")
 
         # Stop only if ALL metrics haven't improved for patience evaluations
@@ -654,47 +431,13 @@ def main():
     print("=" * 80)
     print()
 
-    # Enable 4-bit QLoRA on CUDA when requested; otherwise fall back to full precision.
-    quantization_config = None
-    device_map = None
-    torch_dtype = None
-    attn_impl = resolve_attention_impl(cfg)
-    attn_kwargs = {"attn_implementation": attn_impl} if attn_impl else {}
-    if cfg.get("use_qlora", torch.cuda.is_available()) and torch.cuda.is_available():
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
-        device_map = "auto"
-        torch_dtype = torch.bfloat16
-    else:
-        print("QLoRA disabled or CUDA unavailable; loading model without 4-bit quantization.")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        cfg.get("model_name_or_path", BASE_MODEL),
-        quantization_config=quantization_config,
-        device_map=device_map,
-        torch_dtype=torch_dtype,
-        trust_remote_code=True,
-        **attn_kwargs,
-    )
-    if device_map is None:
-        model = model.to(device)
-    model.config.use_cache = False
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        cfg.get("model_name_or_path", BASE_MODEL),
-        trust_remote_code=True,
-    )
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
+    model, tokenizer = load_model_and_tokenizer(cfg, device, disable_cache=True)
 
     # Build datasets
     train_path, eval_path = resolve_dataset_paths(cfg, args.config)
     train_ds, eval_ds = build_datasets(str(train_path), str(eval_path))
     eval_ds = maybe_shrink_eval(eval_ds, cfg.get("max_eval_samples", MAX_EVAL_SAMPLES))
+    raw_eval_ds_for_gen = eval_ds
 
     # Define formatting function for parallel preprocessing
     def formatting_func(example: Dict[str, Any]) -> str:
@@ -767,6 +510,7 @@ def main():
         bf16=cfg.get("bf16", torch.cuda.is_available()),
         fp16=cfg.get("fp16", False),
         gradient_checkpointing=cfg.get("gradient_checkpointing", False),
+        gradient_checkpointing_kwargs={"use_reentrant": False} if cfg.get("gradient_checkpointing", False) else None,
         report_to=resolve_report_to(cfg),
     )
 
@@ -896,6 +640,68 @@ def main():
 
         return {"accuracy": accuracy, "f1": f1}
 
+    def run_generative_eval(model, tokenizer, raw_eval_ds, num_samples: int = 32):
+        """Lightweight generative eval to mirror real inference behavior."""
+        if num_samples <= 0 or len(raw_eval_ds) == 0:
+            return
+
+        sample_ds = raw_eval_ds.select(range(min(len(raw_eval_ds), num_samples)))
+        preds: List[int] = []
+        labels: List[int] = []
+
+        print(f"\nRunning generative eval on {len(sample_ds)} samples (greedy, max_new_tokens=8)...")
+        for example in sample_ds:
+            # Use to_generation_messages to build prompt WITHOUT assistant response
+            messages = to_generation_messages(example)
+            chat_str = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            inputs = tokenizer(
+                chat_str,
+                return_tensors="pt",
+                padding=True,
+                return_attention_mask=True,
+            )
+            input_ids = inputs["input_ids"].to(device)
+            attn_mask = inputs["attention_mask"].to(device)
+
+            with torch.no_grad():
+                out = model.generate(
+                    input_ids=input_ids,
+                    attention_mask=attn_mask,
+                    max_new_tokens=8,
+                    temperature=0.0,
+                    top_p=1.0,
+                    do_sample=False,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+
+            response = tokenizer.decode(out[0], skip_special_tokens=True)
+            pred_label = _normalize_label(response)
+            true_label = _normalize_label(example.get("output", ""))
+
+            if pred_label is not None and true_label is not None:
+                preds.append(pred_label)
+                labels.append(true_label)
+
+        if not preds:
+            print("No valid pairs for generative eval.")
+            return
+
+        preds_arr = np.array(preds)
+        labels_arr = np.array(labels)
+        gen_accuracy = float((preds_arr == labels_arr).mean())
+
+        tp = float(((preds_arr == 1) & (labels_arr == 1)).sum())
+        fp = float(((preds_arr == 1) & (labels_arr == 0)).sum())
+        fn = float(((preds_arr == 0) & (labels_arr == 1)).sum())
+        denom = (2 * tp + fp + fn)
+        gen_f1 = float(0.0 if denom == 0 else (2 * tp) / denom)
+
+        print(f"Generative eval — accuracy: {gen_accuracy:.4f}, f1: {gen_f1:.4f}, samples: {len(preds)}\n")
+
     # TRL SFTTrainer handles PEFT integration
     # Note: Datasets are pre-tokenized via multiprocessing, so no formatting_func needed
     trainer = SFTTrainer(
@@ -917,6 +723,14 @@ def main():
     )
 
     trainer.train()
+
+    # Optional small generative eval to mirror inference behavior.
+    run_generative_eval(
+        trainer.model,
+        tokenizer,
+        raw_eval_ds_for_gen,
+        num_samples=cfg.get("gen_eval_samples", 0),
+    )
 
     # Save LoRA adapter + tokenizer
     out_dir = Path(cfg.get("output_dir", OUTPUT_DIR))

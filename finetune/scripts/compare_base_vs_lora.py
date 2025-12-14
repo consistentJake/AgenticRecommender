@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Dict, List
 
 import torch
-import yaml
 from peft import PeftModel
 from transformers import (
     AutoModelForCausalLM,
@@ -24,166 +23,22 @@ from transformers import (
 )
 from tqdm import tqdm
 
-# Defaults (overridden by config)
-MAX_NEW_TOKENS = 64
-TEMPERATURE = 0.7
-TOP_P = 0.9
-SYSTEM_PROMPT = (
-    "You are a movie recommendation assistant. Given a user's recent history and "
-    "a candidate movie, respond with exactly one word: Yes or No."
+# Import shared utilities and constants
+from utils import (
+    BASE_MODEL,
+    get_device,
+    load_yaml_config,
+    load_data,
+    format_prompt,
+    generate,
+    generate_batch,
+    extract_answer,
+    compute_metrics,
 )
 
 
-def load_yaml_config(path: Path) -> Dict:
-    """Load YAML configuration file."""
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
-
-
-def get_device():
-    if torch.backends.mps.is_available():
-        return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
-
-
-def load_data(path: str) -> List[Dict]:
-    """Load data from JSON or JSONL file."""
-    data = []
-    with open(path, 'r', encoding='utf-8') as f:
-        # Try to load as JSON first
-        try:
-            f.seek(0)
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        # Fall back to JSONL format
-        f.seek(0)
-        for line in f:
-            line = line.strip()
-            if line:
-                data.append(json.loads(line))
-    return data
-
-
-def format_prompt(example: Dict) -> str:
-    """Format example into prompt, supporting both training and test formats."""
-    # Training data format (JSON with instruction/input)
-    if "input" in example:
-        return example["input"]
-
-    # Test data format (JSONL with history_titles, candidate_title)
-    if "history_titles" in example and "candidate_title" in example:
-        history_str = "\n".join(example["history_titles"])
-        prompt = (
-            f"User's last 15 watched movies:\n"
-            f"{history_str}\n\n"
-            f"Candidate movie:\n"
-            f"{example['candidate_title']}\n\n"
-            f"Should we recommend this movie to the user? Answer Yes or No."
-        )
-        return prompt
-
-    raise ValueError(f"Unknown data format. Example keys: {example.keys()}")
-
-
-def generate(prompt: str, model, tokenizer, device: str, system_prompt: str = None) -> str:
-    """Generate prediction for a single prompt."""
-    messages = [
-        {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
-        {"role": "user", "content": prompt},
-    ]
-
-    chat_str = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-    inputs = tokenizer(
-        chat_str,
-        return_tensors="pt",
-        padding=True,
-        return_attention_mask=True,
-    )
-
-    input_ids = inputs["input_ids"].to(device)
-    attn_mask = inputs["attention_mask"].to(device)
-
-    with torch.no_grad():
-        out = model.generate(
-            input_ids=input_ids,
-            attention_mask=attn_mask,
-            max_new_tokens=MAX_NEW_TOKENS,
-            temperature=TEMPERATURE,
-            top_p=TOP_P,
-            do_sample=True,
-        )
-
-    return tokenizer.decode(out[0], skip_special_tokens=True)
-
-
-def extract_answer(response: str) -> str:
-    """Extract Yes/No answer from model response."""
-    # Extract only the assistant's actual response after the prompt
-    # Split by "assistant" to get the generated part
-    if "assistant" in response:
-        response = response.split("assistant")[-1]
-
-    # Remove <think> tags and their content
-    import re
-    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-
-    # Clean up whitespace
-    response = response.strip()
-    response_lower = response.lower()
-
-    # Look for yes/no in the cleaned response
-    if response_lower.startswith("yes"):
-        return "Yes"
-    elif response_lower.startswith("no"):
-        return "No"
-    elif "yes" in response_lower and "no" not in response_lower:
-        return "Yes"
-    elif "no" in response_lower and "yes" not in response_lower:
-        return "No"
-    else:
-        return "Unknown"
-
-
-def compute_metrics(predictions: List[str], labels: List[str]) -> Dict[str, float]:
-    """Compute accuracy and F1 score."""
-    correct = sum(1 for p, l in zip(predictions, labels) if p == l)
-    accuracy = correct / len(labels) if labels else 0.0
-
-    # Compute F1 for "Yes" class
-    tp = sum(1 for p, l in zip(predictions, labels) if p == "Yes" and l == "Yes")
-    fp = sum(1 for p, l in zip(predictions, labels) if p == "Yes" and l == "No")
-    fn = sum(1 for p, l in zip(predictions, labels) if p == "No" and l == "Yes")
-    tn = sum(1 for p, l in zip(predictions, labels) if p == "No" and l == "No")
-
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-    return {
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "total": len(labels),
-        "correct": correct,
-        "tp": tp,
-        "fp": fp,
-        "fn": fn,
-        "tn": tn,
-    }
+# All utility functions (load_yaml_config, get_device, load_data, format_prompt,
+# generate, extract_answer, compute_metrics) imported from utils
 
 
 def display_example(example: Dict, max_history: int = 5):
@@ -240,8 +95,15 @@ def main():
     base_model_name = cfg.get("model_name_or_path", "Qwen/Qwen3-0.6B")
     adapter_dir = Path(cfg.get("output_dir", "output/qwen3-movielens-qlora"))
     test_file = Path(inference_cfg.get("test_file", "data/movielens_qwen3/test_raw.jsonl"))
-    infer_subdir = inference_cfg.get("infer_subdir", "infer")
-    output_dir = adapter_dir / infer_subdir
+
+    # Use separate infer_results directory instead of subdirectory under output_dir
+    # This prevents mixing inference outputs with training artifacts
+    infer_output_dir = Path(inference_cfg.get("infer_output_dir", "infer_results"))
+    # Create a subdirectory based on the adapter name for organization
+    adapter_name = adapter_dir.name
+    output_dir = infer_output_dir / adapter_name
+
+    batch_size = inference_cfg.get("batch_size", 1)
     max_samples = inference_cfg.get("max_samples", None)
     show_examples = inference_cfg.get("show_examples", 5)
 
@@ -257,6 +119,7 @@ def main():
     print(f"Adapter directory: {adapter_dir}")
     print(f"Test file: {test_file}")
     print(f"Output directory: {output_dir}")
+    print(f"Batch size: {batch_size}")
     print(f"Max samples: {max_samples or 'all'}")
     print(f"Show examples: {show_examples}")
     print("=" * 80)
@@ -296,15 +159,6 @@ def main():
     if device_map is None:
         base_model = base_model.to(device)
 
-    # Load LoRA adapter
-    print(f"Loading LoRA adapter from {adapter_dir}...")
-    peft_model = PeftModel.from_pretrained(
-        base_model,
-        str(adapter_dir),
-        is_trainable=False,
-    )
-    lora_model = peft_model.merge_and_unload()
-
     # Load test data
     print(f"\nLoading test data from {test_file}...")
     test_data = load_data(str(test_file))
@@ -315,81 +169,158 @@ def main():
 
     print(f"Total test samples: {len(test_data)}\n")
 
-    # Run inference on BASE MODEL
+    # Run inference on BASE MODEL FIRST (before loading LoRA to avoid contamination)
     print("="*60)
     print("Running inference on BASE MODEL (without LoRA)...")
+    print(f"Processing {len(test_data)} samples in batches of {batch_size}...")
     print("="*60)
     base_predictions = []
     base_results = []
 
-    for example in tqdm(test_data, desc="Base model inference"):
-        prompt = format_prompt(example)
-        system_prompt = example.get("system", None)
-        response = generate(prompt, base_model, tokenizer, device, system_prompt)
-        prediction = extract_answer(response)
+    # Open file for streaming output during inference
+    base_output = output_dir / "base_predictions.jsonl"
+    base_file = open(base_output, 'w', encoding='utf-8')
 
-        # Extract label from either format
-        label = example.get("output") or example.get("label")
+    # Process in batches for efficiency
+    for i in tqdm(range(0, len(test_data), batch_size), desc="Base model inference", unit="batch"):
+        batch = test_data[i:i+batch_size]
 
-        base_predictions.append(prediction)
+        # Prepare batch prompts
+        prompts = [format_prompt(example) for example in batch]
+        system_prompts = [example.get("system", None) for example in batch]
 
-        # Build result dict with available fields
-        result = {
-            "label": label,
-            "prediction": prediction,
-            "full_response": response,
-        }
+        # Use batch generation if batch_size > 1, otherwise use single generation
+        if batch_size > 1:
+            # All system prompts should be the same, use the first one
+            system_prompt = system_prompts[0] if system_prompts else None
+            responses = generate_batch(prompts, base_model, tokenizer, device, system_prompt)
+        else:
+            system_prompt = system_prompts[0] if system_prompts else None
+            responses = [generate(prompts[0], base_model, tokenizer, device, system_prompt)]
 
-        # Add format-specific fields if available
-        if "user_id" in example:
-            result["user_id"] = example["user_id"]
-        if "candidate_title" in example:
-            result["candidate_title"] = example["candidate_title"]
-        if "instruction" in example:
-            result["instruction"] = example["instruction"]
-        if "input" in example:
-            result["input"] = example["input"]
+        # Process each response in the batch
+        for example, prompt, response in zip(batch, prompts, responses):
+            prediction = extract_answer(response)
 
-        base_results.append(result)
+            # Extract label from either format
+            label = example.get("output") or example.get("label")
+
+            base_predictions.append(prediction)
+
+            # Extract assistant's response only (after "assistant" marker)
+            assistant_response = response.split("assistant")[-1].strip() if "assistant" in response else response
+
+            # Build result dict with available fields for better debugging
+            result = {
+                "label": label,
+                "prediction": prediction,
+                "prompt": prompt,  # The user prompt sent to the model
+                "assistant_response": assistant_response,  # What the model actually generated
+                "full_response": response,  # Complete output including system/user/assistant
+            }
+
+            # Add format-specific fields if available
+            if "user_id" in example:
+                result["user_id"] = example["user_id"]
+            if "candidate_title" in example:
+                result["candidate_title"] = example["candidate_title"]
+            if "instruction" in example:
+                result["instruction"] = example["instruction"]
+            if "input" in example:
+                result["input"] = example["input"]
+
+            base_results.append(result)
+
+            # Write to file immediately for progress tracking
+            base_file.write(json.dumps(result) + '\n')
+            base_file.flush()  # Ensure it's written to disk
+
+    # Close base predictions file
+    base_file.close()
+    print(f"Base predictions saved to: {base_output}")
+
+    # NOW load LoRA adapter AFTER base inference is complete
+    print("\n" + "="*60)
+    print(f"Loading LoRA adapter from {adapter_dir}...")
+    print("="*60)
+    peft_model = PeftModel.from_pretrained(
+        base_model,
+        str(adapter_dir),
+        is_trainable=False,
+    )
+    lora_model = peft_model.merge_and_unload()
 
     # Run inference on LORA MODEL
     print("\n" + "="*60)
     print("Running inference on LORA-FINETUNED MODEL...")
+    print(f"Processing {len(test_data)} samples in batches of {batch_size}...")
     print("="*60)
     lora_predictions = []
     lora_results = []
     labels = []
 
-    for example in tqdm(test_data, desc="LoRA model inference"):
-        prompt = format_prompt(example)
-        system_prompt = example.get("system", None)
-        response = generate(prompt, lora_model, tokenizer, device, system_prompt)
-        prediction = extract_answer(response)
+    # Open file for streaming output during inference
+    lora_output = output_dir / "lora_predictions.jsonl"
+    lora_file = open(lora_output, 'w', encoding='utf-8')
 
-        # Extract label from either format
-        label = example.get("output") or example.get("label")
+    # Process in batches for efficiency
+    for i in tqdm(range(0, len(test_data), batch_size), desc="LoRA model inference", unit="batch"):
+        batch = test_data[i:i+batch_size]
 
-        lora_predictions.append(prediction)
-        labels.append(label)
+        # Prepare batch prompts
+        prompts = [format_prompt(example) for example in batch]
+        system_prompts = [example.get("system", None) for example in batch]
 
-        # Build result dict with available fields
-        result = {
-            "label": label,
-            "prediction": prediction,
-            "full_response": response,
-        }
+        # Use batch generation if batch_size > 1, otherwise use single generation
+        if batch_size > 1:
+            # All system prompts should be the same, use the first one
+            system_prompt = system_prompts[0] if system_prompts else None
+            responses = generate_batch(prompts, lora_model, tokenizer, device, system_prompt)
+        else:
+            system_prompt = system_prompts[0] if system_prompts else None
+            responses = [generate(prompts[0], lora_model, tokenizer, device, system_prompt)]
 
-        # Add format-specific fields if available
-        if "user_id" in example:
-            result["user_id"] = example["user_id"]
-        if "candidate_title" in example:
-            result["candidate_title"] = example["candidate_title"]
-        if "instruction" in example:
-            result["instruction"] = example["instruction"]
-        if "input" in example:
-            result["input"] = example["input"]
+        # Process each response in the batch
+        for example, prompt, response in zip(batch, prompts, responses):
+            prediction = extract_answer(response)
 
-        lora_results.append(result)
+            # Extract label from either format
+            label = example.get("output") or example.get("label")
+
+            lora_predictions.append(prediction)
+            labels.append(label)
+
+            # Extract assistant's response only (after "assistant" marker)
+            assistant_response = response.split("assistant")[-1].strip() if "assistant" in response else response
+
+            # Build result dict with available fields for better debugging
+            result = {
+                "label": label,
+                "prediction": prediction,
+                "prompt": prompt,  # The user prompt sent to the model
+                "assistant_response": assistant_response,  # What the model actually generated
+                "full_response": response,  # Complete output including system/user/assistant
+            }
+
+            # Add format-specific fields if available
+            if "user_id" in example:
+                result["user_id"] = example["user_id"]
+            if "candidate_title" in example:
+                result["candidate_title"] = example["candidate_title"]
+            if "instruction" in example:
+                result["instruction"] = example["instruction"]
+            if "input" in example:
+                result["input"] = example["input"]
+
+            lora_results.append(result)
+
+            # Write to file immediately for progress tracking
+            lora_file.write(json.dumps(result) + '\n')
+            lora_file.flush()  # Ensure it's written to disk
+
+    # Close LoRA predictions file
+    lora_file.close()
+    print(f"LoRA predictions saved to: {lora_output}")
 
     # Compute metrics
     print("\n" + "="*60)
@@ -462,23 +393,12 @@ def main():
     print(f"  - LoRA regressed (was correct, now wrong): {len(base_correct_lora_wrong)}")
     print(f"  - Both wrong but different: {len(both_wrong)}")
 
-    # Save predictions
-    base_output = output_dir / "base_predictions.jsonl"
-    lora_output = output_dir / "lora_predictions.jsonl"
+    # File paths for additional analysis files
+    # Note: base_output and lora_output were already written during inference
     comparison_file = output_dir / "comparison_report.json"
     disagreements_file = output_dir / "disagreements_analysis.jsonl"
     improvements_file = output_dir / "lora_improvements.jsonl"
     regressions_file = output_dir / "lora_regressions.jsonl"
-
-    print(f"\nSaving base model predictions to {base_output}...")
-    with open(base_output, 'w', encoding='utf-8') as f:
-        for result in base_results:
-            f.write(json.dumps(result) + '\n')
-
-    print(f"Saving LoRA model predictions to {lora_output}...")
-    with open(lora_output, 'w', encoding='utf-8') as f:
-        for result in lora_results:
-            f.write(json.dumps(result) + '\n')
 
     # Save disagreements analysis
     print(f"Saving disagreements analysis to {disagreements_file}...")
@@ -497,8 +417,11 @@ def main():
                     d["history_titles"] = example["history_titles"]
                 if "input" in example:
                     d["input"] = example["input"]
-                d["base_response"] = base_results[d["index"]]["full_response"]
-                d["lora_response"] = lora_results[d["index"]]["full_response"]
+                # Include both assistant responses and full responses for debugging
+                d["base_assistant_response"] = base_results[d["index"]]["assistant_response"]
+                d["lora_assistant_response"] = lora_results[d["index"]]["assistant_response"]
+                d["base_full_response"] = base_results[d["index"]]["full_response"]
+                d["lora_full_response"] = lora_results[d["index"]]["full_response"]
                 f.write(json.dumps(d, indent=2) + '\n')
 
     # Save regressions (cases where LoRA made base model worse)
@@ -512,22 +435,25 @@ def main():
                     d["history_titles"] = example["history_titles"]
                 if "input" in example:
                     d["input"] = example["input"]
-                d["base_response"] = base_results[d["index"]]["full_response"]
-                d["lora_response"] = lora_results[d["index"]]["full_response"]
+                # Include both assistant responses and full responses for debugging
+                d["base_assistant_response"] = base_results[d["index"]]["assistant_response"]
+                d["lora_assistant_response"] = lora_results[d["index"]]["assistant_response"]
+                d["base_full_response"] = base_results[d["index"]]["full_response"]
+                d["lora_full_response"] = lora_results[d["index"]]["full_response"]
                 f.write(json.dumps(d, indent=2) + '\n')
 
     # Save comparison report
     print(f"Saving comparison report to {comparison_file}...")
     with open(comparison_file, 'w', encoding='utf-8') as f:
         json.dump({
-            "test_file": args.test_file,
+            "test_file": str(test_file),
             "total_samples": len(labels),
             "base_model": {
-                "name": BASE_MODEL,
+                "name": base_model_name,
                 "metrics": base_metrics,
             },
             "lora_model": {
-                "adapter_dir": args.adapter_dir,
+                "adapter_dir": str(adapter_dir),
                 "metrics": lora_metrics,
             },
             "improvement": {
@@ -547,14 +473,20 @@ def main():
 
     print(f"\nAll results saved successfully!")
     print(f"\nFiles saved in {output_dir}/:")
-    print(f"  - base_predictions.jsonl: All base model predictions")
-    print(f"  - lora_predictions.jsonl: All LoRA model predictions")
+    print(f"  - base_predictions.jsonl: All base model predictions (written during inference)")
+    print(f"  - lora_predictions.jsonl: All LoRA model predictions (written during inference)")
     print(f"  - comparison_report.json: Overall metrics and summary")
     print(f"  - disagreements_analysis.jsonl: All cases where models disagree")
     if lora_correct_base_wrong:
         print(f"  - lora_improvements.jsonl: Cases where LoRA fixed base model errors ({len(lora_correct_base_wrong)} samples)")
     if base_correct_lora_wrong:
         print(f"  - lora_regressions.jsonl: Cases where LoRA made mistakes base didn't ({len(base_correct_lora_wrong)} samples)")
+    print(f"\nEach prediction file includes:")
+    print(f"  - label: Ground truth")
+    print(f"  - prediction: Extracted Yes/No/Unknown")
+    print(f"  - prompt: User prompt sent to model")
+    print(f"  - assistant_response: Only the model's generated text (for debugging)")
+    print(f"  - full_response: Complete output including system/user/assistant")
 
     # ========================================================================
     # ANALYSIS SECTION

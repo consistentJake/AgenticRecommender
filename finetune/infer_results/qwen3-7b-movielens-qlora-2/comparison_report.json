@@ -1,0 +1,47 @@
+{
+  "test_file": "data/movielens_qwen3/test_raw.jsonl",
+  "total_samples": 100,
+  "base_model": {
+    "name": "Qwen/Qwen3-8B",
+    "metrics": {
+      "accuracy": 0.35,
+      "precision": 0.5,
+      "recall": 0.038461538461538464,
+      "f1": 0.07142857142857144,
+      "total": 100,
+      "correct": 35,
+      "tp": 1,
+      "fp": 1,
+      "fn": 25,
+      "tn": 34
+    }
+  },
+  "lora_model": {
+    "adapter_dir": "output/qwen3-7b-movielens-qlora-2",
+    "metrics": {
+      "accuracy": 0.69,
+      "precision": 0.6,
+      "recall": 0.675,
+      "f1": 0.6352941176470589,
+      "total": 100,
+      "correct": 69,
+      "tp": 27,
+      "fp": 18,
+      "fn": 13,
+      "tn": 42
+    }
+  },
+  "improvement": {
+    "accuracy": 0.33999999999999997,
+    "precision": 0.09999999999999998,
+    "recall": 0.6365384615384616,
+    "f1": 0.5638655462184875
+  },
+  "disagreements_summary": {
+    "total": 66,
+    "percentage": 66.0,
+    "lora_improvements": 42,
+    "lora_regressions": 8,
+    "both_wrong": 16
+  }
+}
