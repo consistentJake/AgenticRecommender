@@ -18,7 +18,7 @@ pip install flash-attn --no-build-isolation
 
 git archive --format=tar -o finetune.tar HEAD:finetune
 
-
+tar -xvf finetune.tar
 ## Data
 ```bash
 # Prepare MovieLens data (downloads ml-latest-small)

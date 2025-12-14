@@ -1,5 +1,7 @@
 # Previous Works folder
-previousWorks/
+previousWorks/LLM-Sequential-Recommendation/
+previousWorks/MACRec/
+# keep thinkRec as added 
 
 # OS files
 .DS_Store
