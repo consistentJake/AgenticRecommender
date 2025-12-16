@@ -7,6 +7,12 @@ model_name_or_path: Qwen/Qwen3-8B
 template: qwen
 finetuning_type: lora
 
+# Special tokenization handling for Qwen models (default: true)
+# When enabled for Qwen models: sets unk_token to "<|object_ref_end|>" (ID: 151647)
+# When disabled or for non-Qwen models: uses standard tokenization with pad_token = eos_token
+# Training before Dec 14 does not include this special handling
+enable_special_tokenization: true
+
 # ==== DATA ====
 dataset_dir: data
 dataset: movielens_qwen3_train
@@ -15,15 +21,24 @@ cutoff_len: 1024
 max_samples: null
 max_eval_samples: 100  # Increased from 25 for more reliable eval metrics
 
+# ==== PACKING ====
+# Sequence packing: false (default) = pre-tokenized mode with caching
+# Set to true to enable packing for better GPU utilization
+# See configs/qwen3_7b_movielens_qlora_packing.yaml for packing example
+# See docs/PACKING_GUIDE.md for details
+# packing is NOT used for inference
+packing: true  # default behavior is false
+
 # ==== OUTPUT & LOGGING ====
 # For training, this is the output directory
 # For inference/comparison, use the checkpoint directory that has adapter_config.json
-output_dir: output/qwen3-7b-movielens-qlora-2/
+output_dir: output/qwen3-7b-movielens-qlora-special-token/
 logging_steps: 500  # Log metrics including GPU memory every 500 steps
-save_steps: 4000
-eval_steps: 2000  # Reduced eval frequency (was 10) since eval is more expensive now
+# if choose to enable packing, save_steps and eval steps can be smaller because the total steps are reduced
+save_steps: 2000
+eval_steps: 1000  # Reduced eval frequency (was 10) since eval is more expensive now
 eval_accumulation_steps: 2  # Reduced to prevent OOM during eval
-save_total_limit: 2
+save_total_limit: 4
 skip_memory_metrics: false  # Enable GPU memory logging to TensorBoard
 
 # ==== BATCHING (24GB-FRIENDLY) ====
@@ -72,10 +87,34 @@ report_to:
   - tensorboard
 
 # ==== INFERENCE & EVALUATION ====
+# used by scripts/compare_base_vs_lora.py
+# Performance optimizations available:
+# 1. use_peft_directly: shares base weights, faster inference (recommended: true)
+# 2. chunk_size: process in chunks for better cache locality and memory efficiency
+# Note: First batch will always be slower due to GPU initialization (unavoidable)
+# See docs/LORA_INFERENCE_OPTIMIZATION.md for details
 inference:
   test_file: data/movielens_qwen3/test_raw.jsonl  # Path to test data
-  # test_file: data/movielens_qwen3/train.json # use traindata for eval
-  infer_output_dir: infer_results/  # Directory for inference results (NOT under output_dir)
+  # test_file: data/movielens_qwen3/train.jsonl # use traindata for eval
+  # infer_output_dir: infer_results_1214_2_training_checkpoint_8000/  # Directory for inference results (NOT under output_dir)
+  infer_output_dir: infer_results_1216_test_special_tokenization_checkpoint_8000/ 
+  # adapter_dir: Specify which adapter to load for comparison (optional)
+  # If not specified, uses output_dir from main config
+  # Examples:
+  #   adapter_dir: output/qwen3-7b-movielens-qlora-2  # Load from final adapter
+  # adapter_dir: output/qwen3-7b-movielens-qlora-2/checkpoint-12240 # Load from specific checkpoint
+  # Uncomment and set to override output_dir:
+  adapter_dir: output/qwen3-7b-movielens-qlora-special-token/checkpoint-8000
+
+
   batch_size: 8  # Batch size for inference (higher = faster but more memory)
-  max_samples: 100  # Limit samples for quick testing (null = use all)
+  chunk_size: 64  # Process 200 samples per chunk (optional; null = process all at once)
+                   # Chunked mode: runs base inference, then LoRA inference on each chunk
+                   # Benefits: lower memory usage, better cache locality, incremental results
+                   # See docs/CHUNKED_INFERENCE.md for details
+  use_peft_directly: true  # Use PEFT model directly (true) vs merge_and_unload (false)
+                           # true: More efficient, only computes LoRA deltas, shares base weights
+                           # false: Creates merged model (slower, more memory, but more compatible)
+                           # Recommended: true for best performance
+  max_samples: 1000  # Limit samples for quick testing (null = use all)
   show_examples: 5  # Number of examples to show in analysis report

@@ -4,6 +4,8 @@
 import json
 import multiprocessing as mp
 import re
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -186,9 +188,9 @@ def to_generation_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
 # ==============================================================================
 
 def build_datasets(train_path: str, eval_path: str) -> Tuple[Dataset, Dataset]:
-    """Build Dataset objects from JSON files."""
-    train_data = load_json(train_path)
-    eval_data = load_json(eval_path)
+    """Build Dataset objects from JSON or JSONL files."""
+    train_data = load_data(train_path)
+    eval_data = load_data(eval_path)
 
     train_ds = Dataset.from_list(train_data)
     eval_ds = Dataset.from_list(eval_data)
@@ -344,11 +346,30 @@ def load_model_and_tokenizer(
     if disable_cache:
         model.config.use_cache = False
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        trust_remote_code=True,
-    )
-    tokenizer.pad_token = tokenizer.eos_token
+    # Load tokenizer with optional special tokenization handling
+    enable_special_tokenization = cfg.get("enable_special_tokenization", False)
+
+    if enable_special_tokenization:
+        if "Qwen" in model_name:
+            # Special tokenization for Qwen models
+            # Use custom unk_token for special object reference handling
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=True,
+            )
+            tokenizer.unk_token = "<|object_ref_end|>"
+            tokenizer.unk_token_id = 151647
+        else:
+            # Standard tokenization
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=True,
+                use_fast=False if not enable_special_tokenization or "Qwen" not in model_name else None,
+            )
+            tokenizer.pad_token = tokenizer.eos_token
+            if tokenizer.unk_token is None:
+                tokenizer.add_special_tokens({"unk_token": "<unk>"})
+
     tokenizer.padding_side = "left"
     tokenizer.truncation_side = "left"
 
@@ -364,8 +385,25 @@ def preprocess_datasets_parallel(
     cache_dir: Optional[Path] = None,
     num_proc: Optional[int] = None,
     clear_cache: bool = False,
+    prepare_for_packing: bool = False,
 ) -> Tuple[Dataset, Dataset]:
     """Preprocess datasets with multiprocessing for faster tokenization.
+
+    This function supports two modes:
+
+    1. **Pre-tokenized mode** (prepare_for_packing=False, default):
+       - Fully tokenizes datasets with proper label masking
+       - Caches tokenized data for fast subsequent runs
+       - Sequences are variable length (NOT padded to cutoff_len)
+       - Use this when packing is disabled in SFTTrainer
+       - Best for: Faster training startup with cached data
+
+    2. **Packing mode** (prepare_for_packing=True):
+       - Only formats to text (no tokenization)
+       - Returns datasets with 'text' field for SFTTrainer to handle
+       - Enables SFTTrainer's packing feature to concatenate multiple examples
+       - Use with SFTTrainer(packing=True, formatting_func=...)
+       - Best for: Maximum GPU efficiency, less padding waste
 
     Args:
         train_ds: Training dataset
@@ -376,9 +414,30 @@ def preprocess_datasets_parallel(
         cache_dir: Directory to cache preprocessed datasets (None = no caching)
         num_proc: Number of processes to use (defaults to CPU count)
         clear_cache: If True, delete existing cache and regenerate datasets
+        prepare_for_packing: If True, only format (no tokenization) for SFTTrainer packing
 
     Returns:
         Preprocessed (train_ds, eval_ds) tuple
+
+    Example:
+        >>> # Pre-tokenized mode (current behavior, with caching)
+        >>> train_ds, eval_ds = preprocess_datasets_parallel(
+        ...     train_ds, eval_ds, tokenizer, formatting_func,
+        ...     cutoff_len=1024, prepare_for_packing=False
+        ... )
+        >>> trainer = SFTTrainer(train_dataset=train_ds, ...)  # No packing
+
+        >>> # Packing mode (for better GPU utilization)
+        >>> train_ds, eval_ds = preprocess_datasets_parallel(
+        ...     train_ds, eval_ds, tokenizer, formatting_func,
+        ...     cutoff_len=1024, prepare_for_packing=True
+        ... )
+        >>> trainer = SFTTrainer(
+        ...     train_dataset=train_ds,
+        ...     packing=True,
+        ...     max_seq_length=1024,
+        ...     ...
+        ... )
     """
     from functools import partial
 
@@ -389,11 +448,16 @@ def preprocess_datasets_parallel(
     # we exceed cutoff_len.
     tokenizer.truncation_side = "left"
 
-    # Check if cached preprocessed datasets exist
+    # Use different cache directories for packing vs non-packing modes
+    # This prevents cache conflicts when switching between modes
     if cache_dir is not None:
         cache_dir = Path(cache_dir)
-        train_cache = cache_dir / "train_preprocessed"
-        eval_cache = cache_dir / "eval_preprocessed"
+        if prepare_for_packing:
+            train_cache = cache_dir / "train_formatted_for_packing"
+            eval_cache = cache_dir / "eval_formatted_for_packing"
+        else:
+            train_cache = cache_dir / "train_preprocessed"
+            eval_cache = cache_dir / "eval_preprocessed"
 
         # Clear cache if requested
         if clear_cache:
@@ -407,7 +471,8 @@ def preprocess_datasets_parallel(
             print("Cache cleared successfully!\n")
 
         if train_cache.exists() and eval_cache.exists():
-            print(f"\nLoading preprocessed datasets from cache: {cache_dir}")
+            mode_str = "formatted (for packing)" if prepare_for_packing else "preprocessed (tokenized)"
+            print(f"\nLoading {mode_str} datasets from cache: {cache_dir}")
             print(f"  Train samples: checking cached dataset...")
             print(f"  Eval samples: checking cached dataset...")
             from datasets import load_from_disk
@@ -415,10 +480,11 @@ def preprocess_datasets_parallel(
             eval_ds = load_from_disk(str(eval_cache))
             print(f"  Train samples loaded: {len(train_ds)}")
             print(f"  Eval samples loaded: {len(eval_ds)}")
-            print("Cached datasets loaded successfully!\n")
+            print(f"Cached datasets loaded successfully!\n")
             return train_ds, eval_ds
 
-    print(f"\nPreprocessing datasets with {num_proc} processes for faster tokenization...")
+    mode_str = "formatting (for packing)" if prepare_for_packing else "preprocessing with tokenization"
+    print(f"\n{mode_str.capitalize()} datasets with {num_proc} processes...")
 
     # Apply formatting function to convert to chat template format
     print("Applying formatting function to train dataset...")
@@ -450,7 +516,26 @@ def preprocess_datasets_parallel(
         desc="Adding EOS to eval"
     )
 
-    # Tokenize with multiprocessing and properly mask labels
+    # If preparing for packing mode, stop here (no tokenization)
+    # SFTTrainer will handle tokenization and packing
+    if prepare_for_packing:
+        print("Formatting complete! (Tokenization will be handled by SFTTrainer with packing)\n")
+
+        # Save formatted datasets to cache for future runs
+        if cache_dir is not None:
+            cache_dir = Path(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            train_cache = cache_dir / "train_formatted_for_packing"
+            eval_cache = cache_dir / "eval_formatted_for_packing"
+
+            print(f"Saving formatted datasets to cache: {cache_dir}")
+            train_ds.save_to_disk(str(train_cache))
+            eval_ds.save_to_disk(str(eval_cache))
+            print("Cache saved successfully!\n")
+
+        return train_ds, eval_ds
+
+    # Pre-tokenized mode: Tokenize with multiprocessing and properly mask labels
     # Use partial to bind tokenizer and cutoff_len to tokenize_func
     tokenize_fn = partial(
         tokenize_func,
@@ -726,3 +811,51 @@ def compute_metrics(predictions: List[str], labels: List[str]) -> Dict[str, floa
         "fn": fn,
         "tn": tn,
     }
+
+
+# ==============================================================================
+# Training Log Archival
+# ==============================================================================
+
+def archive_training_log(log_path: str, timestamp_format: str = "%y%m%d%H%M") -> Optional[str]:
+    """Archive training log file with timestamp.
+
+    Creates a copy of the training log file with a timestamp appended to the filename.
+    The timestamp format is YYMMDDHHmm by default (e.g., 2412141530 for Dec 14, 2024 15:30).
+
+    Args:
+        log_path: Path to the training log file (e.g., "training.log" or "training-resume.log")
+        timestamp_format: strftime format string for timestamp (default: "%y%m%d%H%M")
+
+    Returns:
+        Path to the archived log file if successful, None if the log file doesn't exist
+
+    Example:
+        >>> # At end of training
+        >>> archived = archive_training_log("training.log")
+        >>> # Creates: training.log.2412141530
+        >>>
+        >>> # Or with custom format
+        >>> archived = archive_training_log("training.log", "%Y%m%d_%H%M%S")
+        >>> # Creates: training.log.20241214_153045
+    """
+    log_path = Path(log_path)
+
+    if not log_path.exists():
+        print(f"Log file not found: {log_path}")
+        return None
+
+    # Generate timestamp
+    timestamp = datetime.now().strftime(timestamp_format)
+
+    # Create archived filename: original_name.timestamp
+    archived_path = Path(f"{log_path}.{timestamp}")
+
+    # Copy the log file
+    try:
+        shutil.copy2(log_path, archived_path)
+        print(f"Training log archived: {archived_path}")
+        return str(archived_path)
+    except Exception as e:
+        print(f"Error archiving log file: {e}")
+        return None

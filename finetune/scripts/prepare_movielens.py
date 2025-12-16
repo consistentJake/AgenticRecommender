@@ -320,8 +320,8 @@ def main() -> None:
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_json(output_dir / "train.json", train_records)
-    write_json(output_dir / "eval.json", val_records)
+    write_jsonl(output_dir / "train.jsonl", train_records)
+    write_jsonl(output_dir / "eval.jsonl", val_records)
     write_jsonl(output_dir / "test_raw.jsonl", test_rows)
 
     meta = {

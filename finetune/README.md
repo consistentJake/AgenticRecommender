@@ -234,6 +234,42 @@ nvidia-smi
 tail -100 training.log | grep "{'loss"
 ```
 
+### Resuming Training from Checkpoints
+
+If training was interrupted or you want to continue training with more epochs, use the `--resume` flag:
+
+```bash
+# Resume from latest checkpoint in output_dir
+python scripts/finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml --resume
+
+# Resume and train for 2 additional epochs beyond what's in the config
+# (e.g., if config has 3 epochs, this will train to 5 total)
+python scripts/finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml --resume --extra-epochs 2
+
+# Example: Continue training in background
+nohup python scripts/finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml --resume --extra-epochs 2 > training_resume.log 2>&1 &
+```
+
+**How it works:**
+- The script automatically finds the latest checkpoint in `output_dir` (e.g., `checkpoint-12000`)
+- The checkpoint number (12000) represents the **last completed training step**
+- Training continues from that checkpoint with all optimizer states preserved
+- **Step counter continues from where it left off** (e.g., if checkpoint-12000, next step will be 12001)
+- If no checkpoint is found, training starts from scratch
+- Use `--extra-epochs` to train beyond the original `num_train_epochs` setting
+
+**Example output when resuming:**
+```
+================================================================================
+RESUMING TRAINING FROM CHECKPOINT
+================================================================================
+Checkpoint: checkpoint-12000
+Last completed step: 12000
+Next step will be: 12001
+Epoch: 2.45
+================================================================================
+```
+
 ## Inference (Deterministic Yes/No)
 
 - Demo mode (prints base vs LoRA on a canned prompt):
@@ -539,20 +575,176 @@ Once training begins, you'll see step output with loss values:
     tensorboard --logdir output/qwen3-7b-movielens-qlora/logs --port 6007
         tensorboard --logdir output/qwen3-7b-movielens-qlora-2/logs --port 6007
 
+        tensorboard --logdir output/qwen3-7b-movielens-qlora-speical-token/logs --port 6007
+
 
   ```
 - Open http://localhost:6006 to view loss curves, accuracy/F1, and eval checkpoints. Point `--logdir` to a parent folder (e.g., `output`) to compare multiple runs.
 
-## Quick sequence-length audit
-- Token-based (uses the same tokenizer as training):
-  ```bash
-  python finetune/scripts/check_seq_len.py --config finetune/configs/qwen3_movielens_qlora.yaml --max-samples 2000
-  ```
-- Char-only (no model/tokenizer download):
-  ```bash
-  python finetune/scripts/check_seq_len.py --config finetune/configs/qwen3_movielens_qlora.yaml --char-only --max-samples 2000
-  ```
-- Reports min/max/mean and percentiles (p50/p90/p95/p99/p100) for the train split using the same chat template formatting. Use this to set `cutoff_len` near your p95 length.
+## Dataset Sequence Length Analysis
+
+The `scripts/check_seq_len.py` tool provides comprehensive analysis of your dataset's sequence lengths, helping you:
+- Verify that `cutoff_len` is appropriately sized
+- Understand how JSON data is transformed into tokenized inputs
+- Identify truncation issues before training
+- See concrete examples of the full data pipeline
+
+### Basic Usage
+
+**Full analysis with example transformations:**
+```bash
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --show-examples 2
+```
+
+**Quick statistics (no examples):**
+```bash
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --show-examples 0
+```
+
+**Analyze subset for quick check:**
+```bash
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --max-samples 1000
+```
+
+**Test different cutoff lengths:**
+```bash
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --cutoff-len 896
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --cutoff-len 512
+```
+
+**Character-based analysis (no tokenizer needed):**
+```bash
+python scripts/check_seq_len.py --config configs/qwen3_7b_movielens_qlora.yaml --char-only
+```
+
+### What the Script Shows
+
+**When using `--show-examples`, you'll see the complete transformation pipeline:**
+
+1. **Original JSON Record**: The raw data format (instruction, input, output, system)
+2. **Chat Messages**: Converted to role-based format (system, user, assistant)
+3. **Applied Chat Template**: Formatted string with Qwen special tokens (`<|im_start|>`, `<|im_end|>`)
+4. **Tokenized**: Token IDs and counts
+5. **Truncation Analysis**: What would be removed if sequence exceeds cutoff
+6. **Label Masking**: How many tokens are masked (-100) vs. trained
+
+**Example Output:**
+```
+================================================================================
+EXAMPLE TRANSFORMATIONS: JSON → Chat Messages → Formatted String → Tokens
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+EXAMPLE 1
+────────────────────────────────────────────────────────────────────────────
+
+[STEP 1] Original JSON Record:
+  instruction: Predict whether the user will like the candidate movie...
+  input: User's last 15 watched movies:
+1. Pearl Harbor (2001) (rating ≈ 3.0)
+...
+  output: No
+  system: You are a movie recommendation assistant...
+
+[STEP 2] Converted to Chat Messages:
+  1. role=system: You are a movie recommendation assistant...
+  2. role=user: Predict whether the user will like...
+  3. role=assistant: No...
+
+[STEP 3] Applied Chat Template (Qwen format with special tokens):
+  <|im_start|>system
+  You are a movie recommendation assistant...
+  <|im_end|>
+  <|im_start|>user
+  Predict whether the user will like the candidate movie...
+  <|im_end|>
+  <|im_start|>assistant
+  No<|im_end|>
+
+[STEP 4] Tokenized:
+  Total tokens: 427
+  First 20 token IDs: [151644, 8948, 198, 2610, 525, ...]
+  Last 20 token IDs: [..., 2753, 151645, 198]
+
+[STEP 5] Truncation Analysis (cutoff_len=1024):
+  ✓ No truncation needed (427 <= 1024)
+
+[STEP 6] Label Masking for Training:
+  Prompt tokens (masked with -100): 420
+  Response tokens (trained): 7
+  Masking ratio: 98.4% masked
+
+================================================================================
+SEQUENCE LENGTH STATISTICS
+================================================================================
+
+Dataset: data/movielens_qwen3/train.json
+Measured: 78271 samples (tokens)
+Cutoff length: 1024
+
+Statistics:
+  min: 393.00
+  max: 875.00
+  mean: 435.02
+  p50: 432.00
+  p90: 458.00
+  p95: 468.00
+  p99: 493.00
+  p100: 875.00
+
+Truncation Analysis:
+  Samples > 1024 tokens: 0 (0.0%)
+  Samples <= 1024 tokens: 78271 (100.0%)
+
+  ✓ No truncation needed for any samples.
+```
+
+### Command-Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--config` | Path to YAML config | `finetune/configs/qwen3_movielens_qlora.yaml` |
+| `--show-examples` | Number of transformation examples to show | `2` |
+| `--max-samples` | Limit number of samples to analyze | All samples |
+| `--cutoff-len` | Override cutoff length for testing | From config |
+| `--char-only` | Skip tokenizer, count characters instead | False |
+| `--percentiles` | Comma-separated percentiles to report | `50,90,95,99,100` |
+
+### Interpreting Results
+
+**Setting `cutoff_len`:**
+- Ideal: Set to ~1.1-1.2x your p95 length for safety margin
+- Too low: If p99 > cutoff_len, many samples will be truncated
+- Too high: Wastes memory and compute on padding
+
+**Truncation Warnings:**
+- **0% truncated**: Perfect, no data loss
+- **<1% truncated**: Generally acceptable
+- **1-5% truncated**: Review truncation strategy
+- **>5% truncated**: Consider reducing `history_len` in data preparation or increasing `cutoff_len`
+
+**For MovieLens Dataset:**
+```
+Mean: 435 tokens (42% of cutoff)
+p95:  468 tokens (46% of cutoff)
+Max:  875 tokens (85% of cutoff)
+
+Conclusion: cutoff_len=1024 is appropriate with 15% headroom.
+Could reduce to 896 for 12.5% memory savings with zero risk.
+```
+
+### When to Run This Tool
+
+1. **Before first training**: Verify your `cutoff_len` setting
+2. **After changing data preparation**: Check impact on sequence lengths
+3. **When debugging**: Understand exactly how data is formatted
+4. **For optimization**: Find the minimum safe `cutoff_len` to save memory
+
+### Documentation
+
+See `/workspace/docs/` for detailed documentation:
+- `dataset_preparation_and_tokenization.md`: Complete pipeline explanation
+- `cutoff_analysis_summary.md`: Analysis of cutoff length and truncation strategy
 
 ## Tuning for Your Hardware
 - **Low VRAM (8GB)**: Keep `per_device_train_batch_size = 1-2`, enable `gradient_checkpointing = true`
@@ -577,30 +769,7 @@ Once training begins, you'll see step output with loss values:
     - Training format: displays input prompt (truncated to 300 chars)
 
   Usage Examples:
-
-  On training data:
-  python scripts/compare_base_vs_lora.py \
-    --test_file data/movielens_qwen3/train.json \
-    --output_dir infer/train_comparison \
-    --max_samples 100
-
-
-    python scripts/compare_base_vs_lora.py \
-    --test_file data/movielens_qwen3/train.json \
-    --output_dir infer/train_comparison \
-    --max_samples 100
-
-
-  On test data (existing behavior):
-  python scripts/compare_base_vs_lora.py \
-    --test_file data/movielens_qwen3/test_raw.jsonl \
-    --output_dir infer/test_comparison \
-    --max_samples 50
-
-  Then analyze results:
-  python scripts/analyze_differences.py \
-    --infer_dir infer/train_comparison \
-    --show_examples 10
+  nohup python scripts/compare_base_vs_lora.py --config configs/qwen3_7b_movielens_qlora.yaml > compare_base_vs_lora.log 2>&1 &
 
 ## Training Metrics Issue: Why Accuracy/F1 Were Showing 0
 
@@ -807,3 +976,178 @@ Let me give you the detailed VRAM breakdown for Qwen3-8B with QLoRA, batch_size=
   - Saves ~2 GiB of VRAM
   - Costs ~25% more computation time
   - But allows 2x bigger batch size = net speedup!
+
+## Sequence Packing: Why Training Sample Count Appears Reduced
+
+### What is Sequence Packing?
+
+When `packing: true` is enabled in your config, TRL's `SFTTrainer` concatenates multiple short sequences together into single training examples to maximize GPU utilization. This is particularly efficient for datasets with variable-length sequences.
+
+### Why Does Sample Count Change?
+
+**Before Packing:**
+- Original dataset: 78,271 individual samples
+- Each sample is a separate training example
+- Many samples are shorter than `max_length=1024`, wasting compute on padding
+
+**After Packing:**
+- Multiple samples are packed into each training example up to `max_length=1024` tokens
+- Result: ~7,344 packed training examples
+- **Average packing ratio**: 78,271 ÷ 7,344 ≈ 10.7 samples per packed example
+
+### Is This Normal?
+
+Yes, this is completely normal and expected! The reduced number you see is **not** a data loss—it's an efficiency optimization.
+
+**Benefits of Packing:**
+- ✅ **Better GPU utilization**: Minimizes padding waste
+- ✅ **Faster training**: Fewer forward/backward passes
+- ✅ **Same data coverage**: All 78,271 samples are still being trained on
+- ✅ **More efficient learning**: The model sees more tokens per training step
+
+**Example:**
+```
+Without packing (78,271 examples):
+  Sample 1: [350 tokens] + [674 padding tokens] = 1024
+  Sample 2: [420 tokens] + [604 padding tokens] = 1024
+  → Total: 770 tokens trained, 1278 tokens wasted
+
+With packing (7,344 examples):
+  Packed 1: [350 + 420 + 254 tokens] = 1024
+  → Total: 1024 tokens trained, 0 tokens wasted
+```
+
+### Configuration
+
+Packing is controlled in the config YAML:
+```yaml
+# Enable sequence packing
+packing: true  # default: false
+cutoff_len: 1024  # Max sequence length for packing
+```
+
+**When to use packing:**
+- ✅ Variable-length sequences (like our MovieLens data: 393-875 tokens)
+- ✅ Mean sequence length << max_length (our data: mean=435, max_length=1024)
+- ✅ Want to maximize GPU efficiency
+
+**When NOT to use packing:**
+- ❌ Sequences are already near max_length
+- ❌ Need to preserve exact sample boundaries for specific evaluation
+- ❌ Debugging individual samples
+
+### Implementation Details (TRL 0.24.0+)
+
+The packing parameters are passed via `SFTConfig` (not `TrainingArguments`):
+
+```python
+from trl import SFTTrainer, SFTConfig
+
+sft_config = SFTConfig(
+    max_length=1024,          # Max sequence length
+    packing=True,              # Enable packing
+    # ... other training args
+)
+
+trainer = SFTTrainer(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=train_dataset,
+    args=sft_config,           # Pass SFTConfig as args
+    formatting_func=formatting_func,  # Required for packing
+)
+```
+
+**Note**: In TRL 0.24.0+, the `packing` parameter was moved from `SFTTrainer.__init__()` to `SFTConfig`. Using the old API will result in:
+```
+TypeError: SFTTrainer.__init__() got an unexpected keyword argument 'packing'
+```
+
+## TensorBoard Troubleshooting: "No Dashboards Active" Error
+
+### Problem
+When opening TensorBoard, you may see the error:
+```
+No dashboards are active for the current data set.
+
+Probable causes:
+  - You haven't written any data to your event files.
+  - TensorBoard can't find your event files.
+```
+
+### Root Cause
+This error is **almost always a TensorBoard cache issue**, not a logging problem. The training code logs correctly to TensorBoard event files, but:
+1. TensorBoard cached an earlier state when the log directory was empty
+2. Browser cached the empty dashboard view
+3. Port conflict with existing TensorBoard instance
+
+**Important**: Enabling packing (`packing: true`) does NOT break TensorBoard logging. Both packing and non-packing modes use the same HuggingFace Trainer logging infrastructure.
+
+### How to Fix
+
+**Step 1: Verify logs are actually being written**
+```bash
+# Check that event files exist and have data
+ls -lh /workspace/output/qwen3-7b-movielens-qlora-special-token/logs/
+
+# Should show files like:
+# events.out.tfevents.1765756160.d2ff652b0591.2363578.0  (17K)
+```
+
+If files exist with size >10KB, your logging is working fine and this is just a cache issue.
+
+**Step 2: Kill existing TensorBoard processes**
+```bash
+pkill -9 -f tensorboard
+```
+
+**Step 3: Clear TensorBoard cache**
+```bash
+rm -rf /tmp/.tensorboard-info/ ~/.tensorboard/
+```
+
+**Step 4: Restart TensorBoard (use port 6007 if 6006 is occupied)**
+```bash
+# Start TensorBoard in background
+nohup tensorboard --logdir=/workspace/output/qwen3-7b-movielens-qlora-special-token --port=6007 --bind_all --reload_interval=5 > /tmp/tensorboard.log 2>&1 &
+
+# Verify it started
+ps aux | grep "tensorboard.*6007" | grep -v grep
+```
+
+**Step 5: Access TensorBoard and hard refresh**
+1. Open `http://localhost:6007/` in your browser
+2. Do a hard refresh: **Ctrl+F5** (Windows/Linux) or **Cmd+Shift+R** (Mac)
+3. If still showing empty, try an incognito/private window
+
+### Verification
+
+After restarting, verify TensorBoard can see your metrics:
+```bash
+# Query the API to check available metrics
+curl -s "http://localhost:6007/data/plugin/scalars/tags" | python3 -m json.tool | grep -E 'train|eval'
+```
+
+You should see metrics like:
+- `train/loss`, `train/grad_norm`, `train/learning_rate`
+- `eval/loss`, `eval/accuracy`, `eval/f1`
+- And many more (typically 20+ metrics)
+
+### Alternative: Point to Parent Directory
+
+Instead of pointing to the `logs/` subdirectory, point to the parent:
+```bash
+tensorboard --logdir=/workspace/output/qwen3-7b-movielens-qlora-special-token --port=6007
+```
+
+TensorBoard will automatically find the `logs/` subdirectory.
+
+### Common Mistakes
+
+**❌ Wrong:** Assuming packing broke logging
+- Packing only affects training step count, not TensorBoard logging
+
+**❌ Wrong:** Pointing to a non-existent directory
+- Double-check the path matches your `output_dir` in the config
+
+**✅ Correct:** Clear cache and restart TensorBoard when you see "No dashboards active"

@@ -3,6 +3,23 @@
 
 Configuration is loaded from a YAML file (default: configs/qwen3_movielens_qlora.yaml).
 Most training/LoRA hyperparameters can be overridden there instead of hardcoding values.
+
+Checkpoint Resumption:
+    Use --resume to automatically resume from the latest checkpoint in output_dir.
+    Use --extra-epochs N to train for N additional epochs beyond the config's num_train_epochs.
+
+    The checkpoint number (e.g., checkpoint-12000) represents the LAST COMPLETED STEP.
+    When resuming, training continues from step 12001 with all optimizer states preserved.
+
+Examples:
+    # Start new training
+    python finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml
+
+    # Resume from latest checkpoint
+    python finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml --resume
+
+    # Resume and train 2 more epochs (e.g., config has 3, total will be 5)
+    python finetune_lora.py --config configs/qwen3_7b_movielens_qlora.yaml --resume --extra-epochs 2
 """
 
 import argparse
@@ -27,7 +44,7 @@ from transformers import (
     TrainerState,
     TrainingArguments,
 )
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 
 # Import shared utilities
 from utils import (
@@ -41,6 +58,7 @@ from utils import (
     to_generation_messages,
     tokenize_func,
     preprocess_datasets_parallel,
+    archive_training_log,
 )
 
 
@@ -334,6 +352,49 @@ class MultiMetricEarlyStoppingCallback(TrainerCallback):
         return control
 
 
+def find_latest_checkpoint(output_dir: Path) -> Optional[Tuple[Path, int]]:
+    """Find the latest checkpoint in the output directory.
+
+    Returns:
+        Tuple of (checkpoint_path, global_step), or None if no checkpoints exist
+    """
+    if not output_dir.exists():
+        return None
+
+    # Find all checkpoint directories
+    checkpoints = []
+    for item in output_dir.iterdir():
+        if item.is_dir() and item.name.startswith("checkpoint-"):
+            try:
+                # Extract step number from checkpoint-XXXX
+                step = int(item.name.split("-")[1])
+                checkpoints.append((step, item))
+            except (IndexError, ValueError):
+                continue
+
+    if not checkpoints:
+        return None
+
+    # Return the checkpoint with the highest step number
+    checkpoints.sort(key=lambda x: x[0], reverse=True)
+    latest_step, latest_path = checkpoints[0]
+    return latest_path, latest_step
+
+
+def get_checkpoint_info(checkpoint_path: Path) -> Dict[str, Any]:
+    """Read trainer state from checkpoint to get training progress info.
+
+    Returns:
+        Dict with keys: global_step, epoch, total_flos, etc.
+    """
+    trainer_state_file = checkpoint_path / "trainer_state.json"
+    if not trainer_state_file.exists():
+        return {}
+
+    with open(trainer_state_file, 'r') as f:
+        return json.load(f)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -347,10 +408,37 @@ def main():
         action="store_true",
         help="Clear preprocessing cache and regenerate eval data (useful when changing max_eval_samples)",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume training from latest checkpoint in output_dir if it exists",
+    )
+    parser.add_argument(
+        "--extra-epochs",
+        type=int,
+        default=0,
+        help="Number of additional epochs to train when resuming (added to num_train_epochs from config)",
+    )
     args = parser.parse_args()
 
     cfg = load_yaml_config(args.config)
     device = get_device()
+
+    # Check for existing checkpoints and resume settings
+    output_dir = Path(cfg.get("output_dir", OUTPUT_DIR))
+    checkpoint_info = find_latest_checkpoint(output_dir) if args.resume else None
+
+    latest_checkpoint = None
+    checkpoint_step = None
+    if checkpoint_info:
+        latest_checkpoint, checkpoint_step = checkpoint_info
+        # Read detailed checkpoint state
+        state_info = get_checkpoint_info(latest_checkpoint)
+
+    # Adjust epochs if continuing training
+    num_train_epochs = cfg.get("num_train_epochs", NUM_TRAIN_EPOCHS)
+    if args.extra_epochs > 0:
+        num_train_epochs += args.extra_epochs
 
     # Print configuration at the start
     print("=" * 80)
@@ -359,6 +447,22 @@ def main():
     print(f"Config file: {args.config}")
     print(f"Device: {device}")
     print(f"Clear cache: {args.clear_cache}")
+    print(f"Resume training: {args.resume}")
+    if latest_checkpoint:
+        print(f"\nCheckpoint Information:")
+        print(f"  Checkpoint directory: {latest_checkpoint.name}")
+        print(f"  Checkpoint path: {latest_checkpoint}")
+        print(f"  Last completed step: {checkpoint_step}")
+        if state_info:
+            print(f"  Training will resume from step: {state_info.get('global_step', checkpoint_step) + 1}")
+            print(f"  Epoch at checkpoint: {state_info.get('epoch', 'unknown'):.2f}" if isinstance(state_info.get('epoch'), (int, float)) else f"  Epoch at checkpoint: {state_info.get('epoch', 'unknown')}")
+            print(f"  Best metric (F1): {state_info.get('best_metric', 'unknown')}")
+        else:
+            print(f"  Training will resume from step: {checkpoint_step + 1}")
+    elif args.resume:
+        print(f"No checkpoint found in {output_dir}, starting from scratch")
+    if args.extra_epochs > 0:
+        print(f"\nExtra epochs: {args.extra_epochs} (total: {num_train_epochs})")
     print()
 
     # Model configuration
@@ -376,6 +480,7 @@ def main():
     print(f"  dataset_dir: {cfg.get('dataset_dir', 'data')}")
     print(f"  max_eval_samples: {cfg.get('max_eval_samples', MAX_EVAL_SAMPLES)}")
     print(f"  cutoff_len: {cfg.get('cutoff_len', MAX_SEQ_LEN)}")
+    print(f"  packing: {cfg.get('packing', False)}")
     print(f"  preprocessing_cache_dir: {cfg.get('preprocessing_cache_dir', '.cache/preprocessed')}")
     print(f"  num_proc: {cfg.get('num_proc', mp.cpu_count())}")
     print()
@@ -391,7 +496,7 @@ def main():
     # Training configuration
     print("Training Configuration:")
     print(f"  output_dir: {cfg.get('output_dir', OUTPUT_DIR)}")
-    print(f"  num_train_epochs: {cfg.get('num_train_epochs', NUM_TRAIN_EPOCHS)}")
+    print(f"  num_train_epochs: {num_train_epochs}")
     print(f"  per_device_train_batch_size: {cfg.get('per_device_train_batch_size', PER_DEVICE_TRAIN_BATCH_SIZE)}")
     print(f"  per_device_eval_batch_size: {cfg.get('per_device_eval_batch_size', PER_DEVICE_EVAL_BATCH_SIZE)}")
     print(f"  gradient_accumulation_steps: {cfg.get('gradient_accumulation_steps', GRADIENT_ACCUMULATION_STEPS)}")
@@ -449,8 +554,13 @@ def main():
 
     # Preprocess datasets with multiprocessing for faster tokenization
     # Use cache to avoid re-tokenizing on subsequent runs
+    # Two modes available:
+    # 1. Pre-tokenized (packing=False): Fully tokenize and cache for fast subsequent runs
+    # 2. Packing (packing=True): Only format text, let SFTTrainer handle tokenization+packing
     num_proc = cfg.get("num_proc", mp.cpu_count())
     cache_dir = cfg.get("preprocessing_cache_dir", ".cache/preprocessed")
+    use_packing = cfg.get("packing", False)
+
     train_ds, eval_ds = preprocess_datasets_parallel(
         train_ds=train_ds,
         eval_ds=eval_ds,
@@ -460,6 +570,7 @@ def main():
         cache_dir=Path(cache_dir),
         num_proc=num_proc,
         clear_cache=args.clear_cache,
+        prepare_for_packing=use_packing,
     )
 
     # LoRA configuration (PEFT)
@@ -473,9 +584,10 @@ def main():
     )
 
     # Training hyperparameters (adapt for your GPU)
-    training_args = TrainingArguments(
-        output_dir=cfg.get("output_dir", OUTPUT_DIR),
-        logging_dir=f"{cfg.get('output_dir', OUTPUT_DIR)}/logs",
+    # Use SFTConfig instead of TrainingArguments to support packing and max_seq_length
+    training_args = SFTConfig(
+        output_dir=str(output_dir),
+        logging_dir=f"{output_dir}/logs",
 
         per_device_train_batch_size=cfg.get(
             "per_device_train_batch_size", PER_DEVICE_TRAIN_BATCH_SIZE
@@ -487,7 +599,7 @@ def main():
             "gradient_accumulation_steps", GRADIENT_ACCUMULATION_STEPS
         ),
 
-        num_train_epochs=cfg.get("num_train_epochs", NUM_TRAIN_EPOCHS),
+        num_train_epochs=num_train_epochs,  # Use adjusted epochs (includes extra_epochs)
         learning_rate=cfg.get("learning_rate", LEARNING_RATE),
         lr_scheduler_type=cfg.get("lr_scheduler_type", "cosine"),
         warmup_ratio=cfg.get("warmup_ratio", WARMUP_RATIO),
@@ -512,6 +624,10 @@ def main():
         gradient_checkpointing=cfg.get("gradient_checkpointing", False),
         gradient_checkpointing_kwargs={"use_reentrant": False} if cfg.get("gradient_checkpointing", False) else None,
         report_to=resolve_report_to(cfg),
+
+        # SFT-specific parameters (only in SFTConfig, not TrainingArguments)
+        packing=use_packing,
+        max_length=cfg.get("cutoff_len", MAX_SEQ_LEN) if use_packing else None,
     )
 
     def _extract_answer(text: str) -> Optional[str]:
@@ -703,26 +819,60 @@ def main():
         print(f"Generative eval — accuracy: {gen_accuracy:.4f}, f1: {gen_f1:.4f}, samples: {len(preds)}\n")
 
     # TRL SFTTrainer handles PEFT integration
-    # Note: Datasets are pre-tokenized via multiprocessing, so no formatting_func needed
-    trainer = SFTTrainer(
-        model=model,
-        processing_class=tokenizer,
-        train_dataset=train_ds,
-        eval_dataset=eval_ds,
-        peft_config=lora_config,
-        args=training_args,
-        compute_metrics=compute_metrics,
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        callbacks=[
+    # Configure based on packing mode:
+    # - Packing mode: Pass formatting_func and enable packing
+    # - Pre-tokenized mode: Datasets already tokenized, no formatting_func needed
+    trainer_kwargs = {
+        "model": model,
+        "processing_class": tokenizer,
+        "train_dataset": train_ds,
+        "eval_dataset": eval_ds,
+        "peft_config": lora_config,
+        "args": training_args,
+        "compute_metrics": compute_metrics,
+        "preprocess_logits_for_metrics": preprocess_logits_for_metrics,
+        "callbacks": [
             MultiMetricEarlyStoppingCallback(
                 patience=cfg.get("multi_metric_patience", 5),
                 min_delta_loss=cfg.get("multi_metric_min_delta_loss", 0.001),
                 min_delta_metrics=cfg.get("multi_metric_min_delta_metrics", 0.001)
             )
         ],
-    )
+    }
 
-    trainer.train()
+    if use_packing:
+        # Packing mode: Let SFTTrainer handle tokenization and packing
+        # Note: packing and max_length are already configured in SFTConfig above
+        trainer_kwargs["formatting_func"] = formatting_func
+        print(f"Trainer configured with packing=True, max_length={cfg.get('cutoff_len', MAX_SEQ_LEN)}")
+    else:
+        # Pre-tokenized mode: Datasets already have input_ids, attention_mask, labels
+        print("Trainer configured with pre-tokenized datasets (no packing)")
+
+    trainer = SFTTrainer(**trainer_kwargs)
+
+    # Resume from checkpoint if found, otherwise start from scratch
+    if latest_checkpoint:
+        print(f"\n{'='*80}")
+        print(f"RESUMING TRAINING FROM CHECKPOINT")
+        print(f"{'='*80}")
+        print(f"Checkpoint: {latest_checkpoint.name}")
+        print(f"Last completed step: {checkpoint_step}")
+        if state_info:
+            next_step = state_info.get('global_step', checkpoint_step) + 1
+            print(f"Next step will be: {next_step}")
+            print(f"Epoch: {state_info.get('epoch', 'unknown'):.2f}" if isinstance(state_info.get('epoch'), (int, float)) else f"Epoch: {state_info.get('epoch', 'unknown')}")
+        else:
+            print(f"Next step will be: {checkpoint_step + 1}")
+        print(f"{'='*80}\n")
+        trainer.train(resume_from_checkpoint=str(latest_checkpoint))
+    else:
+        print(f"\n{'='*80}")
+        print(f"STARTING TRAINING FROM SCRATCH")
+        print(f"{'='*80}")
+        print(f"Step counter will start from: 1")
+        print(f"{'='*80}\n")
+        trainer.train()
 
     # Optional small generative eval to mirror inference behavior.
     run_generative_eval(
@@ -732,13 +882,25 @@ def main():
         num_samples=cfg.get("gen_eval_samples", 0),
     )
 
-    # Save LoRA adapter + tokenizer
-    out_dir = Path(cfg.get("output_dir", OUTPUT_DIR))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    trainer.save_model(out_dir)
-    tokenizer.save_pretrained(out_dir)
+    # Save final LoRA adapter + tokenizer to output_dir root
+    # (Checkpoints are in output_dir/checkpoint-XXXX subdirectories)
+    print(f"\nSaving final adapter to {output_dir}...")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trainer.save_model(output_dir)
+    tokenizer.save_pretrained(output_dir)
 
-    print(f"Training complete. Adapter + tokenizer saved to: {out_dir}")
+    print(f"\n{'='*80}")
+    print(f"TRAINING COMPLETE")
+    print(f"{'='*80}")
+    print(f"Final adapter + tokenizer saved to: {output_dir}")
+    print(f"Checkpoints saved in: {output_dir}/checkpoint-*")
+    print(f"{'='*80}\n")
+
+    # Archive training logs with timestamp
+    print("Archiving training logs...")
+    for log_name in ["training.log", "training-resume.log"]:
+        archive_training_log(log_name)
+    print()
 
 
 if __name__ == "__main__":
