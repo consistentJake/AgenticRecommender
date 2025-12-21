@@ -28,10 +28,6 @@ DEFAULT_SYSTEM_PROMPT = (
     "decide whether the user is likely to purchase this product next. "
     "You must answer ONLY with 'Yes' or 'No'."
 )
-DEFAULT_INSTRUCTION = (
-    "Predict whether the user will purchase the candidate product. "
-    "Answer only with Yes or No."
-)
 
 
 @dataclass
@@ -58,10 +54,21 @@ def parse_args() -> argparse.Namespace:
         help="Destination folder for processed dataset.",
     )
     parser.add_argument(
-        "--history-len",
+        "--min-history-len",
         type=int,
-        default=10,
-        help="Number of historical purchases to include in prompt.",
+        default=3,
+        help="Minimum number of historical purchases required.",
+    )
+    parser.add_argument(
+        "--max-history-len",
+        type=int,
+        default=5,
+        help="Maximum number of historical purchases to include in prompt.",
+    )
+    parser.add_argument(
+        "--enable-sliding-windows",
+        action="store_true",
+        help="Enable sliding window technique to generate multiple samples per user.",
     )
     parser.add_argument(
         "--val-ratio",
@@ -94,12 +101,6 @@ def parse_args() -> argparse.Namespace:
         help="System prompt for chat format.",
     )
     parser.add_argument(
-        "--instruction",
-        type=str,
-        default=DEFAULT_INSTRUCTION,
-        help="Instruction prompt for Alpaca format.",
-    )
-    parser.add_argument(
         "--sample-customers",
         type=int,
         default=None,
@@ -120,6 +121,21 @@ def time_to_bucket(time_str: str) -> str:
             return "eve"
     except:
         return "aft"  # default
+
+
+def get_hour_from_time(time_str: str) -> int:
+    """Extract hour from time string."""
+    try:
+        return int(time_str.split(':')[0])
+    except:
+        return 12  # default noon
+
+
+def get_day_of_week(day_num: int) -> str:
+    """Convert day number to day of week (Mon-Sun)."""
+    # Assuming day_num is days from some starting point, we'll use modulo 7
+    day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    return day_names[day_num % 7]
 
 
 def load_data(source_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -171,9 +187,15 @@ def merge_order_data(orders_df, vendors_df, products_df):
 
     # Convert time to bucket
     merged['time_bucket'] = merged['order_time'].apply(time_to_bucket)
+    
+    # Extract hour from order_time
+    merged['hour'] = merged['order_time'].apply(get_hour_from_time)
 
     # Extract day number from order_day (e.g., "11 days" -> 11)
     merged['day_num'] = merged['order_day'].str.extract(r'(\d+)').astype(int)
+    
+    # Get day of week
+    merged['day_of_week'] = merged['day_num'].apply(get_day_of_week)
 
     # Handle missing values
     merged['product_name'] = merged['product_name'].fillna('Unknown Product')
@@ -193,7 +215,7 @@ def format_history_list(history_items: List[Dict]) -> str:
     for idx, item in enumerate(history_items, start=1):
         line = (
             f"{idx}. {item['product_name']} "
-            f"(day={item['day_num']}, time={item['time_bucket']}, "
+            f"(day={item['day_of_week']}, hour={item['hour']}, "
             f"cuisine={item['cuisine']}, price=${item['unit_price']:.2f})"
         )
         lines.append(line)
@@ -212,15 +234,85 @@ def split_bounds(length: int, val_ratio: float, test_ratio: float) -> Tuple[int,
     return val_start, test_start
 
 
+def analyze_customer_history_lengths(merged_df: pd.DataFrame) -> None:
+    """Analyze the distribution of historic event lengths for each customer."""
+    print("\n" + "=" * 80)
+    print("CUSTOMER HISTORY LENGTH ANALYSIS")
+    print("=" * 80)
+    
+    customer_groups = merged_df.groupby('customer_id')
+    history_lengths = []
+    
+    for customer_id, group in customer_groups:
+        history_lengths.append(len(group))
+    
+    # Calculate statistics
+    total_customers = len(history_lengths)
+    min_len = min(history_lengths)
+    max_len = max(history_lengths)
+    avg_len = sum(history_lengths) / len(history_lengths)
+    
+    print(f"Total customers: {total_customers:,}")
+    print(f"Min historic events per customer: {min_len}")
+    print(f"Max historic events per customer: {max_len}")
+    print(f"Average historic events per customer: {avg_len:.2f}")
+    
+    # Calculate percentiles
+    sorted_lengths = sorted(history_lengths)
+    p25 = sorted_lengths[int(0.25 * len(sorted_lengths))]
+    p50 = sorted_lengths[int(0.50 * len(sorted_lengths))]
+    p75 = sorted_lengths[int(0.75 * len(sorted_lengths))]
+    p90 = sorted_lengths[int(0.90 * len(sorted_lengths))]
+    p95 = sorted_lengths[int(0.95 * len(sorted_lengths))]
+    
+    print(f"\nPercentiles:")
+    print(f"25th percentile: {p25}")
+    print(f"50th percentile (median): {p50}")
+    print(f"75th percentile: {p75}")
+    print(f"90th percentile: {p90}")
+    print(f"95th percentile: {p95}")
+    
+    # Show data preservation for different sequence lengths
+    print(f"\nData Preservation Analysis:")
+    print(f"{'Seq Length':<12} {'Customers Kept':<15} {'% Preserved':<12} {'Customers Lost':<15}")
+    print("-" * 60)
+    
+    for seq_len in [5, 10, 15, 20, 25, 30, 40, 50]:
+        customers_kept = sum(1 for length in history_lengths if length > seq_len)
+        customers_lost = total_customers - customers_kept
+        pct_preserved = (customers_kept / total_customers) * 100
+        print(f"{seq_len:<12} {customers_kept:<15,} {pct_preserved:<12.1f}% {customers_lost:<15,}")
+    
+    # Distribution by bins
+    print(f"\nHistoric Event Length Distribution:")
+    bins = [(1, 5), (6, 10), (11, 20), (21, 30), (31, 50), (51, 100), (101, float('inf'))]
+    for min_val, max_val in bins:
+        if max_val == float('inf'):
+            count = sum(1 for length in history_lengths if length >= min_val)
+            label = f"{min_val}+"
+        else:
+            count = sum(1 for length in history_lengths if min_val <= length <= max_val)
+            label = f"{min_val}-{max_val}"
+        pct = (count / total_customers) * 100
+        print(f"{label:<10}: {count:>6,} customers ({pct:>5.1f}%)")
+    
+    print("=" * 80 + "\n")
+
+
 def build_samples(
     merged_df: pd.DataFrame,
-    history_len: int,
+    min_history_len: int,
+    max_history_len: int,
+    enable_sliding_windows: bool,
     val_ratio: float,
     test_ratio: float,
     neg_ratio: int,
 ) -> List[Sample]:
     """Build positive and negative samples with train/val/test splits."""
     print("[info] Building samples...")
+
+    # First analyze customer history lengths before filtering
+    analyze_customer_history_lengths(merged_df)
 
     samples = []
     customer_groups = merged_df.groupby('customer_id')
@@ -242,28 +334,89 @@ def build_samples(
         # Sort by order day and time
         group = group.sort_values(['day_num', 'order_time']).reset_index(drop=True)
 
-        # Skip customers without enough history
-        if len(group) <= history_len:
+        # Skip customers without minimum history
+        if len(group) < min_history_len:
             continue
 
-        # Usable events (after warm-up history)
-        usable = group.iloc[history_len:].reset_index(drop=True)
-        val_start, test_start = split_bounds(len(usable), val_ratio, test_ratio)
-
-        # Get user's purchased products for negative sampling
+        # Get user's purchased products and product names for negative sampling
         user_product_ids = set(group['product_id'].unique())
+        user_product_names = set(group['product_name'].unique())
 
-        for idx in range(len(usable)):
-            # Get history slice
-            history_slice = group.iloc[idx:idx + history_len].to_dict('records')
+        if enable_sliding_windows:
+            # Generate multiple samples using sliding windows
+            # For each possible prediction point, create a sample
+            for pred_idx in range(min_history_len, len(group)):
+                # Determine history slice (use up to max_history_len)
+                history_start = max(0, pred_idx - max_history_len)
+                history_slice = group.iloc[history_start:pred_idx].to_dict('records')
+                
+                # Current order (positive sample)
+                current_order = group.iloc[pred_idx].to_dict()
 
-            # Current order (positive sample)
-            current_order = usable.iloc[idx].to_dict()
+                # Determine usable samples for splitting
+                total_predictions = len(group) - min_history_len
+                current_pred_idx = pred_idx - min_history_len
+                val_start, test_start = split_bounds(total_predictions, val_ratio, test_ratio)
 
-            # Determine split
-            if idx >= test_start:
+                # Determine split
+                if current_pred_idx >= test_start:
+                    split = "test"
+                elif current_pred_idx >= val_start:
+                    split = "val"
+                else:
+                    split = "train"
+
+                # Add positive sample
+                samples.append(
+                    Sample(
+                        split=split,
+                        customer_id=customer_id,
+                        history_items=history_slice,
+                        candidate=current_order,
+                        label="Yes"
+                    )
+                )
+
+                # Add negative samples - exclude products with same ID OR same name
+                negative_candidates = [
+                    p for p in all_products_list
+                    if (p['product_id'] not in user_product_ids and 
+                        p['product_name'] not in user_product_names)
+                ]
+
+                if negative_candidates and neg_ratio > 0:
+                    n_neg = min(neg_ratio, len(negative_candidates))
+                    neg_samples = random.sample(negative_candidates, n_neg)
+
+                    for neg_product in neg_samples:
+                        samples.append(
+                            Sample(
+                                split=split,
+                                customer_id=customer_id,
+                                history_items=history_slice,
+                                candidate=neg_product,
+                                label="No"
+                            )
+                        )
+        else:
+            # Original approach: one sample per user using latest history
+            if len(group) < max_history_len + 1:  # Need history + 1 for prediction
+                continue
+                
+            # Use the first max_history_len items as history
+            history_slice = group.iloc[:max_history_len].to_dict('records')
+            # Predict the next item
+            current_order = group.iloc[max_history_len].to_dict()
+
+            # For single sample per user, distribute across splits
+            # Use customer hash to deterministically assign splits
+            import hashlib
+            customer_hash = int(hashlib.md5(str(customer_id).encode()).hexdigest(), 16)
+            hash_mod = customer_hash % 100
+            
+            if hash_mod < int(test_ratio * 100):
                 split = "test"
-            elif idx >= val_start:
+            elif hash_mod < int((test_ratio + val_ratio) * 100):
                 split = "val"
             else:
                 split = "train"
@@ -282,7 +435,8 @@ def build_samples(
             # Add negative samples
             negative_candidates = [
                 p for p in all_products_list
-                if p['product_id'] not in user_product_ids
+                if (p['product_id'] not in user_product_ids and 
+                    p['product_name'] not in user_product_names)
             ]
 
             if negative_candidates and neg_ratio > 0:
@@ -304,13 +458,14 @@ def build_samples(
     return samples
 
 
-def format_alpaca(sample: Sample, history_len: int, instruction: str, system: str) -> Dict:
-    """Convert sample to Alpaca format (instruction/input/output/system/history)."""
+def format_alpaca(sample: Sample, max_history_len: int, system: str) -> Dict:
+    """Convert sample to Alpaca format (input/output/system/history) - optimized for chat template."""
     history_str = format_history_list(sample.history_items)
     candidate = sample.candidate
 
+    history_count = len(sample.history_items)
     input_text = (
-        f"User's last {history_len} food orders:\n{history_str}\n\n"
+        f"User's last {history_count} food orders:\n{history_str}\n\n"
         f"Candidate product:\n"
         f"- {candidate['product_name']} "
         f"(cuisine: {candidate['cuisine']}, price: ${candidate['unit_price']:.2f})\n\n"
@@ -318,8 +473,8 @@ def format_alpaca(sample: Sample, history_len: int, instruction: str, system: st
     )
 
     return {
-        "instruction": instruction,
-        "input": input_text,
+        "instruction": input_text,
+        "input": "",
         "output": sample.label,
         "system": system,
         "history": [],
@@ -349,7 +504,9 @@ def main() -> None:
     print("=" * 80)
     print("Delivery Hero → Alpaca Dataset Conversion")
     print("=" * 80)
-    print(f"[config] History length: {args.history_len}")
+    print(f"[config] Min history length: {args.min_history_len}")
+    print(f"[config] Max history length: {args.max_history_len}")
+    print(f"[config] Enable sliding windows: {args.enable_sliding_windows}")
     print(f"[config] Val ratio: {args.val_ratio}")
     print(f"[config] Test ratio: {args.test_ratio}")
     print(f"[config] Negative ratio: {args.neg_ratio}")
@@ -374,7 +531,9 @@ def main() -> None:
     print("[info] Starting sample generation...")
     samples = build_samples(
         merged_df=merged,
-        history_len=args.history_len,
+        min_history_len=args.min_history_len,
+        max_history_len=args.max_history_len,
+        enable_sliding_windows=args.enable_sliding_windows,
         val_ratio=args.val_ratio,
         test_ratio=args.test_ratio,
         neg_ratio=args.neg_ratio,
@@ -399,23 +558,28 @@ def main() -> None:
 
     print("[info] Formatting train records...")
     train_records = [
-        format_alpaca(s, args.history_len, args.instruction, args.system_prompt)
+        format_alpaca(s, args.max_history_len, args.system_prompt)
         for s in train_samples
     ]
     print("[info] Formatting val records...")
     val_records = [
-        format_alpaca(s, args.history_len, args.instruction, args.system_prompt)
+        format_alpaca(s, args.max_history_len, args.system_prompt)
         for s in val_samples
     ]
     print("[info] Formatting test records...")
     test_records = [
-        format_alpaca(s, args.history_len, args.instruction, args.system_prompt)
+        format_alpaca(s, args.max_history_len, args.system_prompt)
         for s in test_samples
     ]
 
-    if not train_records or not val_records or not test_records:
+    # For small datasets without sliding windows, allow empty val/test splits
+    if args.enable_sliding_windows and (not train_records or not val_records or not test_records):
         raise RuntimeError(
             "Some splits are empty. Adjust val/test ratios or history requirements."
+        )
+    elif not args.enable_sliding_windows and not train_records:
+        raise RuntimeError(
+            "No training samples generated. Check history requirements."
         )
 
     # Write outputs
@@ -432,7 +596,9 @@ def main() -> None:
     # Write metadata
     meta = {
         "dataset": "delivery_hero",
-        "history_len": args.history_len,
+        "min_history_len": args.min_history_len,
+        "max_history_len": args.max_history_len,
+        "enable_sliding_windows": args.enable_sliding_windows,
         "val_ratio": args.val_ratio,
         "test_ratio": args.test_ratio,
         "neg_ratio": args.neg_ratio,
@@ -468,3 +634,37 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# Example usage commands:
+#
+# 1. Basic conversion with optimized settings (recommended):
+#    python convert_to_jsonl.py --min-history-len 3 --max-history-len 5 --enable-sliding-windows
+#
+# 2. Convert with custom paths:
+#    python convert_to_jsonl.py --source /path/to/delivery_hero/data --output-dir /path/to/output
+#
+# 3. Sample customers for testing with sliding windows:
+#    python convert_to_jsonl.py --sample-customers 1000 --min-history-len 3 --max-history-len 5 --enable-sliding-windows
+#
+# 4. Without sliding windows (one sample per user):
+#    python convert_to_jsonl.py --min-history-len 3 --max-history-len 5 --sample-customers 1000
+#
+# 5. Adjust ratios and negative sampling:
+#    python convert_to_jsonl.py --min-history-len 3 --max-history-len 5 --val-ratio 0.1 --test-ratio 0.2 --neg-ratio 2
+#
+# 6. Custom prompts:
+#    python convert_to_jsonl.py --system-prompt "You are a recommendation system..."
+#
+# 7. Full example with multiple parameters:
+#    python agentic_recommender/datasets/convert_to_jsonl.py \
+#        --source agentic_recommender/datasets/delivery_hero \
+#        --output-dir agentic_recommender/datasets \
+#        --min-history-len 3 \
+#        --max-history-len 5 \
+#        --enable-sliding-windows \
+#        --val-ratio 0.05 \
+#        --test-ratio 0.1 \
+#        --neg-ratio 1 \
+#        --sample-customers 1000 \
+#        --seed 42
