@@ -207,16 +207,22 @@ def merge_order_data(orders_df, vendors_df, products_df):
 
 
 def format_history_list(history_items: List[Dict]) -> str:
-    """Format purchase history as numbered list (similar to MovieLens)."""
+    """Format purchase history as table format (oldest to newest)."""
     if not history_items:
         return "No previous purchase history."
 
-    lines = []
+    # Create table header
+    lines = [
+        "User recent orders (oldest → newest):\n",
+        "| idx | day | hour | cuisine     | price |",
+        "|-----|-----|------|-------------|",
+    ]
+    
+    # Add table rows
     for idx, item in enumerate(history_items, start=1):
         line = (
-            f"{idx}. {item['product_name']} "
-            f"(day={item['day_of_week']}, hour={item['hour']}, "
-            f"cuisine={item['cuisine']}, price=${item['unit_price']:.2f})"
+            f"| {idx:<3} | {item['day_of_week']:<3} | {item['hour']:<4} | "
+            f"{item['cuisine']:<11} | {item['unit_price']:>5.2f} |"
         )
         lines.append(line)
 
@@ -463,13 +469,11 @@ def format_alpaca(sample: Sample, max_history_len: int, system: str) -> Dict:
     history_str = format_history_list(sample.history_items)
     candidate = sample.candidate
 
-    history_count = len(sample.history_items)
     input_text = (
-        f"User's last {history_count} food orders:\n{history_str}\n\n"
+        f"{history_str}\n\n"
         f"Candidate product:\n"
         f"- {candidate['product_name']} "
-        f"(cuisine: {candidate['cuisine']}, price: ${candidate['unit_price']:.2f})\n\n"
-        "Should we recommend this product to the user? Answer Yes or No."
+        f"(cuisine: {candidate['cuisine']}, price: ${candidate['unit_price']:.2f})"
     )
 
     return {
