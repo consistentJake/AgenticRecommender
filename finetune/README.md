@@ -1151,3 +1151,436 @@ TensorBoard will automatically find the `logs/` subdirectory.
 - Double-check the path matches your `output_dir` in the config
 
 **✅ Correct:** Clear cache and restart TensorBoard when you see "No dashboards active"
+
+---
+
+## Troubleshooting: CUDA/Environment Setup Issues (December 2025)
+
+This section documents a complete environment setup fix that resolved multiple dependency and CUDA version mismatch issues.
+
+### Quick Command Summary (TL;DR)
+
+For those who just want the working commands without explanation:
+
+```bash
+# 1. Install Python 3.11
+apt install -y software-properties-common
+add-apt-repository -y ppa:deadsnakes/ppa
+apt update
+apt install -y python3.11 python3.11-venv python3.11-dev
+
+# 2. Clean up (WARNING: removes old environments!)
+rm -rf /venv/main /venv/py311-cu128 /root/.cache/pip
+
+# 3. Create fresh venv
+python3.11 -m venv /venv/py311-cu128
+/venv/py311-cu128/bin/pip install --upgrade pip setuptools wheel
+
+# 4. Install PyTorch with CUDA 12.8
+/venv/py311-cu128/bin/pip install torch torchvision torchaudio \
+  --index-url https://download.pytorch.org/whl/cu128
+
+# 5. Install ML dependencies
+/venv/py311-cu128/bin/pip install transformers peft trl datasets accelerate bitsandbytes
+
+# 6. Fix dataset structure
+cd /workspace/AgenticRecommender/agentic_recommender/datasets
+mkdir -p train eval
+cp train.jsonl train/train.json
+cp eval.jsonl eval/eval.json
+cat > dataset_info.json << 'EOF'
+{
+  "train": {
+    "file_name": "train/train.json",
+    "file_name_eval": "eval/eval.json"
+  }
+}
+EOF
+
+# 7. Update config (set flash_attn: disabled)
+sed -i 's/flash_attn: auto/flash_attn: disabled/' \
+  /workspace/AgenticRecommender/finetune/configs/qwen3_7b_delivery_hero_qlora.yaml
+
+# 8. Verify environment
+/venv/py311-cu128/bin/python -c "import torch; print(f'✅ PyTorch {torch.__version__}, CUDA {torch.cuda.is_available()}')"
+
+# 9. Run training
+cd /workspace/AgenticRecommender/finetune
+nohup /venv/py311-cu128/bin/python scripts/finetune_lora.py \
+  --config configs/qwen3_7b_delivery_hero_qlora.yaml \
+  > training.log 2>&1 &
+
+# 10. Monitor
+tail -f training.log
+```
+
+**Result:** Python 3.11.14 + PyTorch 2.9.1+cu128 + bitsandbytes 0.49.0 + all dependencies working ✅
+
+---
+
+### Problem Summary
+
+When running the training script, encountered the following errors:
+1. **bitsandbytes error**: `RuntimeError: Configured CUDA binary not found at libbitsandbytes_cuda130.so`
+2. **FlashAttention error**: `ImportError: the package flash_attn seems to be not installed`
+3. **Python version mismatch**: Using Python 3.12 instead of recommended 3.10/3.11
+4. **Dataset path error**: `FileNotFoundError: [Errno 2] No such file or directory: '.../datasets/train/train.json'`
+
+### Root Causes
+
+1. **CUDA version mismatch**: System had CUDA 13.0 installed, but PyTorch was built with CUDA 13.0, and bitsandbytes had libraries only up to CUDA 12.9
+2. **Missing FlashAttention**: Package not installed
+3. **Python version**: Using Python 3.12.12 instead of the more stable 3.11 for ML workloads
+4. **Dataset structure**: Files were `.jsonl` format in flat directory, but script expected subdirectory structure with `.json` files
+
+### Complete Solution
+
+#### Step 1: Check Current Environment
+
+```bash
+# Check CUDA version
+nvcc --version
+nvidia-smi
+
+# Check Python version
+python --version
+
+# Check PyTorch CUDA version
+python -c "import torch; print(f'PyTorch CUDA: {torch.version.cuda}')"
+
+# Check disk space (important for large installations)
+df -h /
+```
+
+#### Step 2: Install Python 3.11
+
+```bash
+# Add deadsnakes PPA (for Ubuntu)
+apt install -y software-properties-common
+add-apt-repository -y ppa:deadsnakes/ppa
+apt update
+
+# Install Python 3.11 and development packages
+apt install -y python3.11 python3.11-venv python3.11-dev
+
+# Verify installation
+python3.11 --version  # Should show: Python 3.11.14
+```
+
+#### Step 3: Clean Up Old Environments (Free Disk Space)
+
+```bash
+# IMPORTANT: This removes old virtual environments
+# Make sure you don't need them before running!
+rm -rf /venv/main /venv/py311-cu128 /root/.cache/pip
+
+# Verify freed space
+df -h /  # Should show significant space freed (we freed ~16GB)
+```
+
+#### Step 4: Create Fresh Python 3.11 Virtual Environment
+
+```bash
+# Create new venv with Python 3.11
+python3.11 -m venv /venv/py311-cu128
+
+# Upgrade pip
+/venv/py311-cu128/bin/pip install --upgrade pip setuptools wheel
+```
+
+#### Step 5: Install PyTorch with CUDA 12.8
+
+```bash
+# Install PyTorch, torchvision, torchaudio with CUDA 12.8 support
+/venv/py311-cu128/bin/pip install torch torchvision torchaudio \
+  --index-url https://download.pytorch.org/whl/cu128
+
+# Verify installation
+/venv/py311-cu128/bin/python -c "
+import torch
+print(f'PyTorch version: {torch.__version__}')
+print(f'CUDA available: {torch.cuda.is_available()}')
+print(f'CUDA version: {torch.version.cuda}')
+"
+# Expected output:
+# PyTorch version: 2.9.1+cu128
+# CUDA available: True
+# CUDA version: 12.8
+```
+
+#### Step 6: Install ML Dependencies
+
+```bash
+# Install transformers, peft, trl, datasets, accelerate
+/venv/py311-cu128/bin/pip install transformers peft trl datasets accelerate
+
+# Install bitsandbytes
+/venv/py311-cu128/bin/pip install bitsandbytes
+
+# Verify versions (exact versions confirmed working)
+/venv/py311-cu128/bin/pip list | grep -E "torch|bitsandbytes|transformers|peft|trl|datasets|accelerate"
+# Expected output:
+# accelerate         1.12.0
+# bitsandbytes       0.49.0
+# datasets           4.4.2
+# peft               0.18.0
+# torch              2.9.1+cu128
+# torchaudio         2.9.1+cu128
+# torchvision        0.24.1+cu128
+# transformers       4.57.3
+# trl                0.26.2
+```
+
+#### Step 7: FlashAttention (Optional - Skip if CUDA Mismatch)
+
+FlashAttention requires matching CUDA toolkit version. If system CUDA (13.0) doesn't match PyTorch CUDA (12.8), skip this step and disable in config:
+
+```yaml
+# In configs/qwen3_7b_delivery_hero_qlora.yaml
+flash_attn: disabled  # Set to disabled if FlashAttention install fails
+```
+
+If your system CUDA matches PyTorch CUDA, install with:
+```bash
+/venv/py311-cu128/bin/pip install flash-attn --no-build-isolation
+```
+
+#### Step 8: Fix Dataset Directory Structure
+
+The script expects a specific directory structure. Create it from existing `.jsonl` files:
+
+```bash
+cd /workspace/AgenticRecommender/agentic_recommender/datasets
+
+# Create subdirectories
+mkdir -p train eval
+
+# Copy and rename files (.jsonl -> .json)
+cp train.jsonl train/train.json
+cp eval.jsonl eval/eval.json
+
+# Create dataset_info.json to map dataset names
+cat > dataset_info.json << 'DATASET_EOF'
+{
+  "train": {
+    "file_name": "train/train.json",
+    "file_name_eval": "eval/eval.json"
+  }
+}
+DATASET_EOF
+
+# Verify structure
+ls -la train/ eval/
+# Should show:
+# train/train.json
+# eval/eval.json
+```
+
+#### Step 9: Update Config (Disable FlashAttention)
+
+```bash
+# Edit config file
+nano /workspace/AgenticRecommender/finetune/configs/qwen3_7b_delivery_hero_qlora.yaml
+
+# Change:
+flash_attn: auto
+# To:
+flash_attn: disabled
+```
+
+#### Step 10: Verify Complete Environment
+
+```bash
+# Run comprehensive environment check
+/venv/py311-cu128/bin/python -c "
+import torch
+import bitsandbytes as bnb
+import transformers
+import peft
+import trl
+import datasets
+import accelerate
+
+print('=== VERIFIED ENVIRONMENT ===')
+print(f'Python: {__import__(\"sys\").version.split()[0]}')
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA available: {torch.cuda.is_available()}')
+print(f'CUDA version (PyTorch): {torch.version.cuda}')
+print(f'bitsandbytes: {bnb.__version__}')
+print(f'transformers: {transformers.__version__}')
+print(f'peft: {peft.__version__}')
+print(f'trl: {trl.__version__}')
+print(f'datasets: {datasets.__version__}')
+print(f'accelerate: {accelerate.__version__}')
+print()
+print('✅ Environment ready for training!')
+"
+
+# Expected output:
+# === VERIFIED ENVIRONMENT ===
+# Python: 3.11.14
+# PyTorch: 2.9.1+cu128
+# CUDA available: True
+# CUDA version (PyTorch): 12.8
+# bitsandbytes: 0.49.0
+# transformers: 4.57.3
+# peft: 0.18.0
+# trl: 0.26.2
+# datasets: 4.4.2
+# accelerate: 1.12.0
+#
+# ✅ Environment ready for training!
+```
+
+#### Step 11: Run Training
+
+```bash
+cd /workspace/AgenticRecommender/finetune
+
+# Test training startup (90 second timeout to verify it starts)
+timeout 90 /venv/py311-cu128/bin/python scripts/finetune_lora.py \
+  --config configs/qwen3_7b_delivery_hero_qlora.yaml
+
+# If successful, run in background
+nohup /venv/py311-cu128/bin/python scripts/finetune_lora.py \
+  --config configs/qwen3_7b_delivery_hero_qlora.yaml \
+  > training.log 2>&1 &
+
+# Monitor progress
+tail -f training.log
+
+# Check GPU usage
+nvidia-smi
+```
+
+### Final Environment Specifications
+
+**Confirmed Working Stack (as of December 22, 2025):**
+- ✅ **Python**: 3.11.14
+- ✅ **PyTorch**: 2.9.1+cu128
+- ✅ **CUDA Runtime (PyTorch)**: 12.8
+- ✅ **System CUDA Toolkit**: 13.0 (mismatch OK for runtime, but breaks FlashAttention build)
+- ✅ **bitsandbytes**: 0.49.0
+- ✅ **transformers**: 4.57.3
+- ✅ **peft**: 0.18.0
+- ✅ **trl**: 0.26.2
+- ✅ **datasets**: 4.4.2
+- ✅ **accelerate**: 1.12.0
+- ⚠️ **FlashAttention**: Disabled (requires CUDA 12.8 toolkit, system has 13.0)
+
+**Virtual Environment Location:**
+- `/venv/py311-cu128/` (use full path to python binary)
+
+**Model Used:**
+- `Qwen/Qwen3-1.7B` (configured in `configs/qwen3_7b_delivery_hero_qlora.yaml`)
+
+**Directory Structure:**
+```
+/venv/py311-cu128/          # Virtual environment
+/workspace/AgenticRecommender/agentic_recommender/datasets/
+├── train/
+│   └── train.json          # Copied from train.jsonl
+├── eval/
+│   └── eval.json           # Copied from eval.jsonl
+├── dataset_info.json       # Dataset mapping
+├── train.jsonl             # Original files (kept)
+├── eval.jsonl
+└── test.jsonl
+```
+
+### Common Pitfalls to Avoid
+
+1. **Don't mix CUDA versions**: Ensure PyTorch CUDA version matches available libraries
+2. **Check disk space first**: PyTorch + CUDA libraries need ~5GB free space
+3. **Use full paths for venv**: `/venv/py311-cu128/bin/python` avoids PATH issues
+4. **Don't build FlashAttention with mismatched CUDA**: Skip it if system CUDA ≠ PyTorch CUDA
+5. **Clean pip cache before large installs**: `rm -rf /root/.cache/pip` prevents disk full errors
+
+### Quick Verification Commands
+
+```bash
+# Is training running?
+ps aux | grep finetune_lora.py | grep -v grep
+
+# Check GPU usage
+nvidia-smi
+
+# Monitor log
+tail -100 /workspace/AgenticRecommender/finetune/training.log
+
+# Verify environment
+/venv/py311-cu128/bin/python -c "import torch; print(torch.cuda.is_available())"
+
+# Check disk space
+df -h /
+```
+
+### Alternative: Using Existing Python 3.10
+
+If you already have Python 3.10 installed, you can use it instead:
+
+```bash
+# Check if Python 3.10 exists
+python3.10 --version
+
+# Create venv with 3.10 instead
+python3.10 -m venv /venv/py310-cu128
+
+# Follow same installation steps but replace py311 with py310
+```
+
+Both Python 3.10 and 3.11 are recommended and tested for this ML stack.
+
+### Before vs After Comparison
+
+| Component | ❌ Before (Broken) | ✅ After (Working) |
+|-----------|-------------------|-------------------|
+| **Python** | 3.12.12 | 3.11.14 |
+| **Virtual Env** | `/venv/main` (11GB) | `/venv/py311-cu128` (5.2GB) |
+| **PyTorch** | 2.9.1+cu130 | 2.9.1+cu128 |
+| **CUDA (PyTorch)** | 13.0 | 12.8 |
+| **bitsandbytes** | 0.47.0 (broken) | 0.49.0 (working) |
+| **transformers** | 4.56.1 | 4.57.3 |
+| **peft** | 0.18.0 | 0.18.0 |
+| **trl** | 0.25.1 | 0.26.2 |
+| **datasets** | N/A | 4.4.2 |
+| **accelerate** | N/A | 1.12.0 |
+| **FlashAttention** | Not installed | Disabled (CUDA mismatch) |
+| **Dataset Structure** | Flat `.jsonl` files | `train/train.json`, `eval/eval.json` + `dataset_info.json` |
+| **Config** | `flash_attn: auto` | `flash_attn: disabled` |
+| **Training Status** | ❌ Crashes on startup | ✅ Running successfully |
+
+### Key Fixes Applied
+
+1. **Downgraded Python** 3.12 → 3.11 (better ML compatibility)
+2. **Changed PyTorch CUDA** 13.0 → 12.8 (matches available bitsandbytes)
+3. **Updated bitsandbytes** 0.47.0 → 0.49.0 (CUDA 12.8 support)
+4. **Disabled FlashAttention** (system CUDA 13.0 ≠ PyTorch CUDA 12.8)
+5. **Fixed dataset paths** (created subdirectory structure + dataset_info.json)
+6. **Freed disk space** (removed old 11GB venv, cleared pip cache)
+
+### Verification of Current Running Environment
+
+```bash
+# Check training is running
+ps aux | grep finetune_lora.py | grep -v grep
+# Output: root 46385 101 0.8 ... python scripts/finetune_lora.py --config configs/qwen3_7b_delivery_hero_qlora.yaml
+
+# Check environment
+/venv/py311-cu128/bin/python -c "import torch, bitsandbytes; print(f'PyTorch: {torch.__version__}, BNB: {bitsandbytes.__version__}, CUDA: {torch.cuda.is_available()}')"
+# Output: PyTorch: 2.9.1+cu128, BNB: 0.49.0, CUDA: True
+
+# Check dataset structure
+ls /workspace/AgenticRecommender/agentic_recommender/datasets/{train,eval}/*.json
+# Output:
+# /workspace/.../datasets/eval/eval.json
+# /workspace/.../datasets/train/train.json
+
+# Check config
+grep "flash_attn:" /workspace/AgenticRecommender/finetune/configs/qwen3_7b_delivery_hero_qlora.yaml
+# Output: flash_attn: disabled  # Disabled: requires CUDA 12.8 toolkit (system has 13.0)
+```
+
+**Status: ✅ All systems operational, training running successfully**
+
+---

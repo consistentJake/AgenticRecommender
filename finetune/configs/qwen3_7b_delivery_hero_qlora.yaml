@@ -1,0 +1,120 @@
+stage: sft
+do_train: true
+do_eval: true
+
+# ==== MODEL ====
+model_name_or_path: Qwen/Qwen3-1.7B
+template: qwen
+finetuning_type: lora
+
+# Special tokenization handling for Qwen models (default: true)
+# When enabled for Qwen models: sets unk_token to "<|object_ref_end|>" (ID: 151647)
+# When disabled or for non-Qwen models: uses standard tokenization with pad_token = eos_token
+# Training before Dec 14 does not include this special handling
+enable_special_tokenization: true
+
+# ==== DATA ====
+dataset_dir: /workspace/AgenticRecommender/agentic_recommender/datasets
+dataset: train
+eval_dataset: eval
+cutoff_len: 1024
+max_samples: null
+max_eval_samples: 100  # Increased from 25 for more reliable eval metrics
+
+# ==== PACKING ====
+# Sequence packing: false (default) = pre-tokenized mode with caching
+# Set to true to enable packing for better GPU utilization
+# See configs/qwen3_7b_movielens_qlora_packing.yaml for packing example
+# See docs/PACKING_GUIDE.md for details
+# packing is NOT used for inference
+packing: true  # default behavior is false
+
+# ==== OUTPUT & LOGGING ====
+# For training, this is the output directory
+# For inference/comparison, use the checkpoint directory that has adapter_config.json
+output_dir: output/qwen3-7b-delivery-hero-qlora-special-token/
+logging_steps: 500  # Log metrics including GPU memory every 500 steps
+# if choose to enable packing, save_steps and eval steps can be smaller because the total steps are reduced
+save_steps: 2000
+eval_steps: 1000  # Reduced eval frequency (was 10) since eval is more expensive now
+eval_accumulation_steps: 2  # Reduced to prevent OOM during eval
+save_total_limit: 4
+skip_memory_metrics: false  # Enable GPU memory logging to TensorBoard
+
+# ==== BATCHING (24GB-FRIENDLY) ====
+# 8B QLoRA with gradient_checkpointing=True can handle bs=2 at seq=1024
+# Effective batch size = 2 × 8 = 16
+per_device_train_batch_size: 4
+per_device_eval_batch_size: 2
+gradient_accumulation_steps: 4
+
+# ==== OPTIMIZER / LR ====
+learning_rate: 3.0e-4
+num_train_epochs: 3
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+weight_decay: 0.0
+adam_beta1: 0.9
+adam_beta2: 0.999
+adam_epsilon: 1.0e-8
+max_grad_norm: 1.0
+
+# ==== LORA ====
+lora_target: qv  # Query and value only (skips key, output proj, and MLP)
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+use_rslora: false
+use_qlora: true
+
+# ==== MEMORY / STABILITY ====
+gradient_checkpointing: true  # CRITICAL: Reduces activation memory by ~90%
+flash_attn: disabled  # Disabled: requires CUDA 12.8 toolkit (system has 13.0)
+ddp_timeout: 180000000
+
+# ==== EARLY STOPPING / LOSS PLATEAU ====
+early_stopping_patience: 5  # Increased from 3 to allow more training
+loss_plateau_patience: 5    # Increased from 3 to allow more training
+loss_plateau_min_delta: 0.0001
+
+# ==== PRECISION ====
+fp16: false
+bf16: true    # keep bf16; works great on 4090-class GPUs
+eval_strategy: steps
+prediction_loss_only: false
+
+report_to:
+  - tensorboard
+
+# ==== INFERENCE & EVALUATION ====
+# used by scripts/compare_base_vs_lora.py
+# Performance optimizations available:
+# 1. use_peft_directly: shares base weights, faster inference (recommended: true)
+# 2. chunk_size: process in chunks for better cache locality and memory efficiency
+# Note: First batch will always be slower due to GPU initialization (unavoidable)
+# See docs/LORA_INFERENCE_OPTIMIZATION.md for details
+inference:
+  test_file: /workspace/AgenticRecommender/agentic_recommender/datasets/test.jsonl  # Path to test data
+  # test_file: /workspace/AgenticRecommender/agentic_recommender/datasets/train.jsonl # use traindata for eval
+  # infer_output_dir: infer_results_1214_2_training_checkpoint_8000/  # Directory for inference results (NOT under output_dir)
+  infer_output_dir: infer_results_delivery_hero_special_tokenization_checkpoint_8000/ 
+  # adapter_dir: Specify which adapter to load for comparison (optional)
+  # If not specified, uses output_dir from main config
+  # Examples:
+  #   adapter_dir: output/qwen3-7b-movielens-qlora-2  # Load from final adapter
+  # adapter_dir: output/qwen3-7b-movielens-qlora-2/checkpoint-12240 # Load from specific checkpoint
+  # Uncomment and set to override output_dir:
+  adapter_dir: output/qwen3-7b-delivery-hero-qlora-special-token/checkpoint-8000
+
+
+  batch_size: 8  # Batch size for inference (higher = faster but more memory)
+  chunk_size: 64  # Process 200 samples per chunk (optional; null = process all at once)
+                   # Chunked mode: runs base inference, then LoRA inference on each chunk
+                   # Benefits: lower memory usage, better cache locality, incremental results
+                   # See docs/CHUNKED_INFERENCE.md for details
+  use_peft_directly: true  # Use PEFT model directly (true) vs merge_and_unload (false)
+                           # true: More efficient, only computes LoRA deltas, shares base weights
+                           # false: Creates merged model (slower, more memory, but more compatible)
+                           # Recommended: true for best performance
+  max_samples: 1000  # Limit samples for quick testing (null = use all)
+  show_examples: 5  # Number of examples to show in analysis report
