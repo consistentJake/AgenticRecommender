@@ -3,7 +3,7 @@ do_train: true
 do_eval: true
 
 # ==== MODEL ====
-model_name_or_path: Qwen/Qwen3-1.7B
+model_name_or_path: Qwen/Qwen3-8B
 template: qwen
 finetuning_type: lora
 
@@ -32,11 +32,11 @@ packing: true  # default behavior is false
 # ==== OUTPUT & LOGGING ====
 # For training, this is the output directory
 # For inference/comparison, use the checkpoint directory that has adapter_config.json
-output_dir: output/qwen3-7b-delivery-hero-qlora-special-token/
+output_dir: output/qwen3-7b-delivery-hero-qlora-special-token-8b/
 logging_steps: 500  # Log metrics including GPU memory every 500 steps
 # if choose to enable packing, save_steps and eval steps can be smaller because the total steps are reduced
-save_steps: 2000
-eval_steps: 1000  # Reduced eval frequency (was 10) since eval is more expensive now
+save_steps: 500
+eval_steps: 500  # Reduced eval frequency (was 10) since eval is more expensive now
 eval_accumulation_steps: 2  # Reduced to prevent OOM during eval
 save_total_limit: 4
 skip_memory_metrics: false  # Enable GPU memory logging to TensorBoard
@@ -69,7 +69,7 @@ use_qlora: true
 
 # ==== MEMORY / STABILITY ====
 gradient_checkpointing: true  # CRITICAL: Reduces activation memory by ~90%
-flash_attn: disabled  # Disabled: requires CUDA 12.8 toolkit (system has 13.0)
+flash_attn: on  # Disabled: requires CUDA 12.8 toolkit (system has 13.0)
 ddp_timeout: 180000000
 
 # ==== EARLY STOPPING / LOSS PLATEAU ====

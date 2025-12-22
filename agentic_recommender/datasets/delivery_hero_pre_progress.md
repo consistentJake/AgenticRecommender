@@ -58,6 +58,14 @@ python agentic_recommender/datasets/convert_to_jsonl.py \
     --min-history-len 3 \
     --max-history-len 5 \
     --sample-customers 1000
+
+
+## command to generate dataset
+python datasets/convert_to_jsonl.py \
+    --source /workspace/data_se \
+    --output-dir datasets \
+    --min-history-len 5 \
+    --max-history-len 10
 ```
 
 ## Previous Questions (Dec 20)
