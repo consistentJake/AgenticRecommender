@@ -102,8 +102,13 @@ def load_data(path: str) -> List[Dict]:
 def format_prompt(example: Dict) -> str:
     """Format example into prompt, supporting both training and test formats."""
     # Training data format (JSON with instruction/input)
-    if "input" in example:
-        return example["input"]
+    if "instruction" in example:
+        # Combine instruction and input (same logic as to_generation_messages)
+        user_content = example.get("instruction", "")
+        example_input = example.get("input")
+        if example_input:
+            user_content = f"{user_content}\n\n{example_input}"
+        return user_content
 
     # Test data format (JSONL with history_titles, candidate_title)
     if "history_titles" in example and "candidate_title" in example:
@@ -120,30 +125,57 @@ def format_prompt(example: Dict) -> str:
     raise ValueError(f"Unknown data format. Example keys: {example.keys()}")
 
 
-def to_chat_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Convert supervised sample to chat-style messages expected by Qwen.
+def _build_messages_up_to_user(example: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Build chat messages up to (and including) the user message.
 
-    This includes the assistant's response and is used for training.
-    For generation/inference, use to_generation_messages() instead.
+    This is a helper function that contains the common logic for both
+    to_chat_messages() and to_generation_messages().
+
+    Args:
+        example: Dict with 'system', 'instruction', 'input', and optionally 'history'
+
+    Returns:
+        List of message dicts with system (if present), history (if present), and user
     """
     messages: List[Dict[str, str]] = []
 
+    # Add system message if present
     system_prompt = example.get("system")
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
 
-    # History is present but empty in current data; keep for forward compatibility.
+    # Add conversation history if present (currently empty but kept for forward compatibility)
     for turn in example.get("history") or []:
         role = turn.get("role")
         content = turn.get("content")
         if role and content:
             messages.append({"role": role, "content": content})
 
+    # Build user message by combining instruction + input
     user_content = example.get("instruction", "")
     example_input = example.get("input")
     if example_input:
         user_content = f"{user_content}\n\n{example_input}"
     messages.append({"role": "user", "content": user_content})
+
+    return messages
+
+
+def to_chat_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Convert supervised sample to chat-style messages expected by Qwen.
+
+    This includes the assistant's response and is used for training.
+    For generation/inference, use to_generation_messages() instead.
+
+    Args:
+        example: Dict with 'system', 'instruction', 'input', 'output', and optionally 'history'
+
+    Returns:
+        List of message dicts with system, user, and assistant messages
+    """
+    messages = _build_messages_up_to_user(example)
+
+    # Delta: Add assistant's response for training
     messages.append({"role": "assistant", "content": example.get("output", "")})
 
     return messages
@@ -161,26 +193,8 @@ def to_generation_messages(example: Dict[str, Any]) -> List[Dict[str, str]]:
     Returns:
         List of message dicts ready for chat template with add_generation_prompt=True
     """
-    messages: List[Dict[str, str]] = []
-
-    system_prompt = example.get("system")
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-
-    # History is present but empty in current data; keep for forward compatibility.
-    for turn in example.get("history") or []:
-        role = turn.get("role")
-        content = turn.get("content")
-        if role and content:
-            messages.append({"role": role, "content": content})
-
-    user_content = example.get("instruction", "")
-    example_input = example.get("input")
-    if example_input:
-        user_content = f"{user_content}\n\n{example_input}"
-    messages.append({"role": "user", "content": user_content})
-
-    return messages
+    # No assistant message - model will generate it
+    return _build_messages_up_to_user(example)
 
 
 # ==============================================================================
@@ -581,34 +595,54 @@ def preprocess_datasets_parallel(
 # ==============================================================================
 
 def generate(
-    prompt: str,
-    model: Any,
-    tokenizer: Any,
-    device: str,
+    prompt: str = None,
+    model: Any = None,
+    tokenizer: Any = None,
+    device: str = None,
     system_prompt: Optional[str] = None,
     max_new_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
-    do_sample: bool = False
+    do_sample: bool = False,
+    return_input_text: bool = False,
+    messages: Optional[List[Dict[str, str]]] = None,
+    example: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Generate model response for a given prompt.
+    """Generate model response for a given prompt or example.
+
+    This function supports three usage modes:
+    1. Direct messages (recommended): Pass `messages` from to_generation_messages()
+    2. Example dict: Pass `example` dict (uses to_generation_messages() internally)
+    3. Legacy mode: Pass `prompt` and optional `system_prompt`
 
     Args:
-        prompt: User prompt text
+        prompt: User prompt text (legacy mode)
         model: Loaded model instance
         tokenizer: Tokenizer instance
         device: Device string ("cuda", "mps", or "cpu")
-        system_prompt: System message (defaults to DEFAULT_SYSTEM_PROMPT)
-    max_new_tokens: Maximum tokens to generate (defaults to MAX_NEW_TOKENS=64)
-    temperature: Sampling temperature (defaults to TEMPERATURE=0.7)
-    top_p: Nucleus sampling parameter (defaults to TOP_P=0.9)
-    do_sample: Whether to use sampling (vs greedy). Defaults to deterministic decoding.
+        system_prompt: System message (legacy mode, defaults to DEFAULT_SYSTEM_PROMPT)
+        max_new_tokens: Maximum tokens to generate (defaults to MAX_NEW_TOKENS=64)
+        temperature: Sampling temperature (defaults to TEMPERATURE=0.7)
+        top_p: Nucleus sampling parameter (defaults to TOP_P=0.9)
+        do_sample: Whether to use sampling (vs greedy). Defaults to deterministic decoding.
+        return_input_text: If True, return tuple of (response, input_text). Defaults to False.
+        messages: Pre-formatted messages list (from to_generation_messages())
+        example: Example dict with 'instruction', 'input', 'system' fields
 
     Returns:
-        Full decoded model response including prompt
+        Full decoded model response including prompt, or tuple of (response, input_text) if return_input_text=True
+
+    Example:
+        >>> # Recommended: Use to_generation_messages()
+        >>> messages = to_generation_messages(example)
+        >>> response = generate(messages=messages, model=model, tokenizer=tokenizer, device=device)
+        >>>
+        >>> # Or pass example directly
+        >>> response = generate(example=example, model=model, tokenizer=tokenizer, device=device)
+        >>>
+        >>> # Legacy mode (backward compatible)
+        >>> response = generate("What movies?", model, tokenizer, device, "You are a recommender")
     """
-    if system_prompt is None:
-        system_prompt = DEFAULT_SYSTEM_PROMPT
     if max_new_tokens is None:
         max_new_tokens = MAX_NEW_TOKENS
     if temperature is None:
@@ -616,10 +650,22 @@ def generate(
     if top_p is None:
         top_p = TOP_P
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt},
-    ]
+    # Mode 1: Direct messages (recommended)
+    if messages is not None:
+        pass  # Use messages as-is
+    # Mode 2: Example dict (uses to_generation_messages)
+    elif example is not None:
+        messages = to_generation_messages(example)
+    # Mode 3: Legacy mode (backward compatible)
+    else:
+        if prompt is None:
+            raise ValueError("Must provide either 'messages', 'example', or 'prompt'")
+        if system_prompt is None:
+            system_prompt = DEFAULT_SYSTEM_PROMPT
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ]
 
     chat_str = tokenizer.apply_chat_template(
         messages,
@@ -648,38 +694,62 @@ def generate(
             eos_token_id=tokenizer.eos_token_id,
         )
 
-    return tokenizer.decode(out[0], skip_special_tokens=True)
+    decoded_response = tokenizer.decode(out[0], skip_special_tokens=True)
+
+    if return_input_text:
+        return decoded_response, chat_str
+    return decoded_response
 
 
 def generate_batch(
-    prompts: List[str],
-    model: Any,
-    tokenizer: Any,
-    device: str,
+    prompts: List[str] = None,
+    model: Any = None,
+    tokenizer: Any = None,
+    device: str = None,
     system_prompt: Optional[str] = None,
     max_new_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
-    do_sample: bool = False
+    do_sample: bool = False,
+    return_input_texts: bool = False,
+    batch_messages: Optional[List[List[Dict[str, str]]]] = None,
+    examples: Optional[List[Dict[str, Any]]] = None,
 ) -> List[str]:
-    """Generate model responses for a batch of prompts (more efficient).
+    """Generate model responses for a batch of prompts or examples (more efficient).
+
+    This function supports three usage modes:
+    1. Direct messages (recommended): Pass `batch_messages` from to_generation_messages()
+    2. Example dicts: Pass `examples` list (uses to_generation_messages() internally)
+    3. Legacy mode: Pass `prompts` and optional `system_prompt`
 
     Args:
-        prompts: List of user prompt texts
+        prompts: List of user prompt texts (legacy mode)
         model: Loaded model instance
         tokenizer: Tokenizer instance
         device: Device string ("cuda", "mps", or "cpu")
-        system_prompt: System message (defaults to DEFAULT_SYSTEM_PROMPT)
+        system_prompt: System message (legacy mode, defaults to DEFAULT_SYSTEM_PROMPT)
         max_new_tokens: Maximum tokens to generate (defaults to MAX_NEW_TOKENS)
         temperature: Sampling temperature (defaults to TEMPERATURE)
         top_p: Nucleus sampling parameter (defaults to TOP_P)
         do_sample: Whether to use sampling (vs greedy). Defaults to deterministic decoding.
+        return_input_texts: If True, return tuple of (responses, input_texts). Defaults to False.
+        batch_messages: List of pre-formatted messages (from to_generation_messages())
+        examples: List of example dicts with 'instruction', 'input', 'system' fields
 
     Returns:
-        List of full decoded model responses including prompts
+        List of full decoded model responses including prompts, or tuple of (responses, input_texts) if return_input_texts=True
+
+    Example:
+        >>> # Recommended: Use to_generation_messages()
+        >>> batch_messages = [to_generation_messages(ex) for ex in examples]
+        >>> responses = generate_batch(batch_messages=batch_messages, model=model, tokenizer=tokenizer, device=device)
+        >>>
+        >>> # Or pass examples directly
+        >>> responses = generate_batch(examples=examples, model=model, tokenizer=tokenizer, device=device)
+        >>>
+        >>> # Legacy mode (backward compatible)
+        >>> responses = generate_batch(["prompt1", "prompt2"], model, tokenizer, device, "You are a recommender")
     """
-    if system_prompt is None:
-        system_prompt = DEFAULT_SYSTEM_PROMPT
     if max_new_tokens is None:
         max_new_tokens = MAX_NEW_TOKENS
     if temperature is None:
@@ -687,14 +757,25 @@ def generate_batch(
     if top_p is None:
         top_p = TOP_P
 
-    # Build messages for each prompt
-    batch_messages = []
-    for prompt in prompts:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
-        batch_messages.append(messages)
+    # Mode 1: Direct batch messages (recommended)
+    if batch_messages is not None:
+        pass  # Use batch_messages as-is
+    # Mode 2: Example dicts (uses to_generation_messages)
+    elif examples is not None:
+        batch_messages = [to_generation_messages(ex) for ex in examples]
+    # Mode 3: Legacy mode (backward compatible)
+    else:
+        if prompts is None:
+            raise ValueError("Must provide either 'batch_messages', 'examples', or 'prompts'")
+        if system_prompt is None:
+            system_prompt = DEFAULT_SYSTEM_PROMPT
+        batch_messages = []
+        for prompt in prompts:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+            batch_messages.append(messages)
 
     # Apply chat template to all prompts
     chat_strs = [
@@ -735,6 +816,8 @@ def generate_batch(
         for output in outputs
     ]
 
+    if return_input_texts:
+        return responses, chat_strs
     return responses
 
 

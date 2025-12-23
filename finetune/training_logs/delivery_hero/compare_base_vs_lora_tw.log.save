@@ -1,0 +1,2437 @@
+nohup: ignoring input
+================================================================================
+INFERENCE CONFIGURATION
+================================================================================
+Config file: configs/qwen3_7b_delivery_hero_qlora_tw.yaml
+Device: cuda
+Base model: Qwen/Qwen3-8B
+Adapter directory: output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650
+  (Source: inference.adapter_dir)
+Test file: /workspace/AgenticRecommender/agentic_recommender/datasets/test.jsonl
+Output directory: infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650
+Batch size: 16
+Chunk size: 64
+Use PEFT directly: True (faster, more memory efficient)
+Max samples: all
+Show examples: 5
+================================================================================
+
+Loading tokenizer...
+Loading base model...
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 47ca1c0d-54f8-4e09-b0a1-fddce287577d)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+Retrying in 1s [Retry 1/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 790b979d-56f9-4963-b199-bf7c4b4fa59e)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+Retrying in 2s [Retry 2/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 05ab5a7a-7aa6-4a21-a590-6e654a1e9120)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+Retrying in 4s [Retry 3/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: f00be4c4-0b38-4943-9407-ff87fec3db6d)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+Retrying in 8s [Retry 4/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 084111fa-1072-492e-b9d8-a6d5d33278db)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+Retrying in 8s [Retry 5/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 7c5cf7fe-a124-41bf-bee1-6012293ba780)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/config.json
+`torch_dtype` is deprecated! Use `dtype` instead!
+
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]
+Loading checkpoint shards:  20%|██        | 1/5 [00:02<00:08,  2.10s/it]
+Loading checkpoint shards:  40%|████      | 2/5 [00:04<00:07,  2.51s/it]
+Loading checkpoint shards:  60%|██████    | 3/5 [00:07<00:05,  2.64s/it]
+Loading checkpoint shards:  80%|████████  | 4/5 [00:09<00:02,  2.48s/it]
+Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  1.63s/it]
+Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  2.01s/it]
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: e2a0881c-ce86-4137-90d5-57b425f195e4)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/generation_config.json
+Retrying in 1s [Retry 1/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: f716ba1e-4d38-4cba-af6d-2c8a4ff738db)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/generation_config.json
+Retrying in 2s [Retry 2/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /Qwen/Qwen3-8B/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 29e85efc-694a-458f-a282-07d85e1889c2)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/generation_config.json
+Retrying in 4s [Retry 3/5].
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 7f13b64f-4193-456d-83dc-e9780d4d6059)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/generation_config.json
+Retrying in 8s [Retry 4/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /Qwen/Qwen3-8B/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 9dd9aaf4-0cce-480b-a130-e270ee12bbda)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen3-8B/resolve/main/generation_config.json
+Retrying in 8s [Retry 5/5].
+
+Loading test data from /workspace/AgenticRecommender/agentic_recommender/datasets/test.jsonl...
+Total test samples: 3700
+
+================================================================================
+CHUNKED PROCESSING MODE
+================================================================================
+Processing data in chunks of 64 samples
+For each chunk:
+  1. Run base model inference
+  2. Load LoRA adapter and run LoRA inference
+  3. Unload LoRA adapter and clear cache
+  4. Write results to disk
+This approach minimizes memory usage and allows LoRA to reuse base model state.
+================================================================================
+
+
+================================================================================
+Processing Chunk 1/58
+Samples 0 to 63 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 1/58)
+============================================================
+
+Base inference (chunk 1):   0%|          | 0/4 [00:00<?, ?batch/s]The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+
+Base inference (chunk 1):  25%|██▌       | 1/4 [00:16<00:49, 16.39s/batch]
+Base inference (chunk 1):  50%|█████     | 2/4 [00:32<00:31, 15.96s/batch]
+Base inference (chunk 1):  75%|███████▌  | 3/4 [00:47<00:15, 15.85s/batch]
+Base inference (chunk 1): 100%|██████████| 4/4 [01:03<00:00, 15.78s/batch]
+Base inference (chunk 1): 100%|██████████| 4/4 [01:03<00:00, 15.86s/batch]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 1/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 1):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 1):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 1):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 1):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 1): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 1): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 1 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 2/58
+Samples 64 to 127 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 2/58)
+============================================================
+
+Base inference (chunk 2):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 2):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 2):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 2):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+Base inference (chunk 2): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+Base inference (chunk 2): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 2/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+/venv/py311-cu128/lib/python3.11/site-packages/peft/tuners/tuners_utils.py:282: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 2):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 2):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+LoRA inference (chunk 2):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 2):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+LoRA inference (chunk 2): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+LoRA inference (chunk 2): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 2 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 3/58
+Samples 128 to 191 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 3/58)
+============================================================
+
+Base inference (chunk 3):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 3):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+Base inference (chunk 3):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 3):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+Base inference (chunk 3): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+Base inference (chunk 3): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 3/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 3):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 3):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 3):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 3):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+LoRA inference (chunk 3): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 3): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 3 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 4/58
+Samples 192 to 255 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 4/58)
+============================================================
+
+Base inference (chunk 4):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 4):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 4):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 4):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 4): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 4): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 4/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 4):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 4):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 4):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 4):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+LoRA inference (chunk 4): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 4): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 4 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 5/58
+Samples 256 to 319 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 5/58)
+============================================================
+
+Base inference (chunk 5):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 5):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 5):  50%|█████     | 2/4 [00:01<00:01,  1.15batch/s]
+Base inference (chunk 5):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+Base inference (chunk 5): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+Base inference (chunk 5): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 5/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 5):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 5):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 5):  50%|█████     | 2/4 [00:01<00:01,  1.15batch/s]
+LoRA inference (chunk 5):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+LoRA inference (chunk 5): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+LoRA inference (chunk 5): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 5 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 6/58
+Samples 320 to 383 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 6/58)
+============================================================
+
+Base inference (chunk 6):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 6):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 6):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 6):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 6): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 6): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 6/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 6):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 6):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 6):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 6):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 6): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 6): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 6 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 7/58
+Samples 384 to 447 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 7/58)
+============================================================
+
+Base inference (chunk 7):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 7):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 7):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 7):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 7): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 7): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 7/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 7):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 7):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+LoRA inference (chunk 7):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 7):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 7): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 7): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 7 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 8/58
+Samples 448 to 511 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 8/58)
+============================================================
+
+Base inference (chunk 8):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 8):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+Base inference (chunk 8):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 8):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 8): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 8): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 8/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 8):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 8):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+LoRA inference (chunk 8):  50%|█████     | 2/4 [00:01<00:01,  1.15batch/s]
+LoRA inference (chunk 8):  75%|███████▌  | 3/4 [00:02<00:00,  1.15batch/s]
+LoRA inference (chunk 8): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 8): 100%|██████████| 4/4 [00:03<00:00,  1.15batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 8 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 9/58
+Samples 512 to 575 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 9/58)
+============================================================
+
+Base inference (chunk 9):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 9):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 9):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 9):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 9): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 9): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 9/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 9):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 9):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 9):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 9):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 9): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 9): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 9 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 10/58
+Samples 576 to 639 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 10/58)
+============================================================
+
+Base inference (chunk 10):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 10):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 10):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 10):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 10): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 10): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 10/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 10):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 10):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 10):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 10):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 10): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 10): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 10 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 11/58
+Samples 640 to 703 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 11/58)
+============================================================
+
+Base inference (chunk 11):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 11):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 11):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 11):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+Base inference (chunk 11): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 11): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 11/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 11):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 11):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 11):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 11):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 11): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 11): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 11 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 12/58
+Samples 704 to 767 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 12/58)
+============================================================
+
+Base inference (chunk 12):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 12):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 12):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 12):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 12): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 12): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 12/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 12):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 12):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 12):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 12):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 12): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 12): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 12 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 13/58
+Samples 768 to 831 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 13/58)
+============================================================
+
+Base inference (chunk 13):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 13):  25%|██▌       | 1/4 [00:00<00:02,  1.12batch/s]
+Base inference (chunk 13):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 13):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 13): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 13): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 13/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 13):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 13):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 13):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 13):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 13): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 13): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 13 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 14/58
+Samples 832 to 895 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 14/58)
+============================================================
+
+Base inference (chunk 14):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 14):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 14):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 14):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 14): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 14): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 14/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 14):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 14):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 14):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 14):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 14): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 14): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 14 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 15/58
+Samples 896 to 959 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 15/58)
+============================================================
+
+Base inference (chunk 15):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 15):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 15):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 15):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 15): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 15): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 15/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 15):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 15):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 15):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 15):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 15): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 15): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 15 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 16/58
+Samples 960 to 1023 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 16/58)
+============================================================
+
+Base inference (chunk 16):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 16):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 16):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 16):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 16): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 16): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 16/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 16):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 16):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+LoRA inference (chunk 16):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 16):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 16): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 16): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 16 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 17/58
+Samples 1024 to 1087 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 17/58)
+============================================================
+
+Base inference (chunk 17):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 17):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 17):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 17):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 17): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 17): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 17/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 17):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 17):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 17):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 17):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 17): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 17): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 17 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 18/58
+Samples 1088 to 1151 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 18/58)
+============================================================
+
+Base inference (chunk 18):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 18):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 18):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 18):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 18): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 18): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 18/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 18):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 18):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 18):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 18):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 18): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 18): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 18 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 19/58
+Samples 1152 to 1215 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 19/58)
+============================================================
+
+Base inference (chunk 19):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 19):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 19):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 19):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 19): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 19): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 19/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 19):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 19):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 19):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 19):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 19): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 19): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 19 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 20/58
+Samples 1216 to 1279 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 20/58)
+============================================================
+
+Base inference (chunk 20):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 20):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 20):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 20):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 20): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 20): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 20/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 20):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 20):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 20):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 20):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 20): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 20): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 20 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 21/58
+Samples 1280 to 1343 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 21/58)
+============================================================
+
+Base inference (chunk 21):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 21):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 21):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 21):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 21): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 21): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 21/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 21):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 21):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 21):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 21):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 21): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 21): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 21 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 22/58
+Samples 1344 to 1407 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 22/58)
+============================================================
+
+Base inference (chunk 22):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 22):  25%|██▌       | 1/4 [00:00<00:02,  1.11batch/s]
+Base inference (chunk 22):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 22):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 22): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 22): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 22/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 22):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 22):  25%|██▌       | 1/4 [00:00<00:02,  1.11batch/s]
+LoRA inference (chunk 22):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 22):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 22): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 22): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 22 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 23/58
+Samples 1408 to 1471 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 23/58)
+============================================================
+
+Base inference (chunk 23):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 23):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 23):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 23):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 23): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 23): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 23/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 23):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 23):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 23):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 23):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 23): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 23): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 23 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 24/58
+Samples 1472 to 1535 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 24/58)
+============================================================
+
+Base inference (chunk 24):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 24):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 24):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 24):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 24): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 24): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 24/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 24):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 24):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 24):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 24):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 24): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 24): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 24 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 25/58
+Samples 1536 to 1599 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 25/58)
+============================================================
+
+Base inference (chunk 25):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 25):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 25):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 25):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+Base inference (chunk 25): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 25): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 25/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 25):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 25):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 25):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 25):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 25): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 25): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 25 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 26/58
+Samples 1600 to 1663 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 26/58)
+============================================================
+
+Base inference (chunk 26):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 26):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 26):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 26):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 26): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 26): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 26/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 26):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 26):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 26):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 26):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 26): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 26): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 26 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 27/58
+Samples 1664 to 1727 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 27/58)
+============================================================
+
+Base inference (chunk 27):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 27):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 27):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 27):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 27): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 27): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 27/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 27):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 27):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 27):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 27):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 27): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 27): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 27 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 28/58
+Samples 1728 to 1791 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 28/58)
+============================================================
+
+Base inference (chunk 28):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 28):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 28):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 28):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 28): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 28): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 28/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 28):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 28):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 28):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 28):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 28): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 28): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 28 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 29/58
+Samples 1792 to 1855 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 29/58)
+============================================================
+
+Base inference (chunk 29):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 29):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 29):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 29):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 29): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 29): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 29/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 29):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 29):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 29):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 29):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 29): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 29): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 29 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 30/58
+Samples 1856 to 1919 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 30/58)
+============================================================
+
+Base inference (chunk 30):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 30):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 30):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 30):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 30): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 30): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 30/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 30):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 30):  25%|██▌       | 1/4 [00:00<00:02,  1.15batch/s]
+LoRA inference (chunk 30):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 30):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 30): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 30): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 30 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 31/58
+Samples 1920 to 1983 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 31/58)
+============================================================
+
+Base inference (chunk 31):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 31):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 31):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 31):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 31): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 31): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 31/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 31):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 31):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 31):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 31):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 31): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 31): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 31 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 32/58
+Samples 1984 to 2047 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 32/58)
+============================================================
+
+Base inference (chunk 32):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 32):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 32):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 32):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 32): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 32): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 32/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 32):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 32):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 32):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 32):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 32): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 32): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 32 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 33/58
+Samples 2048 to 2111 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 33/58)
+============================================================
+
+Base inference (chunk 33):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 33):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 33):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 33):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 33): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 33): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 33/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 33):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 33):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 33):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 33):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 33): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 33): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 33 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 34/58
+Samples 2112 to 2175 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 34/58)
+============================================================
+
+Base inference (chunk 34):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 34):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 34):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 34):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 34): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 34): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 34/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 34):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 34):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 34):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 34):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 34): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 34): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 34 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 35/58
+Samples 2176 to 2239 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 35/58)
+============================================================
+
+Base inference (chunk 35):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 35):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 35):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 35):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 35): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 35): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 35/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 35):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 35):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 35):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 35):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 35): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 35): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 35 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 36/58
+Samples 2240 to 2303 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 36/58)
+============================================================
+
+Base inference (chunk 36):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 36):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 36):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 36):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 36): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 36): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 36/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 36):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 36):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+LoRA inference (chunk 36):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 36):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 36): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 36): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 36 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 37/58
+Samples 2304 to 2367 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 37/58)
+============================================================
+
+Base inference (chunk 37):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 37):  25%|██▌       | 1/4 [00:00<00:02,  1.12batch/s]
+Base inference (chunk 37):  50%|█████     | 2/4 [00:01<00:01,  1.11batch/s]
+Base inference (chunk 37):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+Base inference (chunk 37): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 37): 100%|██████████| 4/4 [00:03<00:00,  1.12batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 37/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 37):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 37):  25%|██▌       | 1/4 [00:00<00:02,  1.10batch/s]
+LoRA inference (chunk 37):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 37):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 37): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 37): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 37 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 38/58
+Samples 2368 to 2431 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 38/58)
+============================================================
+
+Base inference (chunk 38):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 38):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 38):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 38):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 38): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 38): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 38/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 38):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 38):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 38):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 38):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 38): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 38): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 38 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 39/58
+Samples 2432 to 2495 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 39/58)
+============================================================
+
+Base inference (chunk 39):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 39):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 39):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 39):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 39): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 39): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 39/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 39):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 39):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 39):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 39):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 39): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 39): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 39 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 40/58
+Samples 2496 to 2559 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 40/58)
+============================================================
+
+Base inference (chunk 40):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 40):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 40):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 40):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 40): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 40): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 40/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 40):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 40):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 40):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 40):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 40): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 40): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 40 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 41/58
+Samples 2560 to 2623 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 41/58)
+============================================================
+
+Base inference (chunk 41):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 41):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 41):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 41):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 41): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 41): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 41/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 41):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 41):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 41):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 41):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 41): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 41): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 41 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 42/58
+Samples 2624 to 2687 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 42/58)
+============================================================
+
+Base inference (chunk 42):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 42):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 42):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 42):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+Base inference (chunk 42): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 42): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 42/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 42):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 42):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 42):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 42):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+LoRA inference (chunk 42): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 42): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 42 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 43/58
+Samples 2688 to 2751 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 43/58)
+============================================================
+
+Base inference (chunk 43):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 43):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 43):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 43):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 43): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 43): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 43/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 43):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 43):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 43):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 43):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 43): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 43): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 43 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 44/58
+Samples 2752 to 2815 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 44/58)
+============================================================
+
+Base inference (chunk 44):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 44):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 44):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 44):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 44): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 44): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 44/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 44):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 44):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+LoRA inference (chunk 44):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 44):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 44): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 44): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 44 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 45/58
+Samples 2816 to 2879 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 45/58)
+============================================================
+
+Base inference (chunk 45):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 45):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 45):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 45):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 45): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 45): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 45/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 45):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 45):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+LoRA inference (chunk 45):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 45):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 45): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 45): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 45 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 46/58
+Samples 2880 to 2943 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 46/58)
+============================================================
+
+Base inference (chunk 46):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 46):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 46):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 46):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 46): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 46): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 46/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 46):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 46):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+LoRA inference (chunk 46):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 46):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 46): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 46): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 46 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 47/58
+Samples 2944 to 3007 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 47/58)
+============================================================
+
+Base inference (chunk 47):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 47):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 47):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 47):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 47): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 47): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 47/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 47):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 47):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 47):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 47):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 47): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 47): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 47 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 48/58
+Samples 3008 to 3071 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 48/58)
+============================================================
+
+Base inference (chunk 48):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 48):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 48):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 48):  75%|███████▌  | 3/4 [00:02<00:00,  1.12batch/s]
+Base inference (chunk 48): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 48): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 48/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 48):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 48):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 48):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 48):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 48): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 48): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 48 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 49/58
+Samples 3072 to 3135 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 49/58)
+============================================================
+
+Base inference (chunk 49):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 49):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 49):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 49):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 49): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 49): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 49/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 49):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 49):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 49):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 49):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 49): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 49): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 49 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 50/58
+Samples 3136 to 3199 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 50/58)
+============================================================
+
+Base inference (chunk 50):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 50):  25%|██▌       | 1/4 [00:01<00:03,  1.05s/batch]
+Base inference (chunk 50):  50%|█████     | 2/4 [00:01<00:01,  1.05batch/s]
+Base inference (chunk 50):  75%|███████▌  | 3/4 [00:02<00:00,  1.09batch/s]
+Base inference (chunk 50): 100%|██████████| 4/4 [00:03<00:00,  1.10batch/s]
+Base inference (chunk 50): 100%|██████████| 4/4 [00:03<00:00,  1.08batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 50/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 50):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 50):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 50):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 50):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 50): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 50): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 50 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 51/58
+Samples 3200 to 3263 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 51/58)
+============================================================
+
+Base inference (chunk 51):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 51):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 51):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 51):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 51): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 51): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 51/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 51):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 51):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 51):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+LoRA inference (chunk 51):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 51): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 51): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 51 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 52/58
+Samples 3264 to 3327 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 52/58)
+============================================================
+
+Base inference (chunk 52):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 52):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 52):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 52):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 52): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 52): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 52/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 52):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 52):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 52):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 52):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 52): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 52): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 52 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 53/58
+Samples 3328 to 3391 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 53/58)
+============================================================
+
+Base inference (chunk 53):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 53):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 53):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 53):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 53): 100%|██████████| 4/4 [00:03<00:00,  1.12batch/s]
+Base inference (chunk 53): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 53/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 53):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 53):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 53):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 53):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 53): 100%|██████████| 4/4 [00:03<00:00,  1.12batch/s]
+LoRA inference (chunk 53): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 53 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 54/58
+Samples 3392 to 3455 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 54/58)
+============================================================
+
+Base inference (chunk 54):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 54):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 54):  50%|█████     | 2/4 [00:01<00:01,  1.13batch/s]
+Base inference (chunk 54):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 54): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 54): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 54/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 54):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 54):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 54):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 54):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 54): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 54): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 54 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 55/58
+Samples 3456 to 3519 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 55/58)
+============================================================
+
+Base inference (chunk 55):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 55):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 55):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 55):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 55): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 55): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 55/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 55):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 55):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 55):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 55):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 55): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 55): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 55 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 56/58
+Samples 3520 to 3583 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 56/58)
+============================================================
+
+Base inference (chunk 56):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 56):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 56):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+Base inference (chunk 56):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 56): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+Base inference (chunk 56): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 56/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 56):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 56):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+LoRA inference (chunk 56):  50%|█████     | 2/4 [00:01<00:01,  1.12batch/s]
+LoRA inference (chunk 56):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+LoRA inference (chunk 56): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+LoRA inference (chunk 56): 100%|██████████| 4/4 [00:03<00:00,  1.13batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 56 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 57/58
+Samples 3584 to 3647 (64 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 57/58)
+============================================================
+
+Base inference (chunk 57):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 57):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+Base inference (chunk 57):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 57):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+Base inference (chunk 57): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+Base inference (chunk 57): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 57/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 57):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 57):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 57):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 57):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 57): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+LoRA inference (chunk 57): 100%|██████████| 4/4 [00:03<00:00,  1.14batch/s]
+
+============================================================
+Step 3: Cleanup before next chunk
+============================================================
+LoRA model unloaded.
+PEFT wrapper unloaded.
+GPU cache cleared.
+Chunk 57 complete. Ready for next chunk.
+
+
+================================================================================
+Processing Chunk 58/58
+Samples 3648 to 3699 (52 samples)
+================================================================================
+
+============================================================
+Step 1: BASE MODEL inference (chunk 58/58)
+============================================================
+
+Base inference (chunk 58):   0%|          | 0/4 [00:00<?, ?batch/s]
+Base inference (chunk 58):  25%|██▌       | 1/4 [00:00<00:02,  1.13batch/s]
+Base inference (chunk 58):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+Base inference (chunk 58):  75%|███████▌  | 3/4 [00:02<00:00,  1.13batch/s]
+Base inference (chunk 58): 100%|██████████| 4/4 [00:03<00:00,  1.36batch/s]
+Base inference (chunk 58): 100%|██████████| 4/4 [00:03<00:00,  1.27batch/s]
+
+============================================================
+Step 2: LORA MODEL inference (chunk 58/58)
+============================================================
+Loading LoRA adapter from output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650...
+Using PEFT model directly (efficient mode).
+
+LoRA inference (chunk 58):   0%|          | 0/4 [00:00<?, ?batch/s]
+LoRA inference (chunk 58):  25%|██▌       | 1/4 [00:00<00:02,  1.14batch/s]
+LoRA inference (chunk 58):  50%|█████     | 2/4 [00:01<00:01,  1.14batch/s]
+LoRA inference (chunk 58):  75%|███████▌  | 3/4 [00:02<00:00,  1.14batch/s]
+LoRA inference (chunk 58): 100%|██████████| 4/4 [00:03<00:00,  1.37batch/s]
+LoRA inference (chunk 58): 100%|██████████| 4/4 [00:03<00:00,  1.27batch/s]
+
+Base predictions saved to: infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/base_predictions.jsonl
+LoRA predictions saved to: infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/lora_predictions.jsonl
+
+============================================================
+EVALUATION RESULTS
+============================================================
+There are 3 different prediction results: Yes, No, Unknown, Unknown will be counted here
+
+BASE MODEL (without LoRA):
+----------------------------------------
+  Accuracy:    0.8497 (3144/3700)
+  Precision:   0.8973
+  Recall:      0.7978
+  F1 Score:    0.8446
+  TP/FP/FN/TN: 1468/168/372/1676
+
+LoRA-FINETUNED MODEL:
+----------------------------------------
+  Accuracy:    0.8565 (3169/3700)
+  Precision:   0.8980
+  Recall:      0.8043
+  F1 Score:    0.8486
+  TP/FP/FN/TN: 1488/169/362/1681
+
+IMPROVEMENT (LoRA vs Base):
+----------------------------------------
+  Accuracy:    +0.0068
+  Precision:   +0.0007
+  Recall:      +0.0065
+  F1 Score:    +0.0039
+============================================================
+
+Disagreements: 34 samples (0.92%)
+  - LoRA improved (was wrong, now correct): 29
+  - LoRA regressed (was correct, now wrong): 4
+  - Both wrong but different: 1
+Saving disagreements analysis to infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/disagreements_analysis.jsonl...
+Saving LoRA improvements to infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/lora_improvements.jsonl...
+Saving LoRA regressions to infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/lora_regressions.jsonl...
+Saving comparison report to infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/comparison_report.json...
+
+All results saved successfully!
+
+Files saved in infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650/:
+  - base_predictions.jsonl: All base model predictions (written during inference)
+  - lora_predictions.jsonl: All LoRA model predictions (written during inference)
+  - comparison_report.json: Overall metrics, summary, and full config (for reproducibility)
+  - disagreements_analysis.jsonl: All cases where models disagree
+  - lora_improvements.jsonl: Cases where LoRA fixed base model errors (29 samples)
+  - lora_regressions.jsonl: Cases where LoRA made mistakes base didn't (4 samples)
+
+Each prediction file includes:
+  - label: Ground truth (Yes/No)
+  - prediction: Extracted answer (Yes/No/Unknown)
+  - user_prompt: User's prompt text only (no chat template formatting)
+  - model_input: Full formatted input sent to model (with system prompt + chat template)
+  - assistant_response: Only the model's generated text
+  - full_response: Complete decoded output (model_input + generated response)
+  - instruction/input: Original data fields (if present in test data)
+
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+
+================================================================================
+LoRA IMPROVEMENTS (29 total)
+Cases where base model was wrong, but LoRA got it right
+================================================================================
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: Unknown ✗
+LoRA Model Prediction: Yes ✓
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: No ✗
+LoRA Model Prediction: Yes ✓
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: No ✗
+LoRA Model Prediction: Yes ✓
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: No ✗
+LoRA Model Prediction: Yes ✓
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: Unknown ✗
+LoRA Model Prediction: Yes ✓
+
+Input prompt (truncated):
+  
+
+... and 24 more improvements
+
+
+================================================================================
+LoRA REGRESSIONS (4 total)
+Cases where base model was correct, but LoRA got it wrong
+================================================================================
+
+================================================================================
+Ground Truth: No
+Base Model Prediction: No ✓
+LoRA Model Prediction: Yes ✗
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: No
+Base Model Prediction: No ✓
+LoRA Model Prediction: Yes ✗
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: No
+Base Model Prediction: No ✓
+LoRA Model Prediction: Yes ✗
+
+Input prompt (truncated):
+  
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: Yes ✓
+LoRA Model Prediction: No ✗
+
+Input prompt (truncated):
+  
+
+
+================================================================================
+BOTH WRONG BUT DIFFERENT (1 total)
+Cases where both models were wrong but gave different answers
+================================================================================
+
+================================================================================
+Ground Truth: Yes
+Base Model Prediction: Unknown ✗
+LoRA Model Prediction: No ✗
+
+================================================================================
+CONCLUSION
+================================================================================
+✓ LoRA fine-tuning IMPROVED the model
+  - F1 score increased by 0.0039
+  - Net 25 more correct predictions
+
+================================================================================
+
+All results and analysis saved to: infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/checkpoint-4650
+================================================================================

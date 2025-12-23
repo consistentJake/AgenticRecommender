@@ -14,7 +14,7 @@ finetuning_type: lora
 enable_special_tokenization: true
 
 # ==== DATA ====
-dataset_dir: /workspace/AgenticRecommender/agentic_recommender/datasets
+dataset_dir: /workspace/AgenticRecommender/agentic_recommender/datasets/tw
 dataset: train
 eval_dataset: eval
 cutoff_len: 1024
@@ -32,7 +32,7 @@ packing: true  # default behavior is false
 # ==== OUTPUT & LOGGING ====
 # For training, this is the output directory
 # For inference/comparison, use the checkpoint directory that has adapter_config.json
-output_dir: output/qwen3-7b-delivery-hero-qlora-special-token-8b/
+output_dir: output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/
 logging_steps: 500  # Log metrics including GPU memory every 500 steps
 # if choose to enable packing, save_steps and eval steps can be smaller because the total steps are reduced
 save_steps: 500
@@ -44,13 +44,13 @@ skip_memory_metrics: false  # Enable GPU memory logging to TensorBoard
 # ==== BATCHING (24GB-FRIENDLY) ====
 # 8B QLoRA with gradient_checkpointing=True can handle bs=2 at seq=1024
 # Effective batch size = 2 × 8 = 16
-per_device_train_batch_size: 4
+per_device_train_batch_size: 8
 per_device_eval_batch_size: 2
-gradient_accumulation_steps: 4
+gradient_accumulation_steps: 2
 
 # ==== OPTIMIZER / LR ====
 learning_rate: 3.0e-4
-num_train_epochs: 3
+num_train_epochs: 5
 lr_scheduler_type: cosine
 warmup_ratio: 0.03
 weight_decay: 0.0
@@ -97,17 +97,16 @@ inference:
   test_file: /workspace/AgenticRecommender/agentic_recommender/datasets/test.jsonl  # Path to test data
   # test_file: /workspace/AgenticRecommender/agentic_recommender/datasets/train.jsonl # use traindata for eval
   # infer_output_dir: infer_results_1214_2_training_checkpoint_8000/  # Directory for inference results (NOT under output_dir)
-  infer_output_dir: infer_results_delivery_hero_special_tokenization_checkpoint_4650/ 
+  infer_output_dir: infer_results_delivery_hero_special_tokenization_tw_checkpoint_4650/ 
   # adapter_dir: Specify which adapter to load for comparison (optional)
   # If not specified, uses output_dir from main config
   # Examples:
   #   adapter_dir: output/qwen3-7b-movielens-qlora-2  # Load from final adapter
   # adapter_dir: output/qwen3-7b-movielens-qlora-2/checkpoint-12240 # Load from specific checkpoint
   # Uncomment and set to override output_dir:
-  adapter_dir: output/qwen3-7b-delivery-hero-qlora-special-token-8b/checkpoint-4650
+  adapter_dir: output/qwen3-7b-delivery-hero-qlora-special-token-8b-tw/checkpoint-4650
 
-
-  batch_size: 8  # Batch size for inference (higher = faster but more memory)
+  batch_size: 16  # Batch size for inference (higher = faster but more memory)
   chunk_size: 64  # Process 200 samples per chunk (optional; null = process all at once)
                    # Chunked mode: runs base inference, then LoRA inference on each chunk
                    # Benefits: lower memory usage, better cache locality, incremental results

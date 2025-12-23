@@ -298,6 +298,53 @@ def test_to_chat_messages_no_system():
     assert messages[0]["role"] == "user"
     assert messages[1]["role"] == "assistant"
 
+    # Should combine instruction and input
+    assert messages[0]["content"] == "Question\n\nInput text"
+
+
+def test_to_chat_messages_empty_input():
+    """Test that empty input field only uses instruction."""
+    example = {
+        "instruction": "Question only",
+        "input": "",  # Empty input (common in test data)
+        "output": "Answer"
+    }
+    messages = to_chat_messages(example)
+
+    assert len(messages) == 2
+    assert messages[0]["role"] == "user"
+    # Should only use instruction when input is empty
+    assert messages[0]["content"] == "Question only"
+
+
+def test_to_generation_messages_combines_fields():
+    """Test that to_generation_messages also combines instruction + input correctly."""
+    example = {
+        "instruction": "User orders:",
+        "input": "Additional details",
+        "system": "You are a recommender"
+    }
+    messages = to_generation_messages(example)
+
+    assert len(messages) == 2  # system + user (no assistant)
+    assert messages[0]["role"] == "system"
+    assert messages[1]["role"] == "user"
+    assert messages[1]["content"] == "User orders:\n\nAdditional details"
+
+
+def test_to_generation_messages_empty_input():
+    """Test that to_generation_messages handles empty input correctly."""
+    example = {
+        "instruction": "User orders:",
+        "input": "",
+        "system": "You are a recommender"
+    }
+    messages = to_generation_messages(example)
+
+    assert len(messages) == 2
+    assert messages[1]["role"] == "user"
+    assert messages[1]["content"] == "User orders:"
+
 
 def test_chat_template_and_tokenization_round_trip(sample_tokenizer, sample_chat_example):
     """Ensure chat example -> template -> tokenization keeps assistant label intact."""

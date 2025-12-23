@@ -64,6 +64,25 @@ Performance Optimizations:
     This is unavoidable and subsequent batches will be fast.
 
     See docs/LORA_INFERENCE_OPTIMIZATION.md for detailed technical explanation.
+
+Output File Structure:
+    Each prediction file (base_predictions.jsonl, lora_predictions.jsonl) contains
+    these fields to help understand the full inference pipeline:
+
+    - label: Ground truth answer (Yes/No)
+    - prediction: Extracted answer from model (Yes/No/Unknown)
+    - user_prompt: User's prompt text only (e.g., "User's last 15 watched movies:...")
+    - model_input: Full formatted text sent to model including system prompt and chat
+                   template markers (e.g., "<|im_start|>system\n...<|im_start|>user\n...")
+    - assistant_response: Only the model's generated text (after "assistant" marker)
+    - full_response: Complete decoded output = model_input + generated response
+    - instruction: Original instruction field from training data (if present)
+    - input: Original input field from training data (if present)
+
+    Understanding the relationship:
+        model_input = format_with_chat_template(system_prompt + user_prompt)
+        full_response = decode(model_output_tokens) = model_input + assistant_response
+        prediction = extract_answer(assistant_response)
 """
 
 import json
@@ -304,13 +323,6 @@ def main():
             print(f"{'='*80}")
 
         # ====================================================================
-        # OPTIMIZATION: Pre-format prompts once for both base and LoRA inference
-        # This avoids duplicate formatting work
-        # ====================================================================
-        chunk_prompts = [format_prompt(example) for example in chunk_data]
-        chunk_system_prompts = [example.get("system", None) for example in chunk_data]
-
-        # ====================================================================
         # STEP 1: Run BASE MODEL inference on this chunk
         # ====================================================================
         print(f"\n{'='*60}")
@@ -320,19 +332,21 @@ def main():
         for i in tqdm(range(0, len(chunk_data), batch_size),
                      desc=f"Base inference (chunk {chunk_idx+1})", unit="batch"):
             batch = chunk_data[i:i+batch_size]
-            batch_prompts = chunk_prompts[i:i+batch_size]
-            batch_system_prompts = chunk_system_prompts[i:i+batch_size]
 
             # Use batch generation if batch_size > 1, otherwise use single generation
             if batch_size > 1:
-                system_prompt = batch_system_prompts[0] if batch_system_prompts else None
-                responses = generate_batch(batch_prompts, base_model, tokenizer, device, system_prompt)
+                responses, input_texts = generate_batch(
+                    examples=batch, model=base_model, tokenizer=tokenizer, device=device, return_input_texts=True
+                )
             else:
-                system_prompt = batch_system_prompts[0] if batch_system_prompts else None
-                responses = [generate(batch_prompts[0], base_model, tokenizer, device, system_prompt)]
+                response, input_text = generate(
+                    example=batch[0], model=base_model, tokenizer=tokenizer, device=device, return_input_text=True
+                )
+                responses = [response]
+                input_texts = [input_text]
 
             # Process each response in the batch
-            for example, prompt, response in zip(batch, batch_prompts, responses):
+            for example, response, input_text in zip(batch, responses, input_texts):
                 prediction = extract_answer(response)
                 label = example.get("output") or example.get("label")
                 base_predictions.append(prediction)
@@ -340,13 +354,20 @@ def main():
                 # Extract assistant's response only
                 assistant_response = response.split("assistant")[-1].strip() if "assistant" in response else response
 
+                # Extract user prompt from example (for display)
+                user_content = example.get("instruction", "")
+                example_input = example.get("input")
+                if example_input:
+                    user_content = f"{user_content}\n\n{example_input}"
+
                 # Build result dict
                 result = {
                     "label": label,
                     "prediction": prediction,
-                    "prompt": prompt,
-                    "assistant_response": assistant_response,
-                    "full_response": response,
+                    "user_prompt": user_content,  # User's prompt text (from instruction + input)
+                    "model_input": input_text,  # Full formatted input sent to model (with chat template)
+                    "assistant_response": assistant_response,  # Only the generated response
+                    "full_response": response,  # Decoded output (input + generated, with chat template)
                 }
 
                 # Add format-specific fields if available
@@ -394,24 +415,25 @@ def main():
                 peft_model = None  # Free the PEFT wrapper
                 print("Using merged model (compatibility mode).")
 
-        # OPTIMIZATION: Reuse the same prompts we formatted earlier
-        # This saves duplicate formatting work
+        # Process LoRA inference on the same batch
         for i in tqdm(range(0, len(chunk_data), batch_size),
                      desc=f"LoRA inference (chunk {chunk_idx+1})", unit="batch"):
             batch = chunk_data[i:i+batch_size]
-            batch_prompts = chunk_prompts[i:i+batch_size]
-            batch_system_prompts = chunk_system_prompts[i:i+batch_size]
 
             # Use batch generation if batch_size > 1, otherwise use single generation
             if batch_size > 1:
-                system_prompt = batch_system_prompts[0] if batch_system_prompts else None
-                responses = generate_batch(batch_prompts, lora_model, tokenizer, device, system_prompt)
+                responses, input_texts = generate_batch(
+                    examples=batch, model=lora_model, tokenizer=tokenizer, device=device, return_input_texts=True
+                )
             else:
-                system_prompt = batch_system_prompts[0] if batch_system_prompts else None
-                responses = [generate(batch_prompts[0], lora_model, tokenizer, device, system_prompt)]
+                response, input_text = generate(
+                    example=batch[0], model=lora_model, tokenizer=tokenizer, device=device, return_input_text=True
+                )
+                responses = [response]
+                input_texts = [input_text]
 
             # Process each response in the batch
-            for example, prompt, response in zip(batch, batch_prompts, responses):
+            for example, response, input_text in zip(batch, responses, input_texts):
                 prediction = extract_answer(response)
                 label = example.get("output") or example.get("label")
                 lora_predictions.append(prediction)
@@ -420,13 +442,20 @@ def main():
                 # Extract assistant's response only
                 assistant_response = response.split("assistant")[-1].strip() if "assistant" in response else response
 
+                # Extract user prompt from example (for display)
+                user_content = example.get("instruction", "")
+                example_input = example.get("input")
+                if example_input:
+                    user_content = f"{user_content}\n\n{example_input}"
+
                 # Build result dict
                 result = {
                     "label": label,
                     "prediction": prediction,
-                    "prompt": prompt,
-                    "assistant_response": assistant_response,
-                    "full_response": response,
+                    "user_prompt": user_content,  # User's prompt text (from instruction + input)
+                    "model_input": input_text,  # Full formatted input sent to model (with chat template)
+                    "assistant_response": assistant_response,  # Only the generated response
+                    "full_response": response,  # Decoded output (input + generated, with chat template)
                 }
 
                 # Add format-specific fields if available
@@ -640,11 +669,13 @@ def main():
     if base_correct_lora_wrong:
         print(f"  - lora_regressions.jsonl: Cases where LoRA made mistakes base didn't ({len(base_correct_lora_wrong)} samples)")
     print(f"\nEach prediction file includes:")
-    print(f"  - label: Ground truth")
-    print(f"  - prediction: Extracted Yes/No/Unknown")
-    print(f"  - prompt: User prompt sent to model")
-    print(f"  - assistant_response: Only the model's generated text (for debugging)")
-    print(f"  - full_response: Complete output including system/user/assistant")
+    print(f"  - label: Ground truth (Yes/No)")
+    print(f"  - prediction: Extracted answer (Yes/No/Unknown)")
+    print(f"  - user_prompt: User's prompt text only (no chat template formatting)")
+    print(f"  - model_input: Full formatted input sent to model (with system prompt + chat template)")
+    print(f"  - assistant_response: Only the model's generated text")
+    print(f"  - full_response: Complete decoded output (model_input + generated response)")
+    print(f"  - instruction/input: Original data fields (if present in test data)")
 
     # ========================================================================
     # ANALYSIS SECTION

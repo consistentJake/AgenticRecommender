@@ -54,6 +54,12 @@ def parse_args() -> argparse.Namespace:
         help="Destination folder for processed dataset.",
     )
     parser.add_argument(
+        "--country-code",
+        type=str,
+        default="sg",
+        help="Country code for data files (e.g., 'sg', 'se', 'tw'). Default: sg",
+    )
+    parser.add_argument(
         "--min-history-len",
         type=int,
         default=3,
@@ -142,10 +148,10 @@ def load_data(source_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFram
     """Load orders, vendors, and products data."""
     print(f"[info] Loading data from {source_dir}")
 
-    orders_train = pd.read_csv(source_dir / "orders_se_train.txt")
-    orders_test = pd.read_csv(source_dir / "orders_se_test.txt")
-    vendors = pd.read_csv(source_dir / "vendors_se.txt")
-    products = pd.read_csv(source_dir / "products_se.txt")
+    orders_train = pd.read_csv(source_dir / "orders_sg_train.txt")
+    orders_test = pd.read_csv(source_dir / "orders_sg_test.txt")
+    vendors = pd.read_csv(source_dir / "vendors_sg.txt")
+    products = pd.read_csv(source_dir / "products_sg.txt")
 
     print(f"[info] Train orders: {len(orders_train)}")
     print(f"[info] Test orders: {len(orders_test)}")
@@ -613,6 +619,46 @@ def main() -> None:
     }
     write_json(output_dir / "meta.json", meta)
 
+    # Write dataset_info.json for LLaMA-Factory
+    dataset_info = {
+        "train": {
+            "file_name": "train.jsonl",
+            "file_name_eval": "eval.jsonl",
+            "formatting": "alpaca",
+            "columns": {
+                "prompt": "instruction",
+                "query": "input",
+                "response": "output",
+                "history": "history",
+                "system": "system"
+            }
+        },
+        "eval": {
+            "file_name": "eval.jsonl",
+            "formatting": "alpaca",
+            "columns": {
+                "prompt": "instruction",
+                "query": "input",
+                "response": "output",
+                "history": "history",
+                "system": "system"
+            }
+        },
+        "test": {
+            "file_name": "test.jsonl",
+            "formatting": "alpaca",
+            "columns": {
+                "prompt": "instruction",
+                "query": "input",
+                "response": "output",
+                "history": "history",
+                "system": "system"
+            }
+        }
+    }
+    print("[info] Writing dataset_info.json for LLaMA-Factory...")
+    write_json(output_dir / "dataset_info.json", dataset_info)
+
     # Count positive/negative samples
     train_pos = sum(1 for r in train_records if r['output'] == 'Yes')
     val_pos = sum(1 for r in val_records if r['output'] == 'Yes')
@@ -628,6 +674,16 @@ def main() -> None:
         "test": {"total": len(test_records), "positive": test_pos, "negative": len(test_records) - test_pos},
         "output_dir": str(output_dir),
     }, indent=2))
+    print("\n[info] Generated files:")
+    print(f"  - {output_dir / 'train.jsonl'}")
+    print(f"  - {output_dir / 'eval.jsonl'}")
+    print(f"  - {output_dir / 'test.jsonl'}")
+    print(f"  - {output_dir / 'meta.json'}")
+    print(f"  - {output_dir / 'dataset_info.json'} (for LLaMA-Factory)")
+    print(f"\n[info] Ready to use with LLaMA-Factory!")
+    print(f"  Set dataset_dir: {output_dir}")
+    print(f"  Set dataset: train")
+    print(f"  Set eval_dataset: eval")
 
     # Show a sample
     print("\n" + "=" * 80)

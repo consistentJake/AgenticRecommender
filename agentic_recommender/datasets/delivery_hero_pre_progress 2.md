@@ -68,6 +68,12 @@ python datasets/convert_to_jsonl.py \
     --max-history-len 10
 ```
 
+python datasets/convert_to_jsonl.py \
+    --source /workspace/data_se \
+    --output-dir datasets/tw \
+    --min-history-len 5 \
+    --max-history-len 10
+
 ## Previous Questions (Dec 20)
 
 1. ✅ we need to integrate the hour of when order is placed, the day of week, like wed, sun, mon

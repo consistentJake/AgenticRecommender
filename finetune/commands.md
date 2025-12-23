@@ -21,6 +21,8 @@ pip install flash-attn --no-build-isolation
 
 git archive --format=tar -o finetune.tar HEAD:finetune
 
+git archive --format=tar -o output.tar HEAD
+
 
 ## Data
 ```bash
@@ -51,14 +53,18 @@ nohup python scripts/finetune_lora.py --config configs/qwen3_7b_delivery_hero_ql
 
 ## Monitor Learning Curves
 ```bash
-tensorboard --logdir output/qwen3-movielens-qlora/logs --port 6006
+tensorboard --logdir /workspace/AgenticRecommender/finetune/output/qwen3-7b-delivery-hero-qlora-special-token-8b/logs --port 6007
 # then open http://localhost:6006
+```
+```
 ```
 
 
 https://drive.google.com/file/d/11OsafYu26ISaUfGEXzFSwNyKDJxKCy8e/view?usp=drive_link
 gdown 11OsafYu26ISaUfGEXzFSwNyKDJxKCy8e
 unzip data_se.zip
+gdown 1Td7sTeJ7xcP8DLcY4bOQ_JqWUdqT93Ox
+unzip data_tw.zip
 
 
 ## fixing bistandbyptes 
@@ -82,5 +88,28 @@ because we download the qwen3-8b model in advance
 cd /workspace/AgenticRecommender/finetune
   source /venv/py311-cu128/bin/activate
   export HF_HOME=/root/.cache/huggingface
+  nohup python scripts/finetune_lora.py --config configs/qwen3_7b_delivery_hero_qlora.yaml --resume --extra-epochs 2 > training.log 2>&1 &
+
   nohup python scripts/finetune_lora.py --config configs/qwen3_7b_delivery_hero_qlora.yaml > training.log 2>&1 &
 
+  nohup python scripts/compare_base_vs_lora.py --config configs/qwen3_7b_delivery_hero_qlora.yaml > compare_base_vs_lora.log 2>&1 &
+
+
+  ### tw
+
+cd /workspace/AgenticRecommender/finetune
+  source /venv/py311-cu128/bin/activate
+  export HF_HOME=/root/.cache/huggingface
+    nohup python scripts/finetune_lora.py --config configs/qwen3_7b_delivery_hero_qlora_tw.yaml > training_tw.log 2>&1 &
+
+
+nohup python scripts/compare_base_vs_lora.py --config configs/qwen3_7b_delivery_hero_qlora_tw.yaml > compare_base_vs_lora_tw.log 2>&1 &
+
+
+### prepare dataset
+
+python datasets/convert_to_jsonl.py \
+    --source /workspace/data_sg \
+    --output-dir datasets/sg \
+    --min-history-len 5 \
+    --max-history-len 10
