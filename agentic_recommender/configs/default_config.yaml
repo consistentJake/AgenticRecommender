@@ -1,0 +1,43 @@
+# Default configuration for Agentic Recommendation System
+
+# LLM Provider Configuration
+llm:
+  provider_type: "gemini"  # Options: gemini, claude, openrouter, mock
+  model_name: null  # null = use provider default
+  api_key: null  # Set via LLM_API_KEY env var
+  fallback_enabled: true
+  retry_count: 2
+  timeout: 30
+
+# Manager Agent Configuration
+manager:
+  thought_temperature: 0.8  # Higher for creative reasoning
+  action_temperature: 0.3   # Lower for structured output
+  max_steps: 10
+  thought_max_tokens: 256
+  action_max_tokens: 128
+
+# Reflector Agent Configuration
+reflector:
+  enable_two_stage: true
+  first_round_temperature: 0.3
+  second_round_temperature: 0.3
+  min_similar_users: 1
+  confidence_threshold: 0.5
+
+# Swing Similarity Configuration
+swing:
+  alpha1: 5.0              # User activity smoothing
+  alpha2: 1.0              # Intersection smoothing
+  beta: 0.3                # Power weight
+  similarity_threshold: 0.1  # Minimum similarity
+  top_k: 5                 # Number of similar users
+
+# Paths
+data_dir: "datasets"
+prompts_dir: "agentic_recommender/prompts"
+cache_dir: ".cache/agents"
+
+# Logging
+log_level: "INFO"
+enable_detailed_logging: true
