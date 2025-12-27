@@ -1,0 +1,11 @@
+1. review the design here /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents, you can use readme.md to quickly catup.
+2. take a short and glimpe of the dataset in /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/datasets/sg/train.jsonl, it is too big a file, just take a glimpe.
+3. I want you to rethink about the design of this part of the code /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents,
+a. we should make the code to adapt to the dataset, you can refer to /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/finetune/scripts/finetune_lora.py about how it construct the chat message to Qwen3 model through chat template
+b. in reflector, we should try to include users that are similar to the current user, we would like to use swing similarity to calculate the top 5 similiar customers.  include these similar user information, but using top 5 but we also have a threshold, if similiarity too low then we exclude the similiar user from consideration too
+c. in reflector, we wil ask the LLM about the first round of llm judegement results, and consider the top similiar user then make the final descion, with reasoning.
+d. create a unified module to allow agent to use different LLM model for reasoning task, first priotity is using claude API.
+## requirement.
+1. thinking harder, design first
+2. do some research, give us some feedback if this is the good apporach to improve the recommendation task
+3. write design doc under /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents/doc
