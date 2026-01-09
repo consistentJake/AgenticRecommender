@@ -148,10 +148,10 @@ def load_data(source_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFram
     """Load orders, vendors, and products data."""
     print(f"[info] Loading data from {source_dir}")
 
-    orders_train = pd.read_csv(source_dir / "orders_sg_train.txt")
-    orders_test = pd.read_csv(source_dir / "orders_sg_test.txt")
-    vendors = pd.read_csv(source_dir / "vendors_sg.txt")
-    products = pd.read_csv(source_dir / "products_sg.txt")
+    orders_train = pd.read_csv(source_dir / "orders_se_train.txt")
+    orders_test = pd.read_csv(source_dir / "orders_se_test.txt")
+    vendors = pd.read_csv(source_dir / "vendors_se.txt")
+    products = pd.read_csv(source_dir / "products_se.txt")
 
     print(f"[info] Train orders: {len(orders_train)}")
     print(f"[info] Test orders: {len(orders_test)}")

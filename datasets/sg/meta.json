@@ -1,0 +1,13 @@
+{
+  "dataset": "delivery_hero",
+  "min_history_len": 5,
+  "max_history_len": 10,
+  "enable_sliding_windows": false,
+  "val_ratio": 0.05,
+  "test_ratio": 0.1,
+  "neg_ratio": 1,
+  "num_train": 31426,
+  "num_eval": 1850,
+  "num_test": 3700,
+  "source_dir": "/Users/zhenkai/Downloads/data_se"
+}
