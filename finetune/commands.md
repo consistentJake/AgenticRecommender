@@ -25,8 +25,9 @@ git archive --format=tar -o finetune.tar HEAD:finetune
 ## Data
 ```bash
 # Prepare MovieLens data (downloads ml-latest-small)
-python finetune/scripts/prepare_movielens.py \
-  --output-dir finetune/data/movielens_qwen3 \
+cd finetune 
+python scripts/prepare_movielens.py \
+  --output-dir data/movielens_qwen3 \
   --history-len 15 \
   --rating-threshold 4.0 \
   --max-eval 1000
@@ -46,3 +47,7 @@ Outputs (adapter, tokenizer, logs) land in `output/qwen3-movielens-qlora/`.
 tensorboard --logdir output/qwen3-movielens-qlora/logs --port 6006
 # then open http://localhost:6006
 ```
+## ssh key
+
+in my linux 
+
