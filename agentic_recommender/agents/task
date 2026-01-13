@@ -32,3 +32,16 @@ I have a requirements that for each stage, we first design the testing, validati
   /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/datasets/convert_to_jsonl.py. original dataset is under     
   /Users/zhenkai/Downloads/data_sg, each file you can take a look at the first 3 rows and you will get to understand the schema.  But I         
   want you to consider include more information into the agnet, into the user and item (the cuisine) presentation  
+
+
+ 1. for cuisine information, we should also add the pearking hours peaking days information. also worth mention peaking days is the weekday we order         
+                                                                                                                                                              
+                                                                                                                                                              
+                                                                                                                                                              
+  this food; 2. eleborate the way you calculate the similarity, we should design the similarity calculation as a module, we canhave multiple different        
+  way of calculating similiarty, and it is easy for us to switch different methods.  3. because in testing time, we can use                                   
+  /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/doc/design/APIs.md and Gemini 2.5 Flash model for testing for now (we can use openRouter      
+  AI), so for now, just implement the openRouter API for LLM provodier is okay. 4. I think instead of focusing of classification task yes and no. I want      
+  you to think about the way of implement the top k hit ratio metrics, design the way how we test this for LLM agentic workflow sequential recommendation     
+  task   like this 
+  
