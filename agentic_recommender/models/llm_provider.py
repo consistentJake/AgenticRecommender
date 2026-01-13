@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT_DIR / "configs" / "config"
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
-DEFAULT_OPENROUTER_MODEL = "google/gemini-flash-1.5"
+DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-001"  # Gemini 2.5 Flash
 
 # Default API keys sourced from APIs.md for local development.
 DEFAULT_GEMINI_KEY = None
@@ -440,6 +440,158 @@ class GeminiProvider(LLMProvider):
     
     def reset_metrics(self):
         """Reset performance metrics"""
+        self.total_calls = 0
+        self.total_tokens = 0
+        self.total_time = 0.0
+
+
+class OpenRouterProvider(LLMProvider):
+    """
+    Dedicated OpenRouter API provider for LLM inference.
+
+    Cleaner interface specifically for OpenRouter.
+    Default model: Gemini 2.5 Flash (google/gemini-2.0-flash-001)
+
+    Usage:
+        provider = OpenRouterProvider(api_key="your-key")
+        response = provider.generate("Hello!")
+    """
+
+    DEFAULT_MODEL = "google/gemini-2.0-flash-001"
+    BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+    def __init__(
+        self,
+        api_key: str = None,
+        model_name: str = None,
+    ):
+        """
+        Initialize OpenRouter provider.
+
+        Args:
+            api_key: OpenRouter API key (or uses OPENROUTER_API_KEY env var)
+            model_name: Model to use (default: google/gemini-2.0-flash-001)
+        """
+        import os
+
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.model_name = model_name or self.DEFAULT_MODEL
+
+        if not self.api_key:
+            raise ValueError("OpenRouter API key required (pass api_key or set OPENROUTER_API_KEY)")
+
+        try:
+            import requests
+            self._requests = requests
+        except ImportError as exc:
+            raise ImportError("requests not installed. Run: pip install requests") from exc
+
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/AgenticRecommender",
+            "X-Title": "Agentic Recommender System",
+        }
+
+        # Metrics
+        self.total_calls = 0
+        self.total_tokens = 0
+        self.total_time = 0.0
+
+    def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        system_prompt: str = None,
+        json_mode: bool = False,
+        **kwargs
+    ) -> str:
+        """
+        Generate using OpenRouter API.
+
+        Args:
+            prompt: User prompt
+            temperature: Sampling temperature (0.0-2.0)
+            max_tokens: Maximum tokens to generate
+            system_prompt: Optional system message
+            json_mode: If True, append JSON instruction
+            **kwargs: Additional parameters
+
+        Returns:
+            Generated text
+        """
+        start_time = time.time()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+        user_content = prompt
+        if json_mode:
+            user_content += "\n\nRespond only with valid JSON."
+        messages.append({"role": "user", "content": user_content})
+
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        try:
+            response = self._requests.post(
+                self.BASE_URL,
+                headers=self.headers,
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            text = ""
+            if data.get("choices"):
+                text = data["choices"][0]["message"]["content"]
+
+            # Track metrics
+            duration = time.time() - start_time
+            self.total_calls += 1
+            self.total_time += duration
+
+            usage = data.get("usage", {})
+            tokens = usage.get("total_tokens", 0)
+            if tokens:
+                self.total_tokens += tokens
+            else:
+                # Estimate tokens
+                self.total_tokens += len(prompt.split()) + len(text.split())
+
+            return text.strip()
+
+        except Exception as e:
+            return f"ERROR: {str(e)}"
+
+    def generate_batch(
+        self,
+        prompts: list,
+        **kwargs
+    ) -> list:
+        """Generate responses for multiple prompts."""
+        return [self.generate(p, **kwargs) for p in prompts]
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get model and usage information."""
+        return {
+            "provider": "OpenRouter",
+            "model_name": self.model_name,
+            "total_calls": self.total_calls,
+            "total_tokens": self.total_tokens,
+            "total_time": self.total_time,
+            "avg_time_per_call": self.total_time / max(self.total_calls, 1),
+        }
+
+    def reset_metrics(self):
+        """Reset performance metrics."""
         self.total_calls = 0
         self.total_tokens = 0
         self.total_time = 0.0
