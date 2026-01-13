@@ -9,3 +9,18 @@ d. create a unified module to allow agent to use different LLM model for reasoni
 1. thinking harder, design first
 2. do some research, give us some feedback if this is the good apporach to improve the recommendation task
 3. write design doc under /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents/doc
+
+
+# Jan 10 versions
+
+1. review the design here /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents, you can use readme.md to quickly catup.
+2. take a short and glimpe of the dataset in /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/datasets/sg/train.jsonl, it is too big a file, just take a glimpe. also here is the code that convert the original data into this jsonl file /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/datasets/convert_to_jsonl.py. original dataset is under /Users/zhenkai/Downloads/data_sg, each file you can take a look at the first 3 rows and you will get to understand the schema. 
+3. I want you to rethink about the design of this part of the code /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents,
+a. we should make the code to adapt to the dataset, you can refer to /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/finetune/scripts/finetune_lora.py about how it construct the chat message to Qwen3 model through chat template
+b. in reflector, we should try to introduce a auxilary matrix, which is based on the original data, we design a way to calcualte the vector representation of the user and item, and we can do a dot product of user and item vectors and get a score about thier connection. This should be based on collaborative filtering algorithm, you should look at the original data and design on this. 
+c. in reflector, we wil ask the LLM about the first round of llm judegement results, and consider user related to item score,  then make the final descion, with reasoning.
+d. create a unified module to allow agent to use different LLM model for reasoning task, first priotity is using claude API.
+## requirement.
+1. thinking harder, design first
+2. do some research, give us some feedback if this is the good apporach to improve the recommendation task
+3. write design doc under /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents/doc
