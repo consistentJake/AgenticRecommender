@@ -354,3 +354,125 @@ Context from `finetune/scripts/finetune_lora.py` on how supervised JSON samples 
 - `tokenizer.apply_chat_template` renders those turns into Qwen chat text (e.g., `<|im_start|>system ... <|im_end|>`, `<|im_start|>user ...`, `<|im_start|>assistant\nNo<|im_end|>`), no generation prompt added.
 - `preprocess_datasets_parallel` appends EOS, tokenizes, and masks all prompt tokens with `-100`, keeping labels only on the assistant response tokens.
 - SFTTrainer then trains on these token/label pairs; metrics extract Yes/No from decoded assistant responses to compute accuracy/F1.
+
+
+## Jan 12 Reform: Modular Recommendation System
+
+This reform introduces a test-first approach with modular components for similarity calculation, enriched data representations, and Top-K evaluation.
+
+**Full design documentation**: `agentic_recommender/agents/doc/ENHANCED_DESIGN_V2.md`
+
+### New Module Structure
+
+```
+agentic_recommender/
+├── data/                       # Data loading and representations
+│   ├── enriched_loader.py      # Singapore dataset loader (preserves full schema)
+│   └── representations.py      # EnrichedUser, CuisineProfile, CuisineRegistry
+├── similarity/                 # Modular similarity calculation
+│   ├── base.py                 # Abstract SimilarityMethod interface
+│   ├── methods.py              # Swing, Cosine, Jaccard implementations
+│   └── factory.py              # SimilarityFactory for easy method switching
+├── evaluation/                 # Top-K evaluation framework
+│   └── topk.py                 # TopKMetrics, SequentialRecommendationEvaluator
+├── models/
+│   └── llm_provider.py         # Added OpenRouterProvider (Gemini 2.5 Flash)
+└── tests/                      # Comprehensive test suite (94 tests)
+    ├── conftest.py             # Pytest fixtures with real Singapore data
+    ├── test_data_loader.py     # Data loader and representation tests
+    ├── test_similarity.py      # Similarity method tests
+    ├── test_llm_provider.py    # LLM provider tests (including API tests)
+    └── test_topk_evaluation.py # Top-K evaluation tests
+```
+
+### New Files Explained
+
+#### Data Module (`agentic_recommender/data/`)
+
+| File | Purpose |
+|------|---------|
+| `enriched_loader.py` | `EnrichedDataLoader` - Loads Singapore dataset preserving all fields (customer_id, order_id, geohash, chain_id, vendor_id). Parses timestamps into hour/day_num. |
+| `representations.py` | `EnrichedUser` - User representation with cuisine preferences, temporal patterns (peak hours/weekdays), vendor loyalty, basket size. `CuisineProfile` - Cuisine profiles with peak ordering hours/days, meal time distribution. `CuisineRegistry` - Fast lookup for cuisine temporal patterns. |
+
+#### Similarity Module (`agentic_recommender/similarity/`)
+
+| File | Purpose |
+|------|---------|
+| `base.py` | Abstract `SimilarityMethod` class defining interface: `fit()`, `compute_similarity()`, `get_similar()`. Includes caching and configuration. |
+| `methods.py` | Three similarity implementations: **SwingMethod** (Alibaba's anti-noise CF algorithm), **CosineMethod** (vector-based similarity), **JaccardMethod** (set overlap similarity). |
+| `factory.py` | `SimilarityFactory` - Factory pattern for creating/switching similarity methods at runtime. Supports `factory.create("swing")`, `factory.set_default("cosine")`. |
+
+#### Evaluation Module (`agentic_recommender/evaluation/`)
+
+| File | Purpose |
+|------|---------|
+| `topk.py` | `TopKMetrics` - Dataclass for Hit@1/3/5/10, MRR, NDCG metrics. `SequentialRecommendationEvaluator` - Evaluates LLM predictions against ground truth. `TopKTestDataBuilder` - Creates test samples from order history (last order = ground truth). |
+
+#### LLM Provider (`agentic_recommender/models/llm_provider.py`)
+
+| Addition | Purpose |
+|----------|---------|
+| `OpenRouterProvider` | LLM provider using OpenRouter API with Gemini 2.5 Flash (`google/gemini-2.0-flash-001`). Supports JSON mode, batch generation, and metrics tracking. |
+
+### Test Suite (`agentic_recommender/tests/`)
+
+**94 tests** covering all new modules with real Singapore data:
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `conftest.py` | - | Pytest fixtures: `all_orders`, `all_vendors`, `all_products`, `sample_customer_orders`, `merged_orders` |
+| `test_data_loader.py` | 29 | EnrichedDataLoader (12), EnrichedUser (7), CuisineProfile (5), CuisineRegistry (5) |
+| `test_similarity.py` | 25 | SwingMethod (8), CosineMethod (4), JaccardMethod (4), SimilarityFactory (9) |
+| `test_llm_provider.py` | 17 | MockLLMProvider (5), OpenRouterProvider (5), API tests (5), Factory (2) |
+| `test_topk_evaluation.py` | 20 | TopKMetrics (3), EvaluationResult (1), TopKTestDataBuilder (5), Evaluator (8), MetricsComputation (3) |
+
+### Running Tests
+
+```bash
+# Run all 94 tests
+python -m pytest agentic_recommender/tests/ -v
+
+# Run specific test modules
+python -m pytest agentic_recommender/tests/test_data_loader.py -v
+python -m pytest agentic_recommender/tests/test_similarity.py -v
+python -m pytest agentic_recommender/tests/test_llm_provider.py -v
+python -m pytest agentic_recommender/tests/test_topk_evaluation.py -v
+
+# Run with coverage
+python -m pytest agentic_recommender/tests/ -v --cov=agentic_recommender
+```
+
+### Quick Validation Commands
+
+```bash
+# Test data loading
+python -c "
+from agentic_recommender.data import EnrichedDataLoader
+loader = EnrichedDataLoader('/Users/zhenkai/Downloads/data_sg')
+print(loader.get_stats())
+"
+
+# Test similarity methods
+python -c "
+from agentic_recommender.similarity import SimilarityFactory
+print('Available methods:', SimilarityFactory.available_methods())
+"
+
+# Test LLM provider (real API call)
+python -c "
+from agentic_recommender.models.llm_provider import OpenRouterProvider
+llm = OpenRouterProvider(api_key='your-api-key')
+print(llm.generate('What is 2+2?'))
+"
+
+# Run full Top-K evaluation
+python agentic_recommender/tests/test_topk_evaluation.py
+```
+
+### Key Design Decisions
+
+1. **Top-K Hit Ratio** instead of Yes/No classification - More meaningful for sequential recommendation
+2. **Modular Similarity** - Easy to switch between Swing/Cosine/Jaccard via factory pattern
+3. **Enriched Representations** - Preserve all original data fields; add temporal patterns (peak hours/days)
+4. **Test-First Approach** - 94 tests using real Singapore data fixtures
+5. **OpenRouter + Gemini 2.5 Flash** - Fast and cost-effective for testing
