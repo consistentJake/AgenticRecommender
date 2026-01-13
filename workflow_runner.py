@@ -295,6 +295,14 @@ class PipelineStages:
         try:
             from agentic_recommender.data.representations import EnrichedUser
 
+            # Check if output already exists (skip if so)
+            output_path = stage_cfg.output.get('users_json')
+            if output_path and os.path.exists(output_path):
+                self.logger.info(f"Output file already exists: {output_path}")
+                self.logger.info("Skipping build_users stage. Delete the file to reprocess.")
+                self.logger.stage_end('build_users', success=True)
+                return True
+
             # Load merged data
             input_path = stage_cfg.input.get('merged_data')
             self.logger.file_read(input_path, "Loading merged data")
@@ -312,20 +320,27 @@ class PipelineStages:
 
             # Limit users if specified
             if max_users:
-                valid_customers = valid_customers[:max_users]
+                valid_customers = list(valid_customers[:max_users])
                 self.logger.info(f"Limiting to {max_users} users for processing")
+            else:
+                valid_customers = list(valid_customers)
 
-            # Build user representations
+            # Build user representations using groupby for O(n+m) instead of O(n*m)
             users = []
             total = len(valid_customers)
+            valid_customers_set = set(valid_customers)
 
             self.logger.info(f"Building representations for {total} users...")
+            self.logger.info("Using optimized groupby approach...")
 
-            for i, customer_id in enumerate(valid_customers):
-                if (i + 1) % 100 == 0 or i == 0 or i == total - 1:
+            # Filter to valid customers first, then group - much faster than filtering per user
+            filtered_df = merged_df[merged_df['customer_id'].isin(valid_customers_set)]
+            grouped = filtered_df.groupby('customer_id')
+
+            for i, (customer_id, customer_orders) in enumerate(grouped):
+                if (i + 1) % 5000 == 0 or i == 0 or i == total - 1:
                     self.logger.info(f"  Processing user {i+1}/{total} ({(i+1)/total*100:.1f}%)")
 
-                customer_orders = merged_df[merged_df['customer_id'] == customer_id]
                 user = EnrichedUser.from_orders(customer_id, customer_orders)
                 users.append(user.to_dict())
 

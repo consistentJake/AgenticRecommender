@@ -1,0 +1,139 @@
+# Workflow Configuration for Data Processing Pipeline
+# Control which stages to execute and specify input/output locations
+
+workflow:
+  name: "Food Delivery Recommendation Pipeline"
+  description: "Process data -> Build representations -> Generate prompts -> Run predictions"
+
+  # Global settings
+  verbose: true
+  log_file: "outputs/workflow.log"
+
+  # Stage definitions
+  stages:
+    # Stage 1: Load raw data from Singapore dataset
+    load_data:
+      enabled: true
+      description: "Load and merge Singapore food delivery data"
+      input:
+        data_dir: "/home/zhenkai/Downloads/data_sg/data_sg/"
+      output:
+        merged_data: "outputs/stage1_merged_data.parquet"
+        merged_preview: "outputs/stage1_merged_preview.json"  # Top 1000 rows for easy viewing
+        stats: "outputs/stage1_stats.json"
+      settings:
+        preview_rows: 1000  # Number of rows for JSON preview
+
+    # Stage 2: Build enriched user representations
+    # NOTE: Set max_users to null to process ALL users for auxiliary matrix calculation
+    build_users:
+      enabled: true
+      description: "Create EnrichedUser representations for all users"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        users_json: "outputs/stage2_enriched_users.json"
+        users_summary: "outputs/stage2_users_summary.json"
+      settings:
+        min_orders: 3  # Minimum orders to include a user
+        max_users: null  # null = process ALL users (needed for auxiliary matrix)
+
+    # Stage 3: Build cuisine profiles
+    build_cuisines:
+      enabled: true
+      description: "Build cuisine profiles for temporal patterns"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        cuisines_json: "outputs/stage3_cuisine_profiles.json"
+
+    # Stage 4: Generate prompts for prediction
+    generate_prompts:
+      enabled: true
+      description: "Generate formatted prompts for LLM prediction"
+      input:
+        users_json: "outputs/stage2_enriched_users.json"
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        prompts_json: "outputs/stage4_prompts.json"
+        prompts_readable: "outputs/stage4_prompts_readable.txt"
+      settings:
+        prompt_type: "reflector_first_round"  # Which prompt template to use
+        max_prompts: 100  # Limit prompts generated
+
+    # Stage 5: Run LLM predictions (DISABLED - use run_topk_evaluation instead)
+    run_predictions:
+      enabled: false
+      description: "Run LLM predictions on generated prompts"
+      input:
+        prompts_json: "outputs/stage4_prompts.json"
+      output:
+        predictions_json: "outputs/stage5_predictions.json"
+        predictions_summary: "outputs/stage5_predictions_summary.json"
+      settings:
+        limit: 50  # Only predict on first N records
+        save_intermediate: true  # Save after each prediction
+
+    # Stage 6: Run TopK Evaluation (DISABLED - use run_rerank_evaluation instead)
+    # Direct LLM prediction from all cuisines (less realistic)
+    run_topk_evaluation:
+      enabled: false
+      description: "Run TopK evaluation with real LLM predictions"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        results_json: "outputs/stage6_topk_results.json"
+        samples_json: "outputs/stage6_topk_samples.json"
+        detailed_predictions: "outputs/stage6_topk_detailed.json"
+      settings:
+        n_samples: 10         # Number of test samples to evaluate (keep small for testing)
+        min_history: 5        # Minimum orders per user
+        k_values: [1, 3, 5, 10]  # K values for Hit@K metrics
+        seed: 42              # Random seed for reproducibility
+        save_predictions: true  # Save individual predictions
+
+    # Stage 7: Retrieve-Rerank Evaluation (RECOMMENDED)
+    # Two-stage approach: Generate candidates → LLM picks from candidates
+    run_rerank_evaluation:
+      enabled: true
+      description: "Retrieve-rerank evaluation with candidate generation"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        results_json: "outputs/stage7_rerank_results.json"
+        samples_json: "outputs/stage7_rerank_samples.json"
+        detailed_json: "outputs/stage7_rerank_detailed.json"
+      settings:
+        # Candidate generation
+        n_candidates: 20        # Total candidates per user
+        n_from_history: 10      # Max from user's own history
+        n_similar_users: 10     # Similar users for CF
+        similarity_method: "swing"  # swing or cosine
+
+        # LLM evaluation
+        k_picks: 5              # Ask LLM to pick K times
+
+        # Test settings
+        n_samples: 10           # Number of test samples
+        min_history: 5          # Min orders per user
+
+# LLM Provider Configuration
+llm:
+  provider: "mock"  # Options: mock, gemini, openrouter
+  temperature: 0.3  # Lower temperature for more consistent predictions
+  max_tokens: 512
+
+  # Provider-specific settings (used when provider != mock)
+  gemini:
+    model_name: "gemini-2.0-flash-exp"
+    # api_key: "your-api-key"  # Or set GEMINI_API_KEY env var
+
+  openrouter:
+    model_name: "google/gemini-2.0-flash-001"
+    # api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
+
+# Output directory settings
+output:
+  base_dir: "outputs"
+  create_dirs: true
+  timestamp_suffix: false  # Add timestamp to output filenames

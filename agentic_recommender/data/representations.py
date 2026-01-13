@@ -60,7 +60,8 @@ class EnrichedUser:
     def from_orders(
         cls,
         customer_id: str,
-        orders_df: pd.DataFrame
+        orders_df: pd.DataFrame,
+        already_filtered: bool = True
     ) -> 'EnrichedUser':
         """
         Build enriched user from order data.
@@ -70,14 +71,16 @@ class EnrichedUser:
             orders_df: DataFrame with customer's orders (from merged data)
                       Required columns: order_id, cuisine, day_of_week, hour,
                                        vendor_id, chain_id, user_geohash, unit_price
+            already_filtered: If True, skip filtering by customer_id (for performance)
         """
         if len(orders_df) == 0:
             return cls(customer_id=customer_id)
 
-        # Ensure we have the right customer
-        orders_df = orders_df[orders_df['customer_id'] == customer_id].copy()
-        if len(orders_df) == 0:
-            return cls(customer_id=customer_id)
+        # Only filter if not already filtered (for backwards compatibility)
+        if not already_filtered:
+            orders_df = orders_df[orders_df['customer_id'] == customer_id].copy()
+            if len(orders_df) == 0:
+                return cls(customer_id=customer_id)
 
         # Primary geohash (most frequent) - handle different column names
         geohash_col = 'user_geohash' if 'user_geohash' in orders_df.columns else 'geohash'
