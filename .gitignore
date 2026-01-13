@@ -20,6 +20,7 @@ agentic_recommender/datasets/*.jsonl
 agentic_recommender/datasets/**/*.json
 agentic_recommender/datasets/**/*.jsonl
 agentic_recommender/datasets/source/
+datasets/
 
 # Python virtual environment
 venv/
