@@ -1149,10 +1149,65 @@ class PipelineStages:
                 ground_truth=sample['ground_truth_cuisine'],
             )
 
-            self.logger.info(f"  Candidates ({len(candidates)}): {candidates[:5]}...")
-            self.logger.info(f"  From history: {len(candidate_info['from_history'])}")
-            self.logger.info(f"  From similar users: {len(candidate_info['from_similar_users'])}")
-            self.logger.info(f"  GT rank: {candidate_info['ground_truth_rank']}, Added: {candidate_info['ground_truth_added']}")
+            # Detailed candidate breakdown for debugging
+            self.logger.info(f"  ")
+            self.logger.info(f"  === CANDIDATE SELECTION ({len(candidates)} total) ===")
+
+            # Show user's order history summary
+            history_cuisines = [o.get('cuisine', 'unknown') for o in sample['order_history']]
+            cuisine_counts = Counter(history_cuisines)
+            self.logger.info(f"  User's cuisine history: {dict(cuisine_counts.most_common(5))}")
+
+            # Show candidates from history
+            from_history = candidate_info['from_history']
+            self.logger.info(f"  ")
+            self.logger.info(f"  [FROM USER HISTORY] ({len(from_history)} cuisines):")
+            for idx, cuisine in enumerate(from_history, 1):
+                count = cuisine_counts.get(cuisine, 0)
+                self.logger.info(f"    {idx}. {cuisine} (ordered {count}x)")
+
+            # Show candidates from similar users
+            from_similar = candidate_info['from_similar_users']
+            self.logger.info(f"  ")
+            self.logger.info(f"  [FROM SIMILAR USERS] ({len(from_similar)} cuisines):")
+            for idx, cuisine in enumerate(from_similar, 1):
+                self.logger.info(f"    {idx}. {cuisine}")
+
+            # Show random fill if any
+            from_history_set = set(from_history)
+            from_similar_set = set(from_similar)
+            from_random = [c for c in candidates if c not in from_history_set and c not in from_similar_set and c != sample['ground_truth_cuisine']]
+            if from_random:
+                self.logger.info(f"  ")
+                self.logger.info(f"  [RANDOM FILL] ({len(from_random)} cuisines):")
+                for idx, cuisine in enumerate(from_random, 1):
+                    self.logger.info(f"    {idx}. {cuisine}")
+
+            # Show ground truth status
+            self.logger.info(f"  ")
+            self.logger.info(f"  [GROUND TRUTH] {sample['ground_truth_cuisine']}")
+            if candidate_info['ground_truth_added']:
+                self.logger.info(f"    -> NOT in candidates naturally, ADDED at rank {candidate_info['ground_truth_rank']}")
+            else:
+                self.logger.info(f"    -> Found in candidates at rank {candidate_info['ground_truth_rank']}")
+
+            # Show all 20 candidates in order
+            self.logger.info(f"  ")
+            self.logger.info(f"  [FINAL CANDIDATE LIST]:")
+            for idx, cuisine in enumerate(candidates, 1):
+                source = ""
+                if cuisine in from_history_set:
+                    source = "(history)"
+                elif cuisine in from_similar_set:
+                    source = "(similar users)"
+                elif cuisine == sample['ground_truth_cuisine'] and candidate_info['ground_truth_added']:
+                    source = "(GT added)"
+                else:
+                    source = "(random)"
+                gt_marker = " <-- GROUND TRUTH" if cuisine == sample['ground_truth_cuisine'] else ""
+                self.logger.info(f"    {idx:2}. {cuisine} {source}{gt_marker}")
+
+            self.logger.info(f"  ")
 
             # Get K picks from LLM
             picks = []
