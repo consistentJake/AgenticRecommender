@@ -22,7 +22,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
 import yaml
@@ -953,6 +953,280 @@ class PipelineStages:
 
         return MockTopKProvider(cuisines)
 
+    # -------------------------------------------------------------------------
+    # Stage 7: Retrieve-Rerank Evaluation
+    # -------------------------------------------------------------------------
+    def stage_run_rerank_evaluation(self) -> bool:
+        """Run retrieve-then-rerank evaluation with candidate generation."""
+        stage_cfg = self.config.get_stage('run_rerank_evaluation')
+        self.logger.stage_start('run_rerank_evaluation', stage_cfg.description)
+
+        try:
+            from agentic_recommender.evaluation.rerank_eval import (
+                CuisineCandidateGenerator,
+                RerankEvaluator,
+                RerankConfig,
+                build_test_samples,
+            )
+            from agentic_recommender.models.llm_provider import OpenRouterProvider
+
+            # Load merged data
+            input_path = stage_cfg.input.get('merged_data')
+            self.logger.file_read(input_path, "Loading merged data for rerank evaluation")
+            merged_df = pd.read_parquet(input_path)
+            self.logger.info(f"Loaded {len(merged_df):,} rows")
+
+            # Get settings
+            settings = stage_cfg.settings
+            config = RerankConfig(
+                n_candidates=settings.get('n_candidates', 20),
+                n_from_history=settings.get('n_from_history', 10),
+                n_similar_users=settings.get('n_similar_users', 10),
+                similarity_method=settings.get('similarity_method', 'swing'),
+                k_picks=settings.get('k_picks', 5),
+                n_samples=settings.get('n_samples', 10),
+                min_history=settings.get('min_history', 5),
+            )
+
+            # Build test samples
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("BUILDING TEST SAMPLES")
+            self.logger.info("=" * 60)
+
+            test_samples = build_test_samples(
+                merged_df,
+                n_samples=config.n_samples,
+                min_history=config.min_history,
+            )
+            self.logger.success(f"Created {len(test_samples)} test samples")
+
+            # Save test samples
+            samples_path = stage_cfg.output.get('samples_json')
+            if samples_path:
+                with open(samples_path, 'w') as f:
+                    json.dump(test_samples, f, indent=2)
+                self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
+
+            # Build candidate generator
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("BUILDING CANDIDATE GENERATOR")
+            self.logger.info("=" * 60)
+            self.logger.info(f"Similarity method: {config.similarity_method}")
+            self.logger.info(f"Candidates per user: {config.n_candidates}")
+
+            generator = CuisineCandidateGenerator(config)
+            generator.fit(merged_df)
+
+            gen_stats = generator.get_stats()
+            self.logger.info(f"Generator stats: {gen_stats['num_users']} users, {gen_stats['num_cuisines']} cuisines")
+
+            # Initialize LLM provider
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("INITIALIZING LLM PROVIDER")
+            self.logger.info("=" * 60)
+
+            llm_config = self.config.get_llm_config()
+            provider_type = llm_config.get('provider', 'mock')
+            self.logger.info(f"Provider type: {provider_type}")
+
+            if provider_type == 'mock':
+                provider = self._create_mock_rerank_provider()
+            elif provider_type == 'openrouter':
+                api_key = (
+                    llm_config.get('openrouter', {}).get('api_key') or
+                    os.environ.get('OPENROUTER_API_KEY')
+                )
+                if not api_key:
+                    self.logger.error("OpenRouter API key not found!")
+                    self.logger.stage_end('run_rerank_evaluation', success=False)
+                    return False
+
+                provider = OpenRouterProvider(
+                    api_key=api_key,
+                    model_name=llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
+                )
+                self.logger.success(f"Initialized OpenRouter")
+            else:
+                from agentic_recommender.models.llm_provider import create_llm_provider
+                provider = create_llm_provider(provider_type=provider_type)
+
+            # Run evaluation
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("RUNNING RERANK EVALUATION")
+            self.logger.info("=" * 60)
+            self.logger.info(f"Samples: {len(test_samples)}, K picks: {config.k_picks}")
+
+            evaluator = RerankEvaluator(
+                llm_provider=provider,
+                candidate_generator=generator,
+                config=config,
+            )
+
+            # Custom verbose evaluation
+            metrics, detailed_results = self._run_rerank_with_logging(
+                evaluator, test_samples, config
+            )
+
+            # Print results
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("RERANK EVALUATION RESULTS")
+            self.logger.info("=" * 60)
+            self.logger.info(f"  Recall@{config.k_picks}:  {metrics.recall_at_k:.2%}")
+            self.logger.info(f"  Precision@{config.k_picks}: {metrics.precision_at_k:.2%}")
+            self.logger.info(f"  First Hit Avg: {metrics.first_hit_avg:.2f}")
+            self.logger.info(f"  GT in Candidates: {metrics.ground_truth_in_candidates:.2%}")
+            self.logger.info(f"  Avg Candidate Rank: {metrics.avg_candidate_rank:.1f}")
+            self.logger.info(f"  Samples: {metrics.valid_samples}/{metrics.total_samples}")
+            self.logger.info(f"  Avg Time: {metrics.avg_time_ms:.2f}ms")
+
+            # Save results
+            results_path = stage_cfg.output.get('results_json')
+            if results_path:
+                with open(results_path, 'w') as f:
+                    json.dump(metrics.to_dict(), f, indent=2)
+                self.logger.file_write(results_path, "Rerank evaluation metrics")
+
+            # Save detailed results
+            detailed_path = stage_cfg.output.get('detailed_json')
+            if detailed_path:
+                with open(detailed_path, 'w') as f:
+                    json.dump(detailed_results, f, indent=2)
+                self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed results")
+
+            self.logger.stage_end('run_rerank_evaluation', success=True)
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Stage failed: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            self.logger.stage_end('run_rerank_evaluation', success=False)
+            return False
+
+    def _run_rerank_with_logging(
+        self,
+        evaluator,
+        test_samples: List[Dict],
+        config,
+    ) -> Tuple[Any, List[Dict]]:
+        """Run rerank evaluation with detailed logging."""
+        import random
+        from collections import Counter
+
+        results = []
+        total_time = 0.0
+
+        for i, sample in enumerate(test_samples):
+            self.logger.info(f"\n[{i+1}/{len(test_samples)}] Customer: {sample['customer_id']}")
+            self.logger.info(f"  History: {len(sample['order_history'])} orders")
+            self.logger.info(f"  Ground truth: {sample['ground_truth_cuisine']}")
+
+            start_time = time.time()
+
+            # Generate candidates
+            candidates, candidate_info = evaluator.generator.generate_candidates(
+                customer_id=sample['customer_id'],
+                ground_truth=sample['ground_truth_cuisine'],
+            )
+
+            self.logger.info(f"  Candidates ({len(candidates)}): {candidates[:5]}...")
+            self.logger.info(f"  From history: {len(candidate_info['from_history'])}")
+            self.logger.info(f"  From similar users: {len(candidate_info['from_similar_users'])}")
+            self.logger.info(f"  GT rank: {candidate_info['ground_truth_rank']}, Added: {candidate_info['ground_truth_added']}")
+
+            # Get K picks from LLM
+            picks = []
+            for k in range(config.k_picks):
+                pick = evaluator._get_llm_pick(
+                    order_history=sample['order_history'],
+                    candidates=candidates,
+                )
+                picks.append(pick)
+                match = "✓" if pick == sample['ground_truth_cuisine'] else "✗"
+                self.logger.info(f"  Pick {k+1}: {pick} {match}")
+
+            elapsed = (time.time() - start_time) * 1000
+            total_time += elapsed
+
+            # Calculate metrics
+            ground_truth = sample['ground_truth_cuisine']
+            hits = [1 if p == ground_truth else 0 for p in picks]
+            first_hit = next((i+1 for i, h in enumerate(hits) if h == 1), 0)
+
+            result = {
+                'sample_idx': i,
+                'customer_id': sample['customer_id'],
+                'ground_truth': ground_truth,
+                'candidates': candidates,
+                'candidate_info': candidate_info,
+                'picks': picks,
+                'hits': hits,
+                'first_hit': first_hit,
+                'recall': 1 if any(hits) else 0,
+                'precision': sum(hits) / len(hits),
+                'time_ms': elapsed,
+            }
+            results.append(result)
+
+            self.logger.info(f"  Recall: {result['recall']}, Precision: {result['precision']:.2f}")
+
+        # Compute aggregate metrics
+        from agentic_recommender.evaluation.rerank_eval import RerankMetrics
+
+        n = len(results)
+        if n == 0:
+            return RerankMetrics(total_samples=len(test_samples)), results
+
+        metrics = RerankMetrics(
+            recall_at_k=sum(r['recall'] for r in results) / n,
+            precision_at_k=sum(r['precision'] for r in results) / n,
+            first_hit_avg=sum(r['first_hit'] for r in results if r['first_hit'] > 0) / max(1, sum(1 for r in results if r['first_hit'] > 0)),
+            ground_truth_in_candidates=sum(1 for r in results if not r['candidate_info']['ground_truth_added']) / n,
+            avg_candidate_rank=sum(r['candidate_info']['ground_truth_rank'] for r in results) / n,
+            total_samples=len(test_samples),
+            valid_samples=n,
+            avg_time_ms=total_time / n,
+        )
+
+        return metrics, results
+
+    def _create_mock_rerank_provider(self):
+        """Create a mock provider for rerank testing."""
+        import random
+
+        class MockRerankProvider:
+            """Mock provider that picks from candidates."""
+
+            def __init__(self):
+                self.call_count = 0
+
+            def generate(self, prompt: str, **kwargs) -> str:
+                """Pick a random cuisine from the prompt's candidates."""
+                self.call_count += 1
+
+                # Extract candidates from prompt
+                if "Available Options:" in prompt:
+                    options_line = prompt.split("Available Options:")[1].split("\n")[1]
+                    candidates = [c.strip() for c in options_line.split(",")]
+                    if candidates:
+                        return random.choice(candidates)
+
+                return "chinese"  # fallback
+
+            def get_model_info(self):
+                return {
+                    "provider": "MockRerank",
+                    "model_name": "mock-rerank-llm",
+                    "total_calls": self.call_count
+                }
+
+        return MockRerankProvider()
+
 
 # =============================================================================
 # WORKFLOW RUNNER
@@ -967,7 +1241,8 @@ class WorkflowRunner:
         'build_cuisines',
         'generate_prompts',
         'run_predictions',
-        'run_topk_evaluation',  # Stage 6: Real LLM evaluation
+        'run_topk_evaluation',     # Stage 6: Direct LLM prediction
+        'run_rerank_evaluation',   # Stage 7: Retrieve-then-rerank (RECOMMENDED)
     ]
 
     def __init__(self, config_path: str = "workflow_config.yaml"):
@@ -986,6 +1261,7 @@ class WorkflowRunner:
             'generate_prompts': self.stages.stage_generate_prompts,
             'run_predictions': self.stages.stage_run_predictions,
             'run_topk_evaluation': self.stages.stage_run_topk_evaluation,
+            'run_rerank_evaluation': self.stages.stage_run_rerank_evaluation,
         }
 
     def run(self, stages: Optional[List[str]] = None) -> Dict[str, bool]:

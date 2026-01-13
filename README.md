@@ -476,3 +476,7 @@ python agentic_recommender/tests/test_topk_evaluation.py
 3. **Enriched Representations** - Preserve all original data fields; add temporal patterns (peak hours/days)
 4. **Test-First Approach** - 94 tests using real Singapore data fixtures
 5. **OpenRouter + Gemini 2.5 Flash** - Fast and cost-effective for testing
+
+
+### commands
+python workflow_runner.py

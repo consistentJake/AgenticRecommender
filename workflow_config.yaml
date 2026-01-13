@@ -74,10 +74,10 @@ workflow:
         limit: 50  # Only predict on first N records
         save_intermediate: true  # Save after each prediction
 
-    # Stage 6: Run TopK Evaluation with REAL LLM
-    # This stage actually calls the LLM and measures prediction quality
+    # Stage 6: Run TopK Evaluation (DISABLED - use run_rerank_evaluation instead)
+    # Direct LLM prediction from all cuisines (less realistic)
     run_topk_evaluation:
-      enabled: true
+      enabled: false
       description: "Run TopK evaluation with real LLM predictions"
       input:
         merged_data: "outputs/stage1_merged_data.parquet"
@@ -91,6 +91,31 @@ workflow:
         k_values: [1, 3, 5, 10]  # K values for Hit@K metrics
         seed: 42              # Random seed for reproducibility
         save_predictions: true  # Save individual predictions
+
+    # Stage 7: Retrieve-Rerank Evaluation (RECOMMENDED)
+    # Two-stage approach: Generate candidates → LLM picks from candidates
+    run_rerank_evaluation:
+      enabled: true
+      description: "Retrieve-rerank evaluation with candidate generation"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        results_json: "outputs/stage7_rerank_results.json"
+        samples_json: "outputs/stage7_rerank_samples.json"
+        detailed_json: "outputs/stage7_rerank_detailed.json"
+      settings:
+        # Candidate generation
+        n_candidates: 20        # Total candidates per user
+        n_from_history: 10      # Max from user's own history
+        n_similar_users: 10     # Similar users for CF
+        similarity_method: "swing"  # swing or cosine
+
+        # LLM evaluation
+        k_picks: 5              # Ask LLM to pick K times
+
+        # Test settings
+        n_samples: 10           # Number of test samples
+        min_history: 5          # Min orders per user
 
 # LLM Provider Configuration
 llm:
