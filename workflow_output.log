@@ -1,0 +1,330 @@
+[0m[23:04:18] [INFO] [0m
+[0m[23:04:18] [INFO] ################################################################################[0m
+[0m[23:04:18] [INFO] #                                                                              #[0m
+[0m[23:04:18] [INFO] #                                WORKFLOW RUNNER                               #[0m
+[0m[23:04:18] [INFO] #                     Food Delivery Recommendation Pipeline                    #[0m
+[0m[23:04:18] [INFO] #                                                                              #[0m
+[0m[23:04:18] [INFO] ################################################################################[0m
+[0m[23:04:18] [INFO] 
+Running enabled stages: ['load_data', 'build_users', 'build_cuisines', 'generate_prompts', 'run_rerank_evaluation'][0m
+[0m[23:04:18] [INFO] 
+Stage Plan:[0m
+[0m[23:04:18] [INFO]   1. load_data: Load and merge Singapore food delivery data[0m
+[0m[23:04:18] [INFO]   2. build_users: Create EnrichedUser representations for all users[0m
+[0m[23:04:18] [INFO]   3. build_cuisines: Build cuisine profiles for temporal patterns[0m
+[0m[23:04:18] [INFO]   4. generate_prompts: Generate formatted prompts for LLM prediction[0m
+[0m[23:04:18] [INFO]   5. run_rerank_evaluation: Retrieve-rerank evaluation with candidate generation[0m
+[0m[23:04:18] [INFO] [0m
+[94m[23:04:18] [START] ======================================================================[0m
+[94m[23:04:18] [START] STAGE: load_data[0m
+[94m[23:04:18] [START] Description: Load and merge Singapore food delivery data[0m
+[94m[23:04:18] [START] ======================================================================[0m
+[0m[23:04:18] [INFO] Loading data from: /home/zhenkai/Downloads/data_sg/data_sg/[0m
+[96m[23:04:18] [FILE] READING: /home/zhenkai/Downloads/data_sg/data_sg//orders_sg_train.txt (239.0 MB) - Loading orders[0m
+[96m[23:04:18] [FILE] READING: /home/zhenkai/Downloads/data_sg/data_sg//vendors_sg.txt (263.2 KB) - Loading vendors[0m
+[96m[23:04:18] [FILE] READING: /home/zhenkai/Downloads/data_sg/data_sg//products_sg.txt (62.2 MB) - Loading products[0m
+[0m[23:04:26] [INFO] Merged data shape: (3431870, 17)[0m
+[0m[23:04:26] [INFO] Columns: ['Unnamed: 0', 'customer_id', 'user_geohash', 'order_id', 'vendor_id', 'product_id', 'day_of_week', 'order_time', 'order_day', 'hour', 'day_num', 'day_name', 'cuisine', 'vendor_geohash', 'chain_id', 'product_name', 'unit_price'][0m
+[0m[23:04:27] [INFO] Dataset Statistics:[0m
+[0m[23:04:27] [INFO]   total_rows: 3,431,870[0m
+[0m[23:04:27] [INFO]   unique_customers: 476,150[0m
+[0m[23:04:27] [INFO]   unique_orders: 1,709,414[0m
+[0m[23:04:27] [INFO]   unique_vendors: 7,203[0m
+[0m[23:04:27] [INFO]   unique_cuisines: 78[0m
+[0m[23:04:27] [INFO]   unique_products: 242,552[0m
+[0m[23:04:27] [INFO]   avg_items_per_order: 2.01[0m
+[96m[23:04:29] [FILE] WRITING: outputs/stage1_merged_data.parquet (143.3 MB) - 3,431,870 rows[0m
+[0m[23:04:29] [INFO] Creating JSON preview with 1000 rows...[0m
+[96m[23:04:29] [FILE] WRITING: outputs/stage1_merged_preview.json (502.9 KB) - 1000 rows preview[0m
+[96m[23:04:29] [FILE] WRITING: outputs/stage1_stats.json (209.0 B) - Dataset statistics[0m
+[92m[23:04:29] [SUCCESS] STAGE load_data COMPLETED in 10.36s[0m
+[92m[23:04:29] [SUCCESS] ----------------------------------------------------------------------[0m
+[0m[23:04:29] [INFO] [0m
+[94m[23:04:29] [START] ======================================================================[0m
+[94m[23:04:29] [START] STAGE: build_users[0m
+[94m[23:04:29] [START] Description: Create EnrichedUser representations for all users[0m
+[94m[23:04:29] [START] ======================================================================[0m
+[96m[23:04:29] [FILE] READING: outputs/stage1_merged_data.parquet (143.3 MB) - Loading merged data[0m
+[0m[23:04:30] [INFO] Loaded 3,431,870 rows[0m
+[0m[23:04:30] [INFO] Customers with >= 3 orders: 190,031[0m
+[0m[23:04:30] [INFO] Building representations for 190031 users...[0m
+[0m[23:04:30] [INFO] Using optimized groupby approach...[0m
+[0m[23:04:31] [INFO]   Processing user 1/190031 (0.0%)[0m
+[0m[23:04:37] [INFO]   Processing user 5000/190031 (2.6%)[0m
+[0m[23:04:43] [INFO]   Processing user 10000/190031 (5.3%)[0m
+[0m[23:04:50] [INFO]   Processing user 15000/190031 (7.9%)[0m
+[0m[23:04:56] [INFO]   Processing user 20000/190031 (10.5%)[0m
+[0m[23:05:03] [INFO]   Processing user 25000/190031 (13.2%)[0m
+[0m[23:05:09] [INFO]   Processing user 30000/190031 (15.8%)[0m
+[0m[23:05:15] [INFO]   Processing user 35000/190031 (18.4%)[0m
+[0m[23:05:22] [INFO]   Processing user 40000/190031 (21.0%)[0m
+[0m[23:05:28] [INFO]   Processing user 45000/190031 (23.7%)[0m
+[0m[23:05:35] [INFO]   Processing user 50000/190031 (26.3%)[0m
+[0m[23:05:41] [INFO]   Processing user 55000/190031 (28.9%)[0m
+[0m[23:05:48] [INFO]   Processing user 60000/190031 (31.6%)[0m
+[0m[23:05:54] [INFO]   Processing user 65000/190031 (34.2%)[0m
+[0m[23:06:00] [INFO]   Processing user 70000/190031 (36.8%)[0m
+[0m[23:06:07] [INFO]   Processing user 75000/190031 (39.5%)[0m
+[0m[23:06:13] [INFO]   Processing user 80000/190031 (42.1%)[0m
+[0m[23:06:20] [INFO]   Processing user 85000/190031 (44.7%)[0m
+[0m[23:06:26] [INFO]   Processing user 90000/190031 (47.4%)[0m
+[0m[23:06:32] [INFO]   Processing user 95000/190031 (50.0%)[0m
+[0m[23:06:39] [INFO]   Processing user 100000/190031 (52.6%)[0m
+[0m[23:06:45] [INFO]   Processing user 105000/190031 (55.3%)[0m
+[0m[23:06:52] [INFO]   Processing user 110000/190031 (57.9%)[0m
+[0m[23:06:58] [INFO]   Processing user 115000/190031 (60.5%)[0m
+[0m[23:07:04] [INFO]   Processing user 120000/190031 (63.1%)[0m
+[0m[23:07:11] [INFO]   Processing user 125000/190031 (65.8%)[0m
+[0m[23:07:17] [INFO]   Processing user 130000/190031 (68.4%)[0m
+[0m[23:07:23] [INFO]   Processing user 135000/190031 (71.0%)[0m
+[0m[23:07:30] [INFO]   Processing user 140000/190031 (73.7%)[0m
+[0m[23:07:37] [INFO]   Processing user 145000/190031 (76.3%)[0m
+[0m[23:07:43] [INFO]   Processing user 150000/190031 (78.9%)[0m
+[0m[23:07:49] [INFO]   Processing user 155000/190031 (81.6%)[0m
+[0m[23:07:56] [INFO]   Processing user 160000/190031 (84.2%)[0m
+[0m[23:08:02] [INFO]   Processing user 165000/190031 (86.8%)[0m
+[0m[23:08:08] [INFO]   Processing user 170000/190031 (89.5%)[0m
+[0m[23:08:14] [INFO]   Processing user 175000/190031 (92.1%)[0m
+[0m[23:08:21] [INFO]   Processing user 180000/190031 (94.7%)[0m
+[0m[23:08:27] [INFO]   Processing user 185000/190031 (97.4%)[0m
+[0m[23:08:34] [INFO]   Processing user 190000/190031 (100.0%)[0m
+[0m[23:08:34] [INFO]   Processing user 190031/190031 (100.0%)[0m
+[92m[23:08:34] [SUCCESS] Built 190031 user representations[0m
+[96m[23:08:39] [FILE] WRITING: outputs/stage2_enriched_users.json (254.4 MB) - 190031 users[0m
+[96m[23:08:39] [FILE] WRITING: outputs/stage2_users_summary.json (168.0 B) - User summary statistics[0m
+[92m[23:08:39] [SUCCESS] STAGE build_users COMPLETED in 249.64s[0m
+[92m[23:08:39] [SUCCESS] ----------------------------------------------------------------------[0m
+[0m[23:08:39] [INFO] [0m
+[94m[23:08:39] [START] ======================================================================[0m
+[94m[23:08:39] [START] STAGE: build_cuisines[0m
+[94m[23:08:39] [START] Description: Build cuisine profiles for temporal patterns[0m
+[94m[23:08:39] [START] ======================================================================[0m
+[96m[23:08:39] [FILE] READING: outputs/stage1_merged_data.parquet (143.3 MB) - Loading merged data[0m
+[0m[23:08:40] [INFO] Building cuisine profiles...[0m
+Built profiles for 78 cuisines
+[92m[23:08:45] [SUCCESS] Built 78 cuisine profiles[0m
+[0m[23:08:45] [INFO] Top cuisines by order count:[0m
+[0m[23:08:45] [INFO]   chinese: 159,522 orders[0m
+[0m[23:08:45] [INFO]   indian: 103,230 orders[0m
+[0m[23:08:45] [INFO]   noodles: 82,419 orders[0m
+[0m[23:08:45] [INFO]   bubble tea: 81,167 orders[0m
+[0m[23:08:45] [INFO]   coffee: 75,973 orders[0m
+[96m[23:08:45] [FILE] WRITING: outputs/stage3_cuisine_profiles.json (133.0 KB) - 78 cuisines[0m
+[92m[23:08:45] [SUCCESS] STAGE build_cuisines COMPLETED in 6.08s[0m
+[92m[23:08:45] [SUCCESS] ----------------------------------------------------------------------[0m
+[0m[23:08:45] [INFO] [0m
+[94m[23:08:45] [START] ======================================================================[0m
+[94m[23:08:45] [START] STAGE: generate_prompts[0m
+[94m[23:08:45] [START] Description: Generate formatted prompts for LLM prediction[0m
+[94m[23:08:45] [START] ======================================================================[0m
+[96m[23:08:45] [FILE] READING: outputs/stage2_enriched_users.json (254.4 MB) - Loading user representations[0m
+[0m[23:08:47] [INFO] Loaded 190031 users[0m
+[96m[23:08:47] [FILE] READING: outputs/stage1_merged_data.parquet (143.3 MB) - Loading merged data for candidates[0m
+[0m[23:08:47] [INFO] Generating up to 100 prompts using template: reflector_first_round[0m
+[0m[23:08:47] [INFO]   Generating prompt 1/100[0m
+[0m[23:08:50] [INFO]   Generating prompt 50/100[0m
+[0m[23:08:52] [INFO]   Generating prompt 100/100[0m
+[92m[23:08:52] [SUCCESS] Generated 100 prompts[0m
+[96m[23:08:52] [FILE] WRITING: outputs/stage4_prompts.json (112.7 KB) - 100 prompts[0m
+[96m[23:08:52] [FILE] WRITING: outputs/stage4_prompts_readable.txt (94.7 KB) - Human-readable prompts[0m
+[92m[23:08:52] [SUCCESS] STAGE generate_prompts COMPLETED in 7.22s[0m
+[92m[23:08:52] [SUCCESS] ----------------------------------------------------------------------[0m
+[0m[23:08:53] [INFO] [0m
+[94m[23:08:53] [START] ======================================================================[0m
+[94m[23:08:53] [START] STAGE: run_rerank_evaluation[0m
+[94m[23:08:53] [START] Description: Retrieve-rerank evaluation with candidate generation[0m
+[94m[23:08:53] [START] ======================================================================[0m
+[96m[23:08:53] [FILE] READING: outputs/stage1_merged_data.parquet (143.3 MB) - Loading merged data for rerank evaluation[0m
+[0m[23:08:53] [INFO] Loaded 3,431,870 rows[0m
+[0m[23:08:53] [INFO] [0m
+[0m[23:08:53] [INFO] ============================================================[0m
+[0m[23:08:53] [INFO] BUILDING TEST SAMPLES[0m
+[0m[23:08:53] [INFO] ============================================================[0m
+[92m[23:08:54] [SUCCESS] Created 10 test samples[0m
+[96m[23:08:54] [FILE] WRITING: outputs/stage7_rerank_samples.json (12.6 KB) - 10 test samples[0m
+[0m[23:08:54] [INFO] [0m
+[0m[23:08:54] [INFO] ============================================================[0m
+[0m[23:08:54] [INFO] BUILDING CANDIDATE GENERATOR[0m
+[0m[23:08:54] [INFO] ============================================================[0m
+[0m[23:08:54] [INFO] Similarity method: swing[0m
+[0m[23:08:54] [INFO] Candidates per user: 20[0m
+[CandidateGenerator] Fitted on 476150 users, 78 cuisines, 1709414 interactions
+[0m[23:08:56] [INFO] Generator stats: 476150 users, 78 cuisines[0m
+[0m[23:08:56] [INFO] [0m
+[0m[23:08:56] [INFO] ============================================================[0m
+[0m[23:08:56] [INFO] INITIALIZING LLM PROVIDER[0m
+[0m[23:08:56] [INFO] ============================================================[0m
+[0m[23:08:56] [INFO] Provider type: mock[0m
+[0m[23:08:56] [INFO] [0m
+[0m[23:08:56] [INFO] ============================================================[0m
+[0m[23:08:56] [INFO] RUNNING RERANK EVALUATION[0m
+[0m[23:08:56] [INFO] ============================================================[0m
+[0m[23:08:56] [INFO] Samples: 10, K picks: 5[0m
+[0m[23:08:56] [INFO] 
+[1/10] Customer: cc28a31082[0m
+[0m[23:08:56] [INFO]   History: 11 orders[0m
+[0m[23:08:56] [INFO]   Ground truth: burgers[0m
+[0m[23:08:57] [INFO]   Candidates (20): ['bubble tea', 'burgers', 'dessert', 'fried chicken', 'sandwiches']...[0m
+[0m[23:08:57] [INFO]   From history: 6[0m
+[0m[23:08:57] [INFO]   From similar users: 14[0m
+[0m[23:08:57] [INFO]   GT rank: 2, Added: False[0m
+[0m[23:08:57] [INFO]   Pick 1: dessert ✗[0m
+[0m[23:08:57] [INFO]   Pick 2: indian ✗[0m
+[0m[23:08:57] [INFO]   Pick 3: burgers ✓[0m
+[0m[23:08:57] [INFO]   Pick 4: pizza ✗[0m
+[0m[23:08:57] [INFO]   Pick 5: sushi ✗[0m
+[0m[23:08:57] [INFO]   Recall: 1, Precision: 0.20[0m
+[0m[23:08:57] [INFO] 
+[2/10] Customer: 240466d472[0m
+[0m[23:08:57] [INFO]   History: 13 orders[0m
+[0m[23:08:57] [INFO]   Ground truth: bakery[0m
+[0m[23:08:57] [INFO]   Candidates (20): ['korean', 'coffee', 'soups', 'indian', 'fried chicken']...[0m
+[0m[23:08:57] [INFO]   From history: 7[0m
+[0m[23:08:57] [INFO]   From similar users: 13[0m
+[0m[23:08:57] [INFO]   GT rank: 6, Added: False[0m
+[0m[23:08:57] [INFO]   Pick 1: dessert ✗[0m
+[0m[23:08:57] [INFO]   Pick 2: korean ✗[0m
+[0m[23:08:57] [INFO]   Pick 3: fried chicken ✗[0m
+[0m[23:08:57] [INFO]   Pick 4: japanese ✗[0m
+[0m[23:08:57] [INFO]   Pick 5: thai ✗[0m
+[0m[23:08:57] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:57] [INFO] 
+[3/10] Customer: 082ba19467[0m
+[0m[23:08:57] [INFO]   History: 7 orders[0m
+[0m[23:08:57] [INFO]   Ground truth: sushi[0m
+[0m[23:08:57] [INFO]   Candidates (20): ['vegetarian', 'western', 'sushi', 'singaporean', 'dim sum ']...[0m
+[0m[23:08:57] [INFO]   From history: 5[0m
+[0m[23:08:57] [INFO]   From similar users: 15[0m
+[0m[23:08:57] [INFO]   GT rank: 3, Added: False[0m
+[0m[23:08:57] [INFO]   Pick 1: thai ✗[0m
+[0m[23:08:57] [INFO]   Pick 2: soups ✗[0m
+[0m[23:08:57] [INFO]   Pick 3: mala xiang guo ✗[0m
+[0m[23:08:57] [INFO]   Pick 4: bubble tea ✗[0m
+[0m[23:08:57] [INFO]   Pick 5: western ✗[0m
+[0m[23:08:57] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:57] [INFO] 
+[4/10] Customer: ec2c3eda9e[0m
+[0m[23:08:57] [INFO]   History: 4 orders[0m
+[0m[23:08:57] [INFO]   Ground truth: pizza[0m
+[0m[23:08:58] [INFO]   Candidates (20): ['burgers', 'pizza', 'french', 'fried rice', 'snacks']...[0m
+[0m[23:08:58] [INFO]   From history: 2[0m
+[0m[23:08:58] [INFO]   From similar users: 0[0m
+[0m[23:08:58] [INFO]   GT rank: 2, Added: False[0m
+[0m[23:08:58] [INFO]   Pick 1: bubble tea ✗[0m
+[0m[23:08:58] [INFO]   Pick 2: international ✗[0m
+[0m[23:08:58] [INFO]   Pick 3: middle eastern ✗[0m
+[0m[23:08:58] [INFO]   Pick 4: french ✗[0m
+[0m[23:08:58] [INFO]   Pick 5: fried rice ✗[0m
+[0m[23:08:58] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:58] [INFO] 
+[5/10] Customer: 5836042008[0m
+[0m[23:08:58] [INFO]   History: 7 orders[0m
+[0m[23:08:58] [INFO]   Ground truth: sushi[0m
+[0m[23:08:58] [INFO]   Candidates (20): ['american', 'japanese', 'sushi', 'coffee', 'dessert']...[0m
+[0m[23:08:58] [INFO]   From history: 6[0m
+[0m[23:08:58] [INFO]   From similar users: 14[0m
+[0m[23:08:58] [INFO]   GT rank: 3, Added: False[0m
+[0m[23:08:58] [INFO]   Pick 1: bubble tea ✗[0m
+[0m[23:08:58] [INFO]   Pick 2: sandwiches ✗[0m
+[0m[23:08:58] [INFO]   Pick 3: sandwiches ✗[0m
+[0m[23:08:58] [INFO]   Pick 4: korean ✗[0m
+[0m[23:08:58] [INFO]   Pick 5: vietnamese ✗[0m
+[0m[23:08:58] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:58] [INFO] 
+[6/10] Customer: 4e7e671123[0m
+[0m[23:08:58] [INFO]   History: 11 orders[0m
+[0m[23:08:58] [INFO]   Ground truth: thai[0m
+[0m[23:08:59] [INFO]   Candidates (20): ['singaporean', 'thai', 'indian', 'american', 'noodles']...[0m
+[0m[23:08:59] [INFO]   From history: 9[0m
+[0m[23:08:59] [INFO]   From similar users: 11[0m
+[0m[23:08:59] [INFO]   GT rank: 2, Added: False[0m
+[0m[23:08:59] [INFO]   Pick 1: fried chicken ✗[0m
+[0m[23:08:59] [INFO]   Pick 2: noodles ✗[0m
+[0m[23:08:59] [INFO]   Pick 3: coffee ✗[0m
+[0m[23:08:59] [INFO]   Pick 4: bubble tea ✗[0m
+[0m[23:08:59] [INFO]   Pick 5: fried chicken ✗[0m
+[0m[23:08:59] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:59] [INFO] 
+[7/10] Customer: 47aac0f05b[0m
+[0m[23:08:59] [INFO]   History: 9 orders[0m
+[0m[23:08:59] [INFO]   Ground truth: malaysian[0m
+[0m[23:08:59] [INFO]   Candidates (20): ['malaysian', 'turkish', 'indian', 'laksa', 'bak kut teh']...[0m
+[0m[23:08:59] [INFO]   From history: 3[0m
+[0m[23:08:59] [INFO]   From similar users: 0[0m
+[0m[23:08:59] [INFO]   GT rank: 1, Added: False[0m
+[0m[23:08:59] [INFO]   Pick 1: fries ✗[0m
+[0m[23:08:59] [INFO]   Pick 2: mediterranean ✗[0m
+[0m[23:08:59] [INFO]   Pick 3: greek ✗[0m
+[0m[23:08:59] [INFO]   Pick 4: seafood ✗[0m
+[0m[23:08:59] [INFO]   Pick 5: acai bowl ✗[0m
+[0m[23:08:59] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:08:59] [INFO] 
+[8/10] Customer: 2d507b577e[0m
+[0m[23:08:59] [INFO]   History: 9 orders[0m
+[0m[23:08:59] [INFO]   Ground truth: thai[0m
+[0m[23:09:00] [INFO]   Candidates (20): ['thai', 'coffee', 'indonesian', 'donut', 'beverages']...[0m
+[0m[23:09:00] [INFO]   From history: 5[0m
+[0m[23:09:00] [INFO]   From similar users: 15[0m
+[0m[23:09:00] [INFO]   GT rank: 1, Added: False[0m
+[0m[23:09:00] [INFO]   Pick 1: beverages ✗[0m
+[0m[23:09:00] [INFO]   Pick 2: sandwiches ✗[0m
+[0m[23:09:00] [INFO]   Pick 3: healthy ✗[0m
+[0m[23:09:00] [INFO]   Pick 4: donut ✗[0m
+[0m[23:09:00] [INFO]   Pick 5: pizza ✗[0m
+[0m[23:09:00] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:09:00] [INFO] 
+[9/10] Customer: ea92ebbeaf[0m
+[0m[23:09:00] [INFO]   History: 22 orders[0m
+[0m[23:09:00] [INFO]   Ground truth: korean[0m
+[0m[23:09:00] [INFO]   Candidates (20): ['korean', 'mala xiang guo', 'fried chicken', 'fast food', 'sandwiches']...[0m
+[0m[23:09:00] [INFO]   From history: 6[0m
+[0m[23:09:00] [INFO]   From similar users: 5[0m
+[0m[23:09:00] [INFO]   GT rank: 1, Added: False[0m
+[0m[23:09:00] [INFO]   Pick 1: fast food ✗[0m
+[0m[23:09:00] [INFO]   Pick 2: fried chicken ✗[0m
+[0m[23:09:00] [INFO]   Pick 3: malaysian ✗[0m
+[0m[23:09:00] [INFO]   Pick 4: mala xiang guo ✗[0m
+[0m[23:09:00] [INFO]   Pick 5: healthy ✗[0m
+[0m[23:09:00] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:09:00] [INFO] 
+[10/10] Customer: 213f8bd0d2[0m
+[0m[23:09:00] [INFO]   History: 4 orders[0m
+[0m[23:09:00] [INFO]   Ground truth: american[0m
+[0m[23:09:01] [INFO]   Candidates (20): ['american', 'sandwiches', 'burgers', 'bubble tea', 'indian']...[0m
+[0m[23:09:01] [INFO]   From history: 3[0m
+[0m[23:09:01] [INFO]   From similar users: 9[0m
+[0m[23:09:01] [INFO]   GT rank: 1, Added: False[0m
+[0m[23:09:01] [INFO]   Pick 1: sandwiches ✗[0m
+[0m[23:09:01] [INFO]   Pick 2: burgers ✗[0m
+[0m[23:09:01] [INFO]   Pick 3: pasta ✗[0m
+[0m[23:09:01] [INFO]   Pick 4: western ✗[0m
+[0m[23:09:01] [INFO]   Pick 5: bubble tea ✗[0m
+[0m[23:09:01] [INFO]   Recall: 0, Precision: 0.00[0m
+[0m[23:09:01] [INFO] [0m
+[0m[23:09:01] [INFO] ============================================================[0m
+[0m[23:09:01] [INFO] RERANK EVALUATION RESULTS[0m
+[0m[23:09:01] [INFO] ============================================================[0m
+[0m[23:09:01] [INFO]   Recall@5:  10.00%[0m
+[0m[23:09:01] [INFO]   Precision@5: 2.00%[0m
+[0m[23:09:01] [INFO]   First Hit Avg: 3.00[0m
+[0m[23:09:01] [INFO]   GT in Candidates: 100.00%[0m
+[0m[23:09:01] [INFO]   Avg Candidate Rank: 2.2[0m
+[0m[23:09:01] [INFO]   Samples: 10/10[0m
+[0m[23:09:01] [INFO]   Avg Time: 442.30ms[0m
+[96m[23:09:01] [FILE] WRITING: outputs/stage7_rerank_results.json (206.0 B) - Rerank evaluation metrics[0m
+[96m[23:09:01] [FILE] WRITING: outputs/stage7_rerank_detailed.json (11.8 KB) - 10 detailed results[0m
+[92m[23:09:01] [SUCCESS] STAGE run_rerank_evaluation COMPLETED in 8.04s[0m
+[92m[23:09:01] [SUCCESS] ----------------------------------------------------------------------[0m
+[0m[23:09:01] [INFO] [0m
+[0m[23:09:01] [INFO] ################################################################################[0m
+[0m[23:09:01] [INFO] WORKFLOW COMPLETE[0m
+[0m[23:09:01] [INFO] ################################################################################[0m
+[0m[23:09:01] [INFO] 
+Total time: 282.47s[0m
+[0m[23:09:01] [INFO] 
+Results:[0m
+[0m[23:09:01] [INFO]   load_data: SUCCESS[0m
+[0m[23:09:01] [INFO]   build_users: SUCCESS[0m
+[0m[23:09:01] [INFO]   build_cuisines: SUCCESS[0m
+[0m[23:09:01] [INFO]   generate_prompts: SUCCESS[0m
+[0m[23:09:01] [INFO]   run_rerank_evaluation: SUCCESS[0m
