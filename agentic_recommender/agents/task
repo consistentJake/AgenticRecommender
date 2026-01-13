@@ -24,3 +24,11 @@ d. create a unified module to allow agent to use different LLM model for reasoni
 1. thinking harder, design first
 2. do some research, give us some feedback if this is the good apporach to improve the recommendation task
 3. write design doc under /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/agents/doc
+
+# after plan is created
+I have a requirements that for each stage, we first design the testing, validation, once the module is up, we can test it with real           
+  example. of original data. secondaly, I would llike you to reconsider the way we convert the original dataset, there are many information     
+  we might left over. here is the code that convert the original data into this jsonl file                                                      
+  /Users/zhenkai/Documents/personal/Projects/AgenticRecommender/agentic_recommender/datasets/convert_to_jsonl.py. original dataset is under     
+  /Users/zhenkai/Downloads/data_sg, each file you can take a look at the first 3 rows and you will get to understand the schema.  But I         
+  want you to consider include more information into the agnet, into the user and item (the cuisine) presentation  
