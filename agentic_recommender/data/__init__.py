@@ -10,12 +10,6 @@ from .representations import (
     CuisineProfile,
     CuisineRegistry,
 )
-from .food_delivery_adapter import (
-    OrderRecord,
-    CandidateProduct,
-    RecommendationRequest,
-    parse_jsonl_record,
-)
 
 __all__ = [
     # Enriched loader
@@ -27,10 +21,4 @@ __all__ = [
     'EnrichedUser',
     'CuisineProfile',
     'CuisineRegistry',
-
-    # Food delivery adapter
-    'OrderRecord',
-    'CandidateProduct',
-    'RecommendationRequest',
-    'parse_jsonl_record',
 ]

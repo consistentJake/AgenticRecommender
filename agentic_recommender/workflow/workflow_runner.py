@@ -152,7 +152,12 @@ class WorkflowConfig:
     """Load and manage workflow configuration from YAML."""
 
     def __init__(self, config_path: str = "workflow_config.yaml"):
-        self.config_path = config_path
+        # If config_path is relative, resolve it relative to this script's directory
+        if not os.path.isabs(config_path):
+            script_dir = Path(__file__).parent
+            self.config_path = str(script_dir / config_path)
+        else:
+            self.config_path = config_path
         self.config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
