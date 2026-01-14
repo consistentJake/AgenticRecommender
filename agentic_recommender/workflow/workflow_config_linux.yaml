@@ -47,9 +47,10 @@ workflow:
       output:
         cuisines_json: "outputs/stage3_cuisine_profiles.json"
 
-    # Stage 4: Generate prompts for prediction
+    # Stage 4: Generate prompts for prediction (DISABLED - use run_rerank_evaluation)
+    # This stage is for binary prediction, not cuisine recommendation
     generate_prompts:
-      enabled: true
+      enabled: false
       description: "Generate formatted prompts for LLM prediction"
       input:
         users_json: "outputs/stage2_enriched_users.json"
