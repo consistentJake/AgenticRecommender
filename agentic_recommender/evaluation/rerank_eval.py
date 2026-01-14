@@ -510,6 +510,7 @@ def build_test_samples(
 
             orders.append({
                 'order_id': order_id,
+                'vendor_id': str(row.get('vendor_id', '')),
                 'cuisine': row.get('cuisine', 'unknown'),
                 'day_of_week': int(row.get('day_of_week', 0)),
                 'hour': int(row.get('hour', 12)),
