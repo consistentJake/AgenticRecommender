@@ -313,14 +313,17 @@ class RerankEvaluator:
 
             # Ask LLM K times
             picks = []
+            llm_interactions = []
             for k in range(self.config.k_picks):
-                pick = self._get_llm_pick(
+                llm_result = self._get_llm_pick(
                     order_history=sample['order_history'],
                     candidates=candidates,
                     target_hour=sample.get('target_hour'),
                     target_day_of_week=sample.get('target_day_of_week'),
                 )
+                pick = llm_result['parsed_pick']
                 picks.append(pick)
+                llm_interactions.append(llm_result)
 
                 if verbose:
                     match = "✓" if pick == sample['ground_truth_cuisine'] else "✗"
@@ -341,6 +344,7 @@ class RerankEvaluator:
                 'candidates': candidates,
                 'candidate_info': candidate_info,
                 'picks': picks,
+                'llm_interactions': llm_interactions,
                 'hits': hits,
                 'first_hit': first_hit,
                 'recall': 1 if any(hits) else 0,
@@ -379,8 +383,12 @@ class RerankEvaluator:
         candidates: List[str],
         target_hour: int = None,
         target_day_of_week: int = None,
-    ) -> str:
-        """Ask LLM to pick ONE cuisine from candidates."""
+    ) -> Dict[str, Any]:
+        """Ask LLM to pick ONE cuisine from candidates.
+
+        Returns:
+            Dict with 'prompt', 'response', 'parsed_pick' keys
+        """
         prompt = self._build_prompt(order_history, candidates, target_hour, target_day_of_week)
 
         response = self.llm.generate(
@@ -389,7 +397,13 @@ class RerankEvaluator:
             max_tokens=100,
         )
 
-        return self._parse_pick(response, candidates)
+        parsed_pick = self._parse_pick(response, candidates)
+
+        return {
+            'prompt': prompt,
+            'response': response,
+            'parsed_pick': parsed_pick,
+        }
 
     def _build_prompt(
         self,

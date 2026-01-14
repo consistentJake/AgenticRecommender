@@ -18,3 +18,7 @@ new module structure
       "bakery"
     ],
 ```
+
+
+## Jan 13 improvement plan
+1. in preparing the user profile data, 
