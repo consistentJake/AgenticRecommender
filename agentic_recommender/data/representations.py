@@ -31,7 +31,8 @@ class EnrichedUser:
 
     # Cuisine preferences
     cuisine_distribution: Dict[str, float] = field(default_factory=dict)
-    cuisine_sequence: List[str] = field(default_factory=list)
+    # Detailed purchase history: each entry has vendor_id, cuisine, hour, day_of_week
+    purchase_history: List[Dict[str, Any]] = field(default_factory=list)
 
     # Temporal patterns
     day_distribution: Dict[int, float] = field(default_factory=dict)
@@ -100,12 +101,31 @@ class EnrichedUser:
             total_cuisine = cuisine_counts.sum()
             cuisine_distribution = {k: v / total_cuisine for k, v in cuisine_counts.items()} if total_cuisine > 0 else {}
 
-        # Cuisine sequence (chronological)
+        # Detailed purchase history (chronological)
+        # Each entry: {vendor_id, cuisine, hour, day_of_week}
+        purchase_history = []
         if cuisine_col in orders_df.columns:
-            sorted_orders = orders_df.sort_values(['day_num', 'hour'] if 'day_num' in orders_df.columns else ['order_id'])
-            cuisine_sequence = sorted_orders.groupby('order_id')[cuisine_col].first().tolist()[-20:]  # Last 20
-        else:
-            cuisine_sequence = []
+            # Sort orders chronologically
+            sort_cols = ['day_num', 'hour'] if 'day_num' in orders_df.columns else ['order_id']
+            sorted_orders = orders_df.sort_values(sort_cols)
+
+            # Group by order_id to get one entry per order
+            seen_orders = set()
+            for _, row in sorted_orders.iterrows():
+                order_id = row.get('order_id')
+                if order_id in seen_orders:
+                    continue
+                seen_orders.add(order_id)
+
+                purchase_history.append({
+                    'vendor_id': str(row.get('vendor_id', '')),
+                    'cuisine': row.get(cuisine_col, 'unknown'),
+                    'hour': int(row.get('hour', 12)),
+                    'day_of_week': int(row.get('day_of_week', 0)),
+                })
+
+            # Keep last 20 orders
+            purchase_history = purchase_history[-20:]
 
         # Day distribution
         day_counts = orders_df.groupby('order_id')['day_of_week'].first().value_counts(normalize=True)
@@ -155,7 +175,7 @@ class EnrichedUser:
             customer_id=customer_id,
             primary_geohash=primary_geohash,
             cuisine_distribution=cuisine_distribution,
-            cuisine_sequence=cuisine_sequence,
+            purchase_history=purchase_history,
             day_distribution=day_distribution,
             hour_distribution=hour_distribution,
             peak_hours=peak_hours,
@@ -177,7 +197,7 @@ class EnrichedUser:
             'customer_id': self.customer_id,
             'primary_geohash': self.primary_geohash,
             'cuisine_distribution': self.cuisine_distribution,
-            'cuisine_sequence': self.cuisine_sequence,
+            'purchase_history': self.purchase_history,
             'day_distribution': self.day_distribution,
             'hour_distribution': self.hour_distribution,
             'peak_hours': self.peak_hours,

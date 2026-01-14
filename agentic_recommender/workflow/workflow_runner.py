@@ -217,6 +217,43 @@ class PipelineStages:
         output_dir = Path(config.get_output_base_dir())
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    def _save_preview(
+        self,
+        data: list,
+        full_path: str,
+        preview_rows: int = 10,
+        description: str = "Preview of data",
+    ) -> None:
+        """
+        Save a preview file for a JSON data list.
+
+        Args:
+            data: List of records to preview
+            full_path: Path to the full JSON file (preview will be saved with _preview suffix)
+            preview_rows: Number of rows to include in preview
+            description: Description for the preview file
+        """
+        if not full_path or not data:
+            return
+
+        # Generate preview path by inserting _preview before .json
+        if full_path.endswith('.json'):
+            preview_path = full_path.replace('.json', '_preview.json')
+        else:
+            preview_path = f"{full_path}_preview.json"
+
+        preview_data = {
+            'description': description,
+            'total_records': len(data),
+            'preview_records': min(preview_rows, len(data)),
+            'data': data[:preview_rows],
+        }
+
+        with open(preview_path, 'w') as f:
+            json.dump(preview_data, f, indent=2, default=str)
+
+        self.logger.file_write(preview_path, f"{preview_data['preview_records']} records preview")
+
     # -------------------------------------------------------------------------
     # Stage 1: Load Data
     # -------------------------------------------------------------------------
@@ -358,6 +395,14 @@ class PipelineStages:
                     json.dump(users, f, indent=2)
                 self.logger.file_write(output_path, f"{len(users)} users")
 
+                # Save preview
+                self._save_preview(
+                    data=users,
+                    full_path=output_path,
+                    preview_rows=10,
+                    description="Preview of enriched user representations",
+                )
+
             # Save summary
             summary_path = stage_cfg.output.get('users_summary')
             if summary_path:
@@ -426,6 +471,15 @@ class PipelineStages:
                 with open(output_path, 'w') as f:
                     json.dump(cuisines_data, f, indent=2)
                 self.logger.file_write(output_path, f"{len(cuisines_data)} cuisines")
+
+                # Save preview (convert dict to list for preview)
+                cuisines_list = [{'cuisine': k, **v} for k, v in list(cuisines_data.items())[:10]]
+                self._save_preview(
+                    data=cuisines_list,
+                    full_path=output_path,
+                    preview_rows=10,
+                    description="Preview of cuisine profiles",
+                )
 
             self.logger.stage_end('build_cuisines', success=True)
             return True
@@ -547,6 +601,14 @@ class PipelineStages:
                 with open(output_path, 'w') as f:
                     json.dump(prompts, f, indent=2)
                 self.logger.file_write(output_path, f"{len(prompts)} prompts")
+
+                # Save preview
+                self._save_preview(
+                    data=prompts,
+                    full_path=output_path,
+                    preview_rows=5,
+                    description="Preview of generated prompts",
+                )
 
             # Save readable prompts
             readable_path = stage_cfg.output.get('prompts_readable')
@@ -686,6 +748,14 @@ class PipelineStages:
                     json.dump(predictions, f, indent=2)
                 self.logger.file_write(output_path, f"{len(predictions)} predictions")
 
+                # Save preview
+                self._save_preview(
+                    data=predictions,
+                    full_path=output_path,
+                    preview_rows=10,
+                    description="Preview of LLM predictions",
+                )
+
             # Generate summary
             summary_path = stage_cfg.output.get('predictions_summary')
             if summary_path:
@@ -784,6 +854,14 @@ class PipelineStages:
                 with open(samples_path, 'w') as f:
                     json.dump(test_samples, f, indent=2)
                 self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
+
+                # Save preview
+                self._save_preview(
+                    data=test_samples,
+                    full_path=samples_path,
+                    preview_rows=5,
+                    description="Preview of TopK test samples",
+                )
 
             # Initialize LLM provider
             llm_config = self.config.get_llm_config()
@@ -930,6 +1008,14 @@ class PipelineStages:
                     json.dump(detailed_results, f, indent=2)
                 self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed predictions")
 
+                # Save preview
+                self._save_preview(
+                    data=detailed_results,
+                    full_path=detailed_path,
+                    preview_rows=5,
+                    description="Preview of detailed TopK predictions",
+                )
+
             self.logger.stage_end('run_topk_evaluation', success=True)
             return True
 
@@ -1028,6 +1114,14 @@ class PipelineStages:
                     json.dump(test_samples, f, indent=2)
                 self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
 
+                # Save preview
+                self._save_preview(
+                    data=test_samples,
+                    full_path=samples_path,
+                    preview_rows=5,
+                    description="Preview of Rerank test samples",
+                )
+
             # Build candidate generator
             self.logger.info("")
             self.logger.info("=" * 60)
@@ -1117,6 +1211,14 @@ class PipelineStages:
                 with open(detailed_path, 'w') as f:
                     json.dump(detailed_results, f, indent=2)
                 self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed results")
+
+                # Save preview
+                self._save_preview(
+                    data=detailed_results,
+                    full_path=detailed_path,
+                    preview_rows=5,
+                    description="Preview of detailed Rerank results",
+                )
 
             self.logger.stage_end('run_rerank_evaluation', success=True)
             return True

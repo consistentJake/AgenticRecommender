@@ -317,6 +317,8 @@ class RerankEvaluator:
                 pick = self._get_llm_pick(
                     order_history=sample['order_history'],
                     candidates=candidates,
+                    target_hour=sample.get('target_hour'),
+                    target_day_of_week=sample.get('target_day_of_week'),
                 )
                 picks.append(pick)
 
@@ -375,9 +377,11 @@ class RerankEvaluator:
         self,
         order_history: List[Dict],
         candidates: List[str],
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> str:
         """Ask LLM to pick ONE cuisine from candidates."""
-        prompt = self._build_prompt(order_history, candidates)
+        prompt = self._build_prompt(order_history, candidates, target_hour, target_day_of_week)
 
         response = self.llm.generate(
             prompt,
@@ -391,15 +395,28 @@ class RerankEvaluator:
         self,
         order_history: List[Dict],
         candidates: List[str],
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> str:
-        """Build prompt for LLM to pick one cuisine."""
+        """Build prompt for LLM to pick one cuisine.
+
+        Args:
+            order_history: List of past orders with cuisine, hour, day_of_week
+            candidates: List of cuisine options to pick from
+            target_hour: Hour when user wants to order (0-23)
+            target_day_of_week: Day when user wants to order (0=Mon, 6=Sun)
+        """
         # Format order history
         history_lines = []
         for i, order in enumerate(order_history[-10:], 1):
             day_name = self.DAY_NAMES[order.get('day_of_week', 0)]
             hour = order.get('hour', 12)
             cuisine = order.get('cuisine', 'unknown')
-            history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
+            vendor_id = order.get('vendor_id', '')
+            if vendor_id:
+                history_lines.append(f"{i}. {cuisine} from vendor {vendor_id} ({day_name} {hour}:00)")
+            else:
+                history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
         history_str = "\n".join(history_lines)
 
         # Shuffle candidates to avoid position bias
@@ -407,11 +424,18 @@ class RerankEvaluator:
         random.shuffle(shuffled)
         candidates_str = ", ".join(shuffled)
 
+        # Build target time context
+        if target_hour is not None and target_day_of_week is not None:
+            target_day_name = self.DAY_NAMES[target_day_of_week]
+            time_context = f"\n## Prediction Context:\nThe user wants to order on {target_day_name} at {target_hour}:00.\n"
+        else:
+            time_context = ""
+
         return f"""Based on this user's order history, pick the ONE cuisine they will most likely order next.
 
 ## Order History (oldest to newest):
 {history_str}
-
+{time_context}
 ## Available Options:
 {candidates_str}
 
@@ -495,10 +519,14 @@ def build_test_samples(
             continue
 
         # Split: history = all but last, ground truth = last
+        # Include target hour/weekday from the ground truth order for prediction context
+        last_order = orders[-1]
         samples.append({
             'customer_id': customer_id,
             'order_history': orders[:-1],
-            'ground_truth_cuisine': orders[-1]['cuisine'],
+            'ground_truth_cuisine': last_order['cuisine'],
+            'target_hour': last_order['hour'],
+            'target_day_of_week': last_order['day_of_week'],
         })
 
     return samples

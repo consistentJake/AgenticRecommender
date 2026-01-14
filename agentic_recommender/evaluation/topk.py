@@ -152,7 +152,9 @@ class SequentialRecommendationEvaluator:
             predictions = self._get_predictions(
                 customer_id=sample['customer_id'],
                 order_history=sample['order_history'],
-                k=max(self.k_values)
+                k=max(self.k_values),
+                target_hour=sample.get('target_hour'),
+                target_day_of_week=sample.get('target_day_of_week'),
             )
 
             elapsed = (time.time() - start_time) * 1000  # ms
@@ -181,7 +183,9 @@ class SequentialRecommendationEvaluator:
         self,
         customer_id: str,
         order_history: List[Dict],
-        k: int
+        k: int,
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> List[Tuple[str, float]]:
         """
         Get top-K cuisine predictions from LLM.
@@ -189,7 +193,7 @@ class SequentialRecommendationEvaluator:
         Returns:
             List of (cuisine, confidence) tuples
         """
-        prompt = self._build_prediction_prompt(customer_id, order_history, k)
+        prompt = self._build_prediction_prompt(customer_id, order_history, k, target_hour, target_day_of_week)
         system_prompt = self._get_system_prompt()
 
         response = self.llm.generate(
@@ -205,10 +209,19 @@ class SequentialRecommendationEvaluator:
         self,
         customer_id: str,
         order_history: List[Dict],
-        k: int
+        k: int,
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> str:
-        """Build prompt for top-K prediction."""
+        """Build prompt for top-K prediction.
 
+        Args:
+            customer_id: Customer identifier
+            order_history: List of past orders with cuisine, hour, day_of_week
+            k: Number of top cuisines to predict
+            target_hour: Hour when user wants to order (0-23)
+            target_day_of_week: Day when user wants to order (0=Mon, 6=Sun)
+        """
         # Format order history (last 10 orders)
         history_lines = []
         for i, order in enumerate(order_history[-10:], 1):
@@ -216,19 +229,32 @@ class SequentialRecommendationEvaluator:
             hour = order.get('hour', 12)
             cuisine = order.get('cuisine', 'unknown')
             price = order.get('price', 0.0)
-            history_lines.append(
-                f"{i}. {cuisine} | {day_name} {hour}:00 | ${price:.2f}"
-            )
+            vendor_id = order.get('vendor_id', '')
+            if vendor_id:
+                history_lines.append(
+                    f"{i}. {cuisine} from vendor {vendor_id} | {day_name} {hour}:00 | ${price:.2f}"
+                )
+            else:
+                history_lines.append(
+                    f"{i}. {cuisine} | {day_name} {hour}:00 | ${price:.2f}"
+                )
         history_str = "\n".join(history_lines)
 
         # Limit cuisine list for prompt
         cuisines_str = ", ".join(self.cuisine_list[:30]) if self.cuisine_list else "various cuisines"
 
+        # Build target time context
+        if target_hour is not None and target_day_of_week is not None:
+            target_day_name = self.DAY_NAMES[target_day_of_week]
+            time_context = f"\n## Prediction Context:\nThe user wants to order on {target_day_name} at {target_hour}:00.\n"
+        else:
+            time_context = ""
+
         return f"""Based on this user's order history, predict the top {k} cuisines they are most likely to order next.
 
 ## Order History (oldest to newest):
 {history_str}
-
+{time_context}
 ## Available Cuisines:
 {cuisines_str}
 
@@ -238,7 +264,7 @@ Predict the TOP {k} cuisines this user is most likely to order next, ranked by p
 Consider:
 1. User's cuisine preferences (which cuisines they order most)
 2. Sequential patterns (what typically follows recent orders)
-3. Time patterns if relevant
+3. Time patterns - especially the target ordering time if provided
 
 Return your predictions as a JSON object:
 {{
@@ -510,13 +536,17 @@ class TopKTestDataBuilder:
             return None
 
         # Use last order as ground truth
-        ground_truth = orders_list[-1]['cuisine']
+        # Include target hour/weekday from the ground truth order for prediction context
+        last_order = orders_list[-1]
+        ground_truth = last_order['cuisine']
         history = orders_list[:-1]
 
         return {
             'customer_id': customer_id,
             'order_history': history,
             'ground_truth_cuisine': ground_truth,
+            'target_hour': last_order['hour'],
+            'target_day_of_week': last_order['day_of_week'],
         }
 
     def get_unique_cuisines(self) -> List[str]:
