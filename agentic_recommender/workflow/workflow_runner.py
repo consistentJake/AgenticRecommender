@@ -352,7 +352,7 @@ class PipelineStages:
             self.logger.info(f"Loaded {len(merged_df):,} rows")
 
             # Get settings
-            min_orders = stage_cfg.settings.get('min_orders', 3)
+            min_orders = stage_cfg.settings.get('min_orders', 5)
             max_users = stage_cfg.settings.get('max_users')
 
             # Filter customers with enough orders
@@ -651,7 +651,7 @@ class PipelineStages:
             self.logger.info(f"Loaded {len(prompts)} prompts")
 
             # Get settings
-            limit = stage_cfg.settings.get('limit', 50)
+            limit = stage_cfg.settings.get('limit', 5)
             save_intermediate = stage_cfg.settings.get('save_intermediate', True)
 
             # Limit prompts

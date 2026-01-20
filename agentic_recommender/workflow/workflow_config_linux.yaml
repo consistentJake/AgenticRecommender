@@ -35,7 +35,7 @@ workflow:
         users_json: "outputs/stage2_enriched_users.json"
         users_summary: "outputs/stage2_users_summary.json"
       settings:
-        min_orders: 3  # Minimum orders to include a user
+        min_orders: 5  # Minimum orders to include a user
         max_users: null  # null = process ALL users (needed for auxiliary matrix)
 
     # Stage 3: Build cuisine profiles
@@ -72,7 +72,7 @@ workflow:
         predictions_json: "outputs/stage5_predictions.json"
         predictions_summary: "outputs/stage5_predictions_summary.json"
       settings:
-        limit: 50  # Only predict on first N records
+        limit: 5  # Only predict on first N records 
         save_intermediate: true  # Save after each prediction
 
     # Stage 6: Run TopK Evaluation (DISABLED - use run_rerank_evaluation instead)
