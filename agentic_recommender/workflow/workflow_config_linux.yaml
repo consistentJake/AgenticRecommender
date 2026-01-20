@@ -16,7 +16,7 @@ workflow:
       enabled: true
       description: "Load and merge Singapore food delivery data"
       input:
-        data_dir: "/home/zhenkai/Downloads/data_sg/data_sg/"
+        data_dir: "/home/zhenkai/Downloads/data_se/data_se/"
       output:
         merged_data: "outputs/stage1_merged_data.parquet"
         merged_preview: "outputs/stage1_merged_preview.json"  # Top 1000 rows for easy viewing

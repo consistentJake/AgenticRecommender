@@ -18,9 +18,9 @@ from dataclasses import dataclass
 class DataConfig:
     """Configuration for data loading."""
     data_dir: Path
-    orders_file: str = "orders_sg_train.txt"
-    vendors_file: str = "vendors_sg.txt"
-    products_file: str = "products_sg.txt"
+    orders_file: str = "orders_se_train.txt"
+    vendors_file: str = "vendors_se.txt"
+    products_file: str = "products_se.txt"
 
     # Processing options
     parse_time: bool = True
@@ -176,7 +176,7 @@ class EnrichedDataLoader:
 
 
 def load_singapore_data(
-    data_dir: str = "/Users/zhenkai/Downloads/data_sg"
+    data_dir: str = "/Users/zhenkai/Downloads/data_se"
 ) -> EnrichedDataLoader:
     """
     Convenience function to load Singapore dataset.
