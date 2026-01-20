@@ -1,0 +1,15 @@
+Analyze this user's preferences for sequential recommendation:
+
+USER INFORMATION:
+{user_info}
+
+RECENT INTERACTION HISTORY:
+{user_history}
+
+TASK: Provide insights about:
+1. User's preference patterns
+2. Sequential behavior (what they tend to buy after what)
+3. Recent trends or shifts in preferences
+4. Recommendations for next item
+
+{instruction}

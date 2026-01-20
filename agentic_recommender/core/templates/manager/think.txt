@@ -1,0 +1,16 @@
+You are a Manager agent in a sequential recommendation system.
+
+CURRENT SITUATION:
+{context}
+
+SCRATCHPAD (previous thoughts and actions):
+{scratchpad}
+
+TASK: Analyze the current situation and think about what information you need to make a good sequential recommendation.
+
+Consider:
+1. What do we know about the user's sequential behavior?
+2. What additional information might be helpful?
+3. What should be our next step?
+
+Think step by step about the reasoning process.

@@ -33,6 +33,30 @@ class PromptType(Enum):
     SYSTEM_RECOMMENDATION = "system_recommendation"
 
 
+# Mapping from PromptType to template file paths (relative to templates directory)
+TEMPLATE_FILES: Dict[PromptType, str] = {
+    PromptType.MANAGER_THINK: "manager/think.txt",
+    PromptType.MANAGER_ACT: "manager/act.txt",
+    PromptType.ANALYST_USER: "analyst/user.txt",
+    PromptType.REFLECTOR_FIRST_ROUND: "reflector/first_round.txt",
+    PromptType.REFLECTOR_SECOND_ROUND: "reflector/second_round.txt",
+    PromptType.SYSTEM_RECOMMENDATION: "system/recommendation.txt",
+}
+
+# Required variables for each prompt type
+REQUIRED_VARS: Dict[PromptType, List[str]] = {
+    PromptType.MANAGER_THINK: ['context', 'scratchpad'],
+    PromptType.MANAGER_ACT: ['context', 'scratchpad'],
+    PromptType.ANALYST_USER: ['user_info', 'user_history', 'instruction'],
+    PromptType.REFLECTOR_FIRST_ROUND: ['order_history', 'candidate_product'],
+    PromptType.REFLECTOR_SECOND_ROUND: [
+        'order_history', 'candidate_product', 'first_prediction',
+        'first_confidence', 'first_reasoning', 'similar_user_evidence'
+    ],
+    PromptType.SYSTEM_RECOMMENDATION: [],
+}
+
+
 class PromptTemplate:
     """
     Template with variable substitution.
@@ -90,6 +114,11 @@ class PromptTemplate:
         return self.variables.copy()
 
 
+def _get_templates_dir() -> Path:
+    """Get the templates directory path."""
+    return Path(__file__).parent / "templates"
+
+
 class PromptManager:
     """
     Centralized prompt manager.
@@ -111,135 +140,24 @@ class PromptManager:
         Initialize prompt manager.
 
         Args:
-            prompts_dir: Optional directory for loading prompts from files
+            prompts_dir: Optional directory for loading prompts from files.
+                         If not provided, uses the default templates directory.
         """
-        self.prompts_dir = Path(prompts_dir) if prompts_dir else None
+        self.prompts_dir = Path(prompts_dir) if prompts_dir else _get_templates_dir()
         self.templates: Dict[PromptType, PromptTemplate] = {}
 
-        # Initialize default prompts
-        self._initialize_default_prompts()
+        # Load prompts from template files
+        self._load_templates()
 
-    def _initialize_default_prompts(self):
-        """Initialize default prompt templates."""
-
-        # Manager: Think prompt
-        self.templates[PromptType.MANAGER_THINK] = PromptTemplate(
-            """You are a Manager agent in a sequential recommendation system.
-
-CURRENT SITUATION:
-{context}
-
-SCRATCHPAD (previous thoughts and actions):
-{scratchpad}
-
-TASK: Analyze the current situation and think about what information you need to make a good sequential recommendation.
-
-Consider:
-1. What do we know about the user's sequential behavior?
-2. What additional information might be helpful?
-3. What should be our next step?
-
-Think step by step about the reasoning process.""",
-            required_vars=['context', 'scratchpad']
-        )
-
-        # Manager: Act prompt
-        self.templates[PromptType.MANAGER_ACT] = PromptTemplate(
-            """Based on your thinking, choose the most appropriate action:
-
-AVAILABLE ACTIONS:
-- Analyse[user, user_id] - analyze user preferences and sequential patterns
-- Analyse[item, item_id] - analyze specific item characteristics
-- Reflect[analysis, candidate] - perform reflection with similar user evidence
-- Finish[result] - return final recommendation result
-
-CURRENT CONTEXT:
-{context}
-
-SCRATCHPAD:
-{scratchpad}
-
-Choose ONE action and return it in the exact format shown above.
-If you have enough information to make a recommendation, use Finish[result].
-Otherwise, choose the most useful analysis or reflection action.""",
-            required_vars=['context', 'scratchpad']
-        )
-
-        # Reflector: First Round
-        self.templates[PromptType.REFLECTOR_FIRST_ROUND] = PromptTemplate(
-            """You are a food delivery recommendation system. Analyze the user's order history and predict whether they will purchase the candidate product.
-
-## User's Recent Orders
-{order_history}
-
-## Candidate Product
-{candidate_product}
-
-## Task
-Predict whether the user is likely to purchase this product. Consider:
-1. Cuisine preferences (do they order this type of food?)
-2. Price sensitivity (is this within their typical spending?)
-3. Time patterns (when do they typically order?)
-4. Sequential behavior (what do they order after certain cuisines?)
-
-Return JSON: {{"prediction": true/false, "confidence": 0.0-1.0, "reasoning": "explanation"}}""",
-            required_vars=['order_history', 'candidate_product']
-        )
-
-        # Reflector: Second Round
-        self.templates[PromptType.REFLECTOR_SECOND_ROUND] = PromptTemplate(
-            """You are a food delivery recommendation system performing a REFINED prediction.
-
-## User's Recent Orders
-{order_history}
-
-## Candidate Product
-{candidate_product}
-
-## First Round Analysis
-- Initial Prediction: {first_prediction}
-- Confidence: {first_confidence:.1%}
-- Reasoning: {first_reasoning}
-
-## Evidence from Similar Users
-{similar_user_evidence}
-
-## Task
-Review your initial prediction considering the behavior of similar users.
-- If similar users (high similarity score) consistently bought/rejected similar items, weigh that heavily
-- If similar user behavior contradicts your initial prediction, reconsider
-- Provide your final decision with reasoning
-
-Return JSON: {{"prediction": true/false, "confidence": 0.0-1.0, "reasoning": "explanation including how similar user evidence influenced your decision"}}""",
-            required_vars=['order_history', 'candidate_product', 'first_prediction',
-                          'first_confidence', 'first_reasoning', 'similar_user_evidence']
-        )
-
-        # Analyst: User Analysis
-        self.templates[PromptType.ANALYST_USER] = PromptTemplate(
-            """Analyze this user's preferences for sequential recommendation:
-
-USER INFORMATION:
-{user_info}
-
-RECENT INTERACTION HISTORY:
-{user_history}
-
-TASK: Provide insights about:
-1. User's preference patterns
-2. Sequential behavior (what they tend to buy after what)
-3. Recent trends or shifts in preferences
-4. Recommendations for next item
-
-{instruction}""",
-            required_vars=['user_info', 'user_history', 'instruction']
-        )
-
-        # System: Recommendation
-        self.templates[PromptType.SYSTEM_RECOMMENDATION] = PromptTemplate(
-            """You are a food delivery recommendation assistant. Given a user's recent purchase history and a candidate product, decide whether the user is likely to purchase this product next. You must answer with 'Yes' or 'No' and provide reasoning.""",
-            required_vars=[]
-        )
+    def _load_templates(self):
+        """Load prompt templates from files."""
+        for prompt_type, file_path in TEMPLATE_FILES.items():
+            full_path = self.prompts_dir / file_path
+            if full_path.exists():
+                with full_path.open('r') as f:
+                    content = f.read()
+                required_vars = REQUIRED_VARS.get(prompt_type, [])
+                self.templates[prompt_type] = PromptTemplate(content, required_vars)
 
     def register_template(self, prompt_type: PromptType, template: PromptTemplate):
         """
@@ -302,7 +220,8 @@ TASK: Provide insights about:
         with path.open('r') as f:
             content = f.read()
 
-        self.templates[prompt_type] = PromptTemplate(content)
+        required_vars = REQUIRED_VARS.get(prompt_type, [])
+        self.templates[prompt_type] = PromptTemplate(content, required_vars)
 
     def save_to_file(self, prompt_type: PromptType, file_path: str):
         """
@@ -321,6 +240,11 @@ TASK: Provide insights about:
 
         with path.open('w') as f:
             f.write(template.template)
+
+    def reload_templates(self):
+        """Reload all templates from files."""
+        self.templates.clear()
+        self._load_templates()
 
 
 # Global singleton

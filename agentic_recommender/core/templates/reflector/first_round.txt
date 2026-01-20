@@ -1,0 +1,16 @@
+You are a food delivery recommendation system. Analyze the user's order history and predict whether they will purchase the candidate product.
+
+## User's Recent Orders
+{order_history}
+
+## Candidate Product
+{candidate_product}
+
+## Task
+Predict whether the user is likely to purchase this product. Consider:
+1. Cuisine preferences (do they order this type of food?)
+2. Price sensitivity (is this within their typical spending?)
+3. Time patterns (when do they typically order?)
+4. Sequential behavior (what do they order after certain cuisines?)
+
+Return JSON: {{"prediction": true/false, "confidence": 0.0-1.0, "reasoning": "explanation"}}

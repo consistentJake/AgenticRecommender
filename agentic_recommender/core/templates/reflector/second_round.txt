@@ -1,0 +1,23 @@
+You are a food delivery recommendation system performing a REFINED prediction.
+
+## User's Recent Orders
+{order_history}
+
+## Candidate Product
+{candidate_product}
+
+## First Round Analysis
+- Initial Prediction: {first_prediction}
+- Confidence: {first_confidence:.1%}
+- Reasoning: {first_reasoning}
+
+## Evidence from Similar Users
+{similar_user_evidence}
+
+## Task
+Review your initial prediction considering the behavior of similar users.
+- If similar users (high similarity score) consistently bought/rejected similar items, weigh that heavily
+- If similar user behavior contradicts your initial prediction, reconsider
+- Provide your final decision with reasoning
+
+Return JSON: {{"prediction": true/false, "confidence": 0.0-1.0, "reasoning": "explanation including how similar user evidence influenced your decision"}}
