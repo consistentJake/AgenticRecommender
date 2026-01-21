@@ -353,12 +353,21 @@ class PipelineStages:
 
             # Get settings
             min_orders = stage_cfg.settings.get('min_orders', 5)
+            max_order_history = stage_cfg.settings.get('max_order_history', None)  # None = infinity
             max_users = stage_cfg.settings.get('max_users')
 
-            # Filter customers with enough orders
+            # Filter customers with enough orders (and optionally max orders)
             customer_order_counts = merged_df.groupby('customer_id')['order_id'].nunique()
-            valid_customers = customer_order_counts[customer_order_counts >= min_orders].index
-            self.logger.info(f"Customers with >= {min_orders} orders: {len(valid_customers):,}")
+
+            if max_order_history is not None:
+                valid_customers = customer_order_counts[
+                    (customer_order_counts >= min_orders) &
+                    (customer_order_counts <= max_order_history)
+                ].index
+                self.logger.info(f"Customers with {min_orders}-{max_order_history} orders: {len(valid_customers):,}")
+            else:
+                valid_customers = customer_order_counts[customer_order_counts >= min_orders].index
+                self.logger.info(f"Customers with >= {min_orders} orders: {len(valid_customers):,}")
 
             # Limit users if specified
             if max_users:
@@ -1412,6 +1421,258 @@ class PipelineStages:
 
         return MockRerankProvider()
 
+    # -------------------------------------------------------------------------
+    # Stage 8: Enhanced Rerank Evaluation (Two-Round LLM + LightGCN)
+    # -------------------------------------------------------------------------
+    def stage_run_enhanced_rerank_evaluation(self) -> bool:
+        """Run enhanced two-round rerank evaluation with LightGCN reflection."""
+        stage_cfg = self.config.get_stage('run_enhanced_rerank_evaluation')
+        self.logger.stage_start('run_enhanced_rerank_evaluation', stage_cfg.description)
+
+        try:
+            from agentic_recommender.evaluation.rerank_eval import (
+                CuisineBasedCandidateGenerator,
+                EnhancedRerankEvaluator,
+                EnhancedRerankConfig,
+                build_test_samples,
+            )
+            from agentic_recommender.similarity.lightGCN import (
+                LightGCNEmbeddingManager,
+                LightGCNConfig,
+            )
+            from agentic_recommender.models.llm_provider import OpenRouterProvider
+
+            # Load merged data
+            input_path = stage_cfg.input.get('merged_data')
+            self.logger.file_read(input_path, "Loading merged data for enhanced rerank evaluation")
+            merged_df = pd.read_parquet(input_path)
+            self.logger.info(f"Loaded {len(merged_df):,} rows")
+
+            # Get settings
+            settings = stage_cfg.settings
+            config = EnhancedRerankConfig(
+                n_candidates=settings.get('n_candidates', 20),
+                items_per_seed=settings.get('items_per_seed', 5),
+                dataset_name=settings.get('dataset_name', 'data_se'),
+                lightgcn_epochs=settings.get('lightgcn_epochs', 50),
+                lightgcn_embedding_dim=settings.get('lightgcn_embedding_dim', 64),
+                temperature_round1=settings.get('temperature_round1', 0.3),
+                temperature_round2=settings.get('temperature_round2', 0.2),
+                n_samples=settings.get('n_samples', 10),
+                min_history=settings.get('min_history', 5),
+            )
+
+            # Build test samples
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("BUILDING TEST SAMPLES")
+            self.logger.info("=" * 60)
+
+            test_samples = build_test_samples(
+                merged_df,
+                n_samples=config.n_samples,
+                min_history=config.min_history,
+            )
+            self.logger.success(f"Created {len(test_samples)} test samples")
+
+            # Save test samples
+            samples_path = stage_cfg.output.get('samples_json')
+            if samples_path:
+                with open(samples_path, 'w') as f:
+                    json.dump(test_samples, f, indent=2)
+                self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
+
+            # Build cuisine-cuisine swing candidate generator
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("BUILDING CUISINE-CUISINE SWING MODEL")
+            self.logger.info("=" * 60)
+
+            generator = CuisineBasedCandidateGenerator(config)
+            generator.fit(merged_df)
+
+            gen_stats = generator.get_stats()
+            self.logger.info(f"Generator stats: {gen_stats}")
+
+            # Build/load LightGCN embeddings
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("LOADING/TRAINING LIGHTGCN EMBEDDINGS")
+            self.logger.info("=" * 60)
+
+            # Get all (user_id, cuisine) interactions
+            interactions = generator.get_all_interactions(merged_df)
+            self.logger.info(f"Total interactions for LightGCN: {len(interactions)}")
+
+            lightgcn_config = LightGCNConfig(
+                embedding_dim=config.lightgcn_embedding_dim,
+                epochs=config.lightgcn_epochs,
+            )
+            lightgcn_manager = LightGCNEmbeddingManager(lightgcn_config)
+            lightgcn_manager.load_or_train(
+                dataset_name=config.dataset_name,
+                interactions=interactions,
+                verbose=True
+            )
+
+            lgcn_stats = lightgcn_manager.get_stats()
+            self.logger.info(f"LightGCN stats: {lgcn_stats}")
+
+            # Initialize LLM provider
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("INITIALIZING LLM PROVIDER")
+            self.logger.info("=" * 60)
+
+            llm_config = self.config.get_llm_config()
+            provider_type = llm_config.get('provider', 'mock')
+            self.logger.info(f"Provider type: {provider_type}")
+
+            if provider_type == 'mock':
+                provider = self._create_mock_enhanced_rerank_provider()
+            elif provider_type == 'openrouter':
+                api_key = (
+                    llm_config.get('openrouter', {}).get('api_key') or
+                    os.environ.get('OPENROUTER_API_KEY')
+                )
+                if not api_key:
+                    self.logger.error("OpenRouter API key not found!")
+                    self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
+                    return False
+
+                provider = OpenRouterProvider(
+                    api_key=api_key,
+                    model_name=llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
+                )
+                self.logger.success(f"Initialized OpenRouter")
+            else:
+                from agentic_recommender.models.llm_provider import create_llm_provider
+                provider = create_llm_provider(provider_type=provider_type)
+
+            # Run evaluation
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("RUNNING ENHANCED TWO-ROUND EVALUATION")
+            self.logger.info("=" * 60)
+            self.logger.info(f"Samples: {len(test_samples)}, Candidates: {config.n_candidates}")
+
+            evaluator = EnhancedRerankEvaluator(
+                llm_provider=provider,
+                candidate_generator=generator,
+                lightgcn_manager=lightgcn_manager,
+                config=config,
+            )
+
+            metrics, detailed_results = evaluator.evaluate(
+                test_samples=test_samples,
+                verbose=True
+            )
+
+            # Print results
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("ENHANCED RERANK EVALUATION RESULTS")
+            self.logger.info("=" * 60)
+            self.logger.info(f"  NDCG@5:       {metrics.ndcg_at_5:.4f}")
+            self.logger.info(f"  NDCG@10:      {metrics.ndcg_at_10:.4f}")
+            self.logger.info(f"  MRR@5:        {metrics.mrr_at_5:.4f}")
+            self.logger.info(f"  MRR@10:       {metrics.mrr_at_10:.4f}")
+            self.logger.info(f"  Hit@1:        {metrics.hit_at_1:.2%}")
+            self.logger.info(f"  Hit@3:        {metrics.hit_at_3:.2%}")
+            self.logger.info(f"  Hit@5:        {metrics.hit_at_5:.2%}")
+            self.logger.info(f"  Hit@10:       {metrics.hit_at_10:.2%}")
+            self.logger.info(f"  Round1 Hit@5: {metrics.round1_hit_at_5:.2%}")
+            self.logger.info(f"  Final Hit@5:  {metrics.final_hit_at_5:.2%}")
+            self.logger.info(f"  Improvement:  {metrics.improvement:+.2%}")
+            self.logger.info(f"  GT in Candidates: {metrics.gt_in_candidates:.2%}")
+            self.logger.info(f"  Samples: {metrics.valid_samples}/{metrics.total_samples}")
+            self.logger.info(f"  Avg Time: {metrics.avg_time_ms:.2f}ms")
+
+            # Save results
+            results_path = stage_cfg.output.get('results_json')
+            if results_path:
+                with open(results_path, 'w') as f:
+                    json.dump(metrics.to_dict(), f, indent=2)
+                self.logger.file_write(results_path, "Enhanced rerank evaluation metrics")
+
+            # Save detailed results
+            detailed_path = stage_cfg.output.get('detailed_json')
+            if detailed_path:
+                with open(detailed_path, 'w') as f:
+                    json.dump(detailed_results, f, indent=2, default=str)
+                self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed results")
+
+                # Save preview
+                self._save_preview(
+                    data=detailed_results,
+                    full_path=detailed_path,
+                    preview_rows=3,
+                    description="Preview of enhanced rerank detailed results",
+                )
+
+            self.logger.stage_end('run_enhanced_rerank_evaluation', success=True)
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Stage failed: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
+            return False
+
+    def _create_mock_enhanced_rerank_provider(self):
+        """Create a mock provider for enhanced rerank testing."""
+        import random
+        import json as json_mod
+
+        class MockEnhancedRerankProvider:
+            """Mock provider that returns random rankings."""
+
+            def __init__(self):
+                self.call_count = 0
+
+            def generate(self, prompt: str, **kwargs) -> str:
+                """Generate mock ranking response."""
+                self.call_count += 1
+
+                # Try to extract candidates from prompt
+                if "Candidates to Rank:" in prompt:
+                    # Round 1: Return ranking JSON
+                    lines = prompt.split("Candidates to Rank:")[1]
+                    candidates_line = lines.split("\n")[1] if "\n" in lines else lines
+                    candidates = [c.strip() for c in candidates_line.split(",") if c.strip()]
+                    if candidates:
+                        random.shuffle(candidates)
+                        return json_mod.dumps({
+                            "ranking": candidates,
+                            "reasoning": "Mock ranking based on pattern analysis"
+                        })
+
+                elif "Initial LLM Ranking" in prompt:
+                    # Round 2: Return final ranking JSON
+                    # Extract from "Initial LLM Ranking" line
+                    if "top 10):" in prompt:
+                        r1_line = prompt.split("top 10):")[1].split("\n")[1]
+                        cuisines = [c.strip() for c in r1_line.split(",") if c.strip()]
+                        if cuisines:
+                            random.shuffle(cuisines)
+                            return json_mod.dumps({
+                                "final_ranking": cuisines,
+                                "reflection": "Balanced initial intuition with CF signals"
+                            })
+
+                # Fallback
+                return json_mod.dumps({"ranking": ["chinese"], "reasoning": "fallback"})
+
+            def get_model_info(self):
+                return {
+                    "provider": "MockEnhancedRerank",
+                    "model_name": "mock-enhanced-rerank-llm",
+                    "total_calls": self.call_count
+                }
+
+        return MockEnhancedRerankProvider()
+
 
 # =============================================================================
 # WORKFLOW RUNNER
@@ -1426,8 +1687,9 @@ class WorkflowRunner:
         'build_cuisines',
         'generate_prompts',
         'run_predictions',
-        'run_topk_evaluation',     # Stage 6: Direct LLM prediction
-        'run_rerank_evaluation',   # Stage 7: Retrieve-then-rerank (RECOMMENDED)
+        'run_topk_evaluation',              # Stage 6: Direct LLM prediction
+        'run_rerank_evaluation',            # Stage 7: Retrieve-then-rerank
+        'run_enhanced_rerank_evaluation',   # Stage 8: Two-round LLM + LightGCN (RECOMMENDED)
     ]
 
     def __init__(self, config_path: str = "workflow_config.yaml"):
@@ -1447,6 +1709,7 @@ class WorkflowRunner:
             'run_predictions': self.stages.stage_run_predictions,
             'run_topk_evaluation': self.stages.stage_run_topk_evaluation,
             'run_rerank_evaluation': self.stages.stage_run_rerank_evaluation,
+            'run_enhanced_rerank_evaluation': self.stages.stage_run_enhanced_rerank_evaluation,
         }
 
     def run(self, stages: Optional[List[str]] = None) -> Dict[str, bool]:

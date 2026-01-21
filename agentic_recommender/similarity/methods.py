@@ -258,3 +258,209 @@ class JaccardMethod(SimilarityMethod):
             'num_users': len(self.user_items),
         })
         return stats
+
+
+# =============================================================================
+# CUISINE-CUISINE SWING SIMILARITY
+# =============================================================================
+
+@dataclass
+class CuisineSwingConfig(SimilarityConfig):
+    """Configuration for Cuisine-Cuisine Swing similarity."""
+    alpha1: float = 5.0   # Cuisine popularity smoothing
+    alpha2: float = 1.0   # User activity smoothing
+    beta: float = 0.3     # Power weight
+
+
+class CuisineSwingMethod(SimilarityMethod):
+    """
+    Cuisine-to-Cuisine Swing similarity.
+
+    Operates at CUISINE level (not vendor level).
+
+    Formula:
+    sim(c1, c2) = Σ(u ∈ common_users) 1 / ((|U(c1)|+α1)^β × (|U(c2)|+α1)^β × (|C(u)|+α2))
+
+    Where:
+    - U(c) = users who ordered cuisine c
+    - C(u) = cuisines ordered by user u
+    """
+
+    def __init__(self, config: CuisineSwingConfig = None):
+        super().__init__(config or CuisineSwingConfig())
+        self.cuisine_users: Dict[str, Set[str]] = {}  # cuisine -> set of user_ids
+        self.user_cuisines: Dict[str, Set[str]] = {}  # user_id -> set of cuisines
+
+    def fit(self, interactions: List[Tuple[str, str]], **kwargs) -> 'CuisineSwingMethod':
+        """
+        Build indices from user-cuisine interactions.
+
+        Args:
+            interactions: List of (user_id, cuisine) tuples
+        """
+        self.cuisine_users.clear()
+        self.user_cuisines.clear()
+        self.clear_cache()
+
+        for user_id, cuisine in interactions:
+            # Build cuisine -> users index
+            if cuisine not in self.cuisine_users:
+                self.cuisine_users[cuisine] = set()
+            self.cuisine_users[cuisine].add(user_id)
+
+            # Build user -> cuisines index
+            if user_id not in self.user_cuisines:
+                self.user_cuisines[user_id] = set()
+            self.user_cuisines[user_id].add(cuisine)
+
+        self._fitted = True
+        return self
+
+    def compute_similarity(self, cuisine1: str, cuisine2: str) -> float:
+        """
+        Compute Swing similarity between two cuisines.
+
+        Based on shared users, penalized by cuisine popularity and user activity.
+        """
+        if cuisine1 == cuisine2:
+            return 1.0
+
+        # Check cache
+        cache_key = (min(cuisine1, cuisine2), max(cuisine1, cuisine2))
+        if self.config.cache_enabled and cache_key in self._cache:
+            return self._cache[cache_key]
+
+        users1 = self.cuisine_users.get(cuisine1, set())
+        users2 = self.cuisine_users.get(cuisine2, set())
+        common_users = users1 & users2
+
+        if not common_users:
+            return 0.0
+
+        cfg = self.config
+        similarity = 0.0
+
+        for user in common_users:
+            user_activity = len(self.user_cuisines.get(user, set()))
+            weight = 1.0 / (
+                ((len(users1) + cfg.alpha1) ** cfg.beta) *
+                ((len(users2) + cfg.alpha1) ** cfg.beta) *
+                (user_activity + cfg.alpha2)
+            )
+            similarity += weight
+
+        if self.config.cache_enabled:
+            self._cache[cache_key] = similarity
+
+        return similarity
+
+    def get_similar_cuisines(
+        self,
+        cuisine: str,
+        top_k: int = None,
+        exclude: Set[str] = None
+    ) -> List[Tuple[str, float]]:
+        """
+        Get top-k similar cuisines to the given cuisine.
+
+        Args:
+            cuisine: Query cuisine
+            top_k: Number of similar cuisines to return (default: config.top_k)
+            exclude: Set of cuisines to exclude from results
+
+        Returns:
+            List of (cuisine, similarity_score) tuples, sorted descending
+        """
+        top_k = top_k or self.config.top_k
+        exclude = exclude or set()
+        exclude.add(cuisine)
+
+        similarities = []
+        for other_cuisine in self.cuisine_users.keys():
+            if other_cuisine in exclude:
+                continue
+
+            sim = self.compute_similarity(cuisine, other_cuisine)
+            if sim >= self.config.min_threshold:
+                similarities.append((other_cuisine, sim))
+
+        similarities.sort(key=lambda x: -x[1])
+        return similarities[:top_k]
+
+    def get_candidates_for_history(
+        self,
+        cuisine_history: List[str],
+        items_per_seed: int = 5,
+        total_candidates: int = 20
+    ) -> List[Tuple[str, float]]:
+        """
+        Generate candidate cuisines based on a user's cuisine history.
+
+        For each unique cuisine in history, get top-k similar cuisines.
+        Combine all, deduplicate by keeping highest score, return top N.
+
+        Args:
+            cuisine_history: List of cuisines the user has ordered
+            items_per_seed: Top-k similar cuisines per history cuisine
+            total_candidates: Total candidates to return
+
+        Returns:
+            List of (cuisine, score) tuples, sorted by score descending
+        """
+        # Deduplicate history
+        unique_cuisines = list(dict.fromkeys(cuisine_history))  # Preserves order
+
+        # Collect all similar cuisines
+        candidate_scores: Dict[str, float] = {}
+        history_set = set(unique_cuisines)
+
+        for seed_cuisine in unique_cuisines:
+            similar = self.get_similar_cuisines(
+                seed_cuisine,
+                top_k=items_per_seed,
+                exclude=history_set  # Don't recommend cuisines already in history
+            )
+            for sim_cuisine, score in similar:
+                if sim_cuisine in candidate_scores:
+                    candidate_scores[sim_cuisine] = max(candidate_scores[sim_cuisine], score)
+                else:
+                    candidate_scores[sim_cuisine] = score
+
+        # Sort by score and return top N
+        sorted_candidates = sorted(
+            candidate_scores.items(),
+            key=lambda x: -x[1]
+        )
+        return sorted_candidates[:total_candidates]
+
+    def _get_candidate_entities(self, entity_id: str) -> List[str]:
+        """Get all cuisines as candidates."""
+        return list(self.cuisine_users.keys())
+
+    def get_method_name(self) -> str:
+        return "cuisine_swing"
+
+    def get_all_cuisines(self) -> List[str]:
+        """Get list of all cuisines."""
+        return list(self.cuisine_users.keys())
+
+    def get_cuisine_popularity(self, cuisine: str) -> int:
+        """Get number of users who ordered this cuisine."""
+        return len(self.cuisine_users.get(cuisine, set()))
+
+    def get_stats(self) -> Dict:
+        stats = super().get_stats()
+        stats.update({
+            'num_cuisines': len(self.cuisine_users),
+            'num_users': len(self.user_cuisines),
+            'total_interactions': sum(len(cuisines) for cuisines in self.user_cuisines.values()),
+            'avg_cuisines_per_user': (
+                sum(len(cuisines) for cuisines in self.user_cuisines.values()) / len(self.user_cuisines)
+                if self.user_cuisines else 0.0
+            ),
+            'avg_users_per_cuisine': (
+                sum(len(users) for users in self.cuisine_users.values()) / len(self.cuisine_users)
+                if self.cuisine_users else 0.0
+            ),
+        })
+        return stats

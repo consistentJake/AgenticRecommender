@@ -62,7 +62,8 @@ class EnrichedUser:
         cls,
         customer_id: str,
         orders_df: pd.DataFrame,
-        already_filtered: bool = True
+        already_filtered: bool = True,
+        max_history: int = None
     ) -> 'EnrichedUser':
         """
         Build enriched user from order data.
@@ -73,6 +74,9 @@ class EnrichedUser:
                       Required columns: order_id, cuisine, day_of_week, hour,
                                        vendor_id, chain_id, user_geohash, unit_price
             already_filtered: If True, skip filtering by customer_id (for performance)
+            max_history: Optional maximum number of orders to keep in purchase_history.
+                        If None, keep ALL history (useful for evaluation).
+                        If specified, keeps last N orders.
         """
         if len(orders_df) == 0:
             return cls(customer_id=customer_id)
@@ -124,8 +128,9 @@ class EnrichedUser:
                     'day_of_week': int(row.get('day_of_week', 0)),
                 })
 
-            # Keep last 20 orders
-            purchase_history = purchase_history[-20:]
+            # Optionally truncate history (if max_history is specified)
+            if max_history is not None:
+                purchase_history = purchase_history[-max_history:]
 
         # Day distribution
         day_counts = orders_df.groupby('order_id')['day_of_week'].first().value_counts(normalize=True)

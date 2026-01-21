@@ -1,0 +1,12 @@
+Based on this user's complete order history, RE-RANK all {n_candidates} candidate cuisines from most likely to least likely.
+
+## Complete Order History ({n_orders} orders, oldest to newest):
+{history}
+
+## Prediction Context:
+{time_context}
+## Candidates to Rank:
+{candidates}
+
+You must rank ALL {n_candidates} cuisines. Return your response as JSON:
+{"ranking": ["most_likely", "second_most_likely", ..., "least_likely"], "reasoning": "brief explanation"}

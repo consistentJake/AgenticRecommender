@@ -190,3 +190,336 @@ def train():
 
 if __name__ == "__main__":
     train()
+
+
+# =============================================================================
+# LightGCN EMBEDDING MANAGER (for Enhanced Rerank Evaluation)
+# =============================================================================
+
+import pickle
+import hashlib
+from pathlib import Path
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Optional, Set
+
+
+@dataclass
+class LightGCNConfig:
+    """Configuration for LightGCN training."""
+    embedding_dim: int = 64
+    n_layers: int = 3
+    learning_rate: float = 0.001
+    epochs: int = 50
+    batch_size: int = 1024
+    reg_weight: float = 1e-4
+
+
+class LightGCNEmbeddingManager:
+    """
+    Manages LightGCN embeddings for user-cuisine collaborative filtering.
+
+    Features:
+    - Trains on user-cuisine interaction graph
+    - Caches embeddings to disk for fast reloading
+    - Provides similarity computation methods
+
+    Cache location: ~/.cache/agentic_recommender/lightgcn/{dataset_name}_embeddings.pkl
+    """
+
+    CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "lightgcn"
+
+    def __init__(self, config: LightGCNConfig = None):
+        self.config = config or LightGCNConfig()
+        self.user_embeddings: Optional[np.ndarray] = None
+        self.cuisine_embeddings: Optional[np.ndarray] = None
+        self.user_to_idx: Dict[str, int] = {}
+        self.idx_to_user: Dict[int, str] = {}
+        self.cuisine_to_idx: Dict[str, int] = {}
+        self.idx_to_cuisine: Dict[int, str] = {}
+        self.cache_key: Optional[str] = None
+        self._fitted = False
+
+    def _compute_cache_key(self, interactions: List[Tuple[str, str]]) -> str:
+        """Compute MD5 hash of interactions for cache validation."""
+        # Sort for consistency
+        sorted_interactions = sorted(interactions)
+        data_str = str(sorted_interactions)
+        return hashlib.md5(data_str.encode()).hexdigest()
+
+    def _get_cache_path(self, dataset_name: str) -> Path:
+        """Get cache file path for a dataset."""
+        self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        return self.CACHE_DIR / f"{dataset_name}_embeddings.pkl"
+
+    def load_or_train(
+        self,
+        dataset_name: str,
+        interactions: List[Tuple[str, str]],
+        force_retrain: bool = False,
+        verbose: bool = True
+    ) -> 'LightGCNEmbeddingManager':
+        """
+        Load embeddings from cache or train new model.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            interactions: List of (user_id, cuisine) tuples
+            force_retrain: Force retraining even if cache exists
+            verbose: Print progress
+
+        Returns:
+            self (for chaining)
+        """
+        cache_path = self._get_cache_path(dataset_name)
+        new_cache_key = self._compute_cache_key(interactions)
+
+        # Try to load from cache
+        if not force_retrain and cache_path.exists():
+            if verbose:
+                print(f"[LightGCNManager] Found cache at {cache_path}")
+            try:
+                with open(cache_path, 'rb') as f:
+                    cached_data = pickle.load(f)
+
+                if cached_data.get('cache_key') == new_cache_key:
+                    if verbose:
+                        print("[LightGCNManager] Cache key matches, loading embeddings...")
+                    self._load_from_cache(cached_data)
+                    return self
+                else:
+                    if verbose:
+                        print("[LightGCNManager] Cache key mismatch, retraining...")
+            except Exception as e:
+                if verbose:
+                    print(f"[LightGCNManager] Failed to load cache: {e}")
+
+        # Train new model
+        if verbose:
+            print(f"[LightGCNManager] Training new model on {len(interactions)} interactions...")
+
+        self._train(interactions, verbose)
+        self.cache_key = new_cache_key
+
+        # Save to cache
+        self._save_to_cache(cache_path, verbose)
+
+        return self
+
+    def _train(self, interactions: List[Tuple[str, str]], verbose: bool = True):
+        """Train LightGCN on user-cuisine interactions."""
+        # Build ID mappings
+        users = sorted(set(uid for uid, _ in interactions))
+        cuisines = sorted(set(cuisine for _, cuisine in interactions))
+
+        self.user_to_idx = {uid: idx for idx, uid in enumerate(users)}
+        self.idx_to_user = {idx: uid for uid, idx in self.user_to_idx.items()}
+        self.cuisine_to_idx = {c: idx for idx, c in enumerate(cuisines)}
+        self.idx_to_cuisine = {idx: c for c, idx in self.cuisine_to_idx.items()}
+
+        num_users = len(users)
+        num_cuisines = len(cuisines)
+
+        if verbose:
+            print(f"[LightGCNManager] Users: {num_users}, Cuisines: {num_cuisines}")
+
+        # Convert interactions to numpy array with indices
+        train_data = np.array([
+            [self.user_to_idx[uid], self.cuisine_to_idx[cuisine]]
+            for uid, cuisine in interactions
+        ])
+        train_data = np.unique(train_data, axis=0)  # Remove duplicates
+
+        if verbose:
+            print(f"[LightGCNManager] Unique interactions: {len(train_data)}")
+
+        # Build graph
+        device = self.config.embedding_dim  # Just use CPU for simplicity
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        graph = build_sparse_graph(train_data, num_users, num_cuisines, device)
+
+        # Create and train model
+        model = LightGCN(num_users, num_cuisines, self._to_config_obj(), graph).to(device)
+        optimizer = optim.Adam(model.parameters(), lr=self.config.learning_rate)
+
+        if verbose:
+            print(f"[LightGCNManager] Training on {device}...")
+
+        for epoch in range(self.config.epochs):
+            model.train()
+            total_loss = 0
+
+            indices = np.arange(len(train_data))
+            np.random.shuffle(indices)
+
+            for i in range(0, len(train_data), self.config.batch_size):
+                batch_idx = indices[i:i + self.config.batch_size]
+                batch_users = train_data[batch_idx, 0]
+                batch_pos = train_data[batch_idx, 1]
+                batch_neg = np.random.randint(0, num_cuisines, size=len(batch_idx))
+
+                u = torch.tensor(batch_users).to(device)
+                pos = torch.tensor(batch_pos).to(device)
+                neg = torch.tensor(batch_neg).to(device)
+
+                optimizer.zero_grad()
+                loss = model.get_loss(u, pos, neg)
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
+            if verbose and (epoch % 10 == 0 or epoch == self.config.epochs - 1):
+                print(f"[LightGCNManager] Epoch {epoch}: Loss = {total_loss:.4f}")
+
+        # Extract embeddings
+        model.eval()
+        with torch.no_grad():
+            final_embs = model.forward().cpu().numpy()
+
+        self.user_embeddings = final_embs[:num_users]
+        self.cuisine_embeddings = final_embs[num_users:]
+        self._fitted = True
+
+        if verbose:
+            print(f"[LightGCNManager] Training complete!")
+            print(f"[LightGCNManager] User embedding shape: {self.user_embeddings.shape}")
+            print(f"[LightGCNManager] Cuisine embedding shape: {self.cuisine_embeddings.shape}")
+
+    def _to_config_obj(self):
+        """Convert dataclass to Config-like object for LightGCN."""
+        class ConfigObj:
+            pass
+        cfg = ConfigObj()
+        cfg.embedding_dim = self.config.embedding_dim
+        cfg.n_layers = self.config.n_layers
+        cfg.lr = self.config.learning_rate
+        cfg.epochs = self.config.epochs
+        cfg.batch_size = self.config.batch_size
+        cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        return cfg
+
+    def _load_from_cache(self, cached_data: Dict):
+        """Load embeddings and mappings from cache dict."""
+        self.user_embeddings = cached_data['user_embeddings']
+        self.cuisine_embeddings = cached_data['cuisine_embeddings']
+        self.user_to_idx = cached_data['user_to_idx']
+        self.idx_to_user = cached_data['idx_to_user']
+        self.cuisine_to_idx = cached_data['cuisine_to_idx']
+        self.idx_to_cuisine = cached_data['idx_to_cuisine']
+        self.cache_key = cached_data['cache_key']
+        self._fitted = True
+
+    def _save_to_cache(self, cache_path: Path, verbose: bool = True):
+        """Save embeddings and mappings to cache."""
+        cached_data = {
+            'user_embeddings': self.user_embeddings,
+            'cuisine_embeddings': self.cuisine_embeddings,
+            'user_to_idx': self.user_to_idx,
+            'idx_to_user': self.idx_to_user,
+            'cuisine_to_idx': self.cuisine_to_idx,
+            'idx_to_cuisine': self.idx_to_cuisine,
+            'cache_key': self.cache_key,
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cached_data, f)
+        if verbose:
+            print(f"[LightGCNManager] Saved embeddings to {cache_path}")
+
+    def get_user_cuisine_similarity(self, user_id: str, cuisine: str) -> float:
+        """
+        Compute similarity between a user and a cuisine using dot product.
+
+        Args:
+            user_id: User identifier
+            cuisine: Cuisine name
+
+        Returns:
+            Similarity score (dot product of embeddings)
+        """
+        if not self._fitted:
+            raise RuntimeError("Model not fitted. Call load_or_train() first.")
+
+        user_idx = self.user_to_idx.get(user_id)
+        cuisine_idx = self.cuisine_to_idx.get(cuisine)
+
+        if user_idx is None or cuisine_idx is None:
+            return 0.0
+
+        user_emb = self.user_embeddings[user_idx]
+        cuisine_emb = self.cuisine_embeddings[cuisine_idx]
+
+        return float(np.dot(user_emb, cuisine_emb))
+
+    def get_user_cuisines_similarities(
+        self,
+        user_id: str,
+        cuisines: List[str]
+    ) -> List[Tuple[str, float]]:
+        """
+        Get similarities between a user and multiple cuisines.
+
+        Args:
+            user_id: User identifier
+            cuisines: List of cuisine names
+
+        Returns:
+            List of (cuisine, similarity) tuples, sorted by similarity descending
+        """
+        similarities = []
+        for cuisine in cuisines:
+            sim = self.get_user_cuisine_similarity(user_id, cuisine)
+            similarities.append((cuisine, sim))
+
+        similarities.sort(key=lambda x: -x[1])
+        return similarities
+
+    def rerank_by_similarity(
+        self,
+        user_id: str,
+        cuisines: List[str]
+    ) -> List[str]:
+        """
+        Rerank cuisines by user-cuisine similarity.
+
+        Args:
+            user_id: User identifier
+            cuisines: List of cuisine names to rerank
+
+        Returns:
+            Cuisines sorted by similarity (highest first)
+        """
+        similarities = self.get_user_cuisines_similarities(user_id, cuisines)
+        return [cuisine for cuisine, _ in similarities]
+
+    def get_top_cuisines_for_user(
+        self,
+        user_id: str,
+        top_k: int = 10,
+        exclude: Set[str] = None
+    ) -> List[Tuple[str, float]]:
+        """
+        Get top-k cuisines for a user based on embedding similarity.
+
+        Args:
+            user_id: User identifier
+            top_k: Number of cuisines to return
+            exclude: Cuisines to exclude from results
+
+        Returns:
+            List of (cuisine, similarity) tuples
+        """
+        exclude = exclude or set()
+        all_cuisines = [c for c in self.cuisine_to_idx.keys() if c not in exclude]
+        similarities = self.get_user_cuisines_similarities(user_id, all_cuisines)
+        return similarities[:top_k]
+
+    def get_stats(self) -> Dict:
+        """Get statistics about the embedding manager."""
+        return {
+            'fitted': self._fitted,
+            'num_users': len(self.user_to_idx),
+            'num_cuisines': len(self.cuisine_to_idx),
+            'embedding_dim': self.config.embedding_dim,
+            'n_layers': self.config.n_layers,
+            'cache_key': self.cache_key,
+        }

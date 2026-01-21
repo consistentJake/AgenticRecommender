@@ -478,5 +478,61 @@ python agentic_recommender/tests/test_topk_evaluation.py
 5. **OpenRouter + Gemini 2.5 Flash** - Fast and cost-effective for testing
 
 
-### commands
-python workflow_runner.py
+## Enhanced Two-Round LLM Reranking System (Stage 8)
+
+A cuisine-level recommendation pipeline with two-round LLM reranking and LightGCN collaborative filtering.
+
+### Pipeline Flow
+
+```
+Data Loading → Cuisine-Cuisine Swing Candidates (top 20)
+    → Round 1: LLM Reranking → LightGCN User-Cuisine Similarity
+    → Round 2: Reflection (final reranking) → Metrics
+```
+
+### Key Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| `CuisineSwingMethod` | `similarity/methods.py` | Cuisine-to-cuisine swing similarity for candidate generation |
+| `LightGCNEmbeddingManager` | `similarity/lightGCN.py` | User-cuisine embeddings with disk caching |
+| `CuisineBasedCandidateGenerator` | `evaluation/rerank_eval.py` | Generates 20 candidates from user's cuisine history |
+| `EnhancedRerankEvaluator` | `evaluation/rerank_eval.py` | Two-round LLM evaluation with LightGCN reflection |
+
+### Metrics
+
+- **NDCG@K** (K=5, 10)
+- **MRR@K** (K=5, 10)
+- **Hit Rate@K** (K=1, 3, 5, 10)
+- Round 1 vs Final comparison
+
+### Configuration
+
+Edit `workflow_config_linux.yaml`:
+
+```yaml
+run_enhanced_rerank_evaluation:
+  enabled: true
+  settings:
+    n_candidates: 20
+    items_per_seed: 5
+    dataset_name: "data_se"
+    lightgcn_epochs: 50
+    lightgcn_embedding_dim: 64
+    temperature_round1: 0.3
+    temperature_round2: 0.2
+    n_samples: 10
+    min_history: 5
+```
+
+### Run Command
+
+```bash
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages run_enhanced_rerank_evaluation
+```
+
+### LightGCN Cache
+
+Embeddings are cached at `~/.cache/agentic_recommender/lightgcn/{dataset_name}_embeddings.pkl` for fast reloading.

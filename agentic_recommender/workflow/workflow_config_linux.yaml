@@ -93,10 +93,10 @@ workflow:
         seed: 42              # Random seed for reproducibility
         save_predictions: true  # Save individual predictions
 
-    # Stage 7: Retrieve-Rerank Evaluation (RECOMMENDED)
+    # Stage 7: Retrieve-Rerank Evaluation
     # Two-stage approach: Generate candidates → LLM picks from candidates
     run_rerank_evaluation:
-      enabled: true
+      enabled: false
       description: "Retrieve-rerank evaluation with candidate generation"
       input:
         merged_data: "outputs/stage1_merged_data.parquet"
@@ -113,6 +113,35 @@ workflow:
 
         # LLM evaluation
         k_picks: 5              # Ask LLM to pick K times
+
+        # Test settings
+        n_samples: 10           # Number of test samples
+        min_history: 5          # Min orders per user
+
+    # Stage 8: Enhanced Two-Round Rerank Evaluation (RECOMMENDED)
+    # Two-round LLM with cuisine-cuisine swing + LightGCN reflection
+    run_enhanced_rerank_evaluation:
+      enabled: true
+      description: "Two-round LLM reranking with LightGCN reflection"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+      output:
+        results_json: "outputs/stage8_enhanced_rerank_results.json"
+        samples_json: "outputs/stage8_enhanced_rerank_samples.json"
+        detailed_json: "outputs/stage8_enhanced_rerank_detailed.json"
+      settings:
+        # Candidate generation (cuisine-to-cuisine swing)
+        n_candidates: 20        # Total candidates to generate
+        items_per_seed: 5       # Top-k similar cuisines per history cuisine
+
+        # LightGCN settings
+        dataset_name: "data_se" # For cache file naming
+        lightgcn_epochs: 50
+        lightgcn_embedding_dim: 64
+
+        # LLM settings
+        temperature_round1: 0.3  # Round 1: reranking
+        temperature_round2: 0.2  # Round 2: reflection
 
         # Test settings
         n_samples: 10           # Number of test samples

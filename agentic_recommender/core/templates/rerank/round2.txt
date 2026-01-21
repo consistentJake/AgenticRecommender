@@ -1,0 +1,18 @@
+Review the initial ranking and collaborative filtering signals to produce a FINAL ranking.
+
+## User's Recent History (last 5):
+{history_summary}
+
+## Initial LLM Ranking (Round 1, top 10):
+{round1_ranking}
+
+## Collaborative Filtering Signals (LightGCN user-cuisine similarity):
+{lightgcn_scores}
+
+## LightGCN-based Ranking:
+{lightgcn_ranking}
+
+Consider both your initial intuition AND the collaborative filtering signals from similar users.
+Produce your FINAL ranking of all cuisines.
+
+Return JSON: {"final_ranking": ["most_likely", ..., "least_likely"], "reflection": "how you balanced the signals"}
