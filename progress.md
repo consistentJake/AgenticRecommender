@@ -47,3 +47,4 @@ HitRate@K	Whether the correct item is in top-K	Fraction of lists containing the 
 1. starting point is agentic_recommender/workflow/workflow_runner.py, any changes are related to the codd used in workflow_runner.py 
 2. how we calculate with lightGCN? so I provide a example code to calcualte lightGCN.  agentic_recommender/similarity/lightGCN.py. This is also something we need to pre-calulated, once the user and item relationships is generated, we calcualte the lightGCN and get the embedding presenatation for each user and item, and cache them. Because we use the same dataset(dataset name is data_se, or data_sg, or other, just cache them with the original name), once we calcualted, in next adn future run we don;'t need to recalcuate just read from the cache. 
 3. how we calculate swing similarity? you can refer and use this agentic_recommender/similarity/methods.py
+
