@@ -536,3 +536,191 @@ python -m agentic_recommender.workflow.workflow_runner \
 ### LightGCN Cache
 
 Embeddings are cached at `~/.cache/agentic_recommender/lightgcn/{dataset_name}_embeddings.pkl` for fast reloading.
+
+---
+
+## 🔍 Validation & Testing
+
+### Workflow Stage Verification
+
+The workflow runner has multiple stages that can be tested independently. Each stage produces output files that can be verified.
+
+#### Stage Summary
+
+| Stage | Name | Output Files | Description |
+|-------|------|--------------|-------------|
+| 1 | `load_data` | `stage1_merged_data.parquet`, `stage1_stats.json` | Load and merge raw data |
+| 2 | `build_users` | `stage2_enriched_users.json`, `stage2_users_summary.json` | Build EnrichedUser representations |
+| 3 | `build_cuisines` | `stage3_cuisine_profiles.json` | Build CuisineProfile for temporal patterns |
+| 8 | `run_enhanced_rerank_evaluation` | `stage8_enhanced_rerank_results.json`, `stage8_enhanced_rerank_detailed.json` | Two-round LLM reranking with LightGCN |
+
+#### Running Individual Stages
+
+```bash
+# Stage 1: Data Loading
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages load_data
+
+# Stage 2: Build Users (requires Stage 1)
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages load_data build_users
+
+# Stage 3: Build Cuisines (requires Stage 1-2)
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages load_data build_users build_cuisines
+
+# Stage 8: Enhanced Rerank Evaluation
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages run_enhanced_rerank_evaluation
+```
+
+#### Full Pipeline Verification Script
+
+```python
+import json
+import pandas as pd
+import os
+
+def verify_all_stages():
+    errors = []
+
+    # Stage 1
+    try:
+        df = pd.read_parquet('outputs/stage1_merged_data.parquet')
+        assert len(df) > 0 and 'customer_id' in df.columns
+        print(f"✓ Stage 1: {len(df)} rows")
+    except Exception as e:
+        errors.append(f"Stage 1: {e}")
+
+    # Stage 2
+    try:
+        with open('outputs/stage2_users_summary.json') as f:
+            summary = json.load(f)
+        assert summary['total_users'] > 0
+        print(f"✓ Stage 2: {summary['total_users']} users")
+    except Exception as e:
+        errors.append(f"Stage 2: {e}")
+
+    # Stage 3
+    try:
+        with open('outputs/stage3_cuisine_profiles.json') as f:
+            cuisines = json.load(f)
+        assert len(cuisines) > 0
+        print(f"✓ Stage 3: {len(cuisines)} cuisines")
+    except Exception as e:
+        errors.append(f"Stage 3: {e}")
+
+    # Stage 8
+    try:
+        with open('outputs/stage8_enhanced_rerank_results.json') as f:
+            results = json.load(f)
+        print(f"✓ Stage 8: NDCG@5={results['ndcg@5']:.4f}, Hit@5={results['hit@5']:.4f}")
+    except Exception as e:
+        errors.append(f"Stage 8: {e}")
+
+    return len(errors) == 0
+
+verify_all_stages()
+```
+
+---
+
+### LightGCN Embedding Validation
+
+A dedicated script validates LightGCN embeddings by checking if a user's top-ranked cuisines match their purchase history.
+
+#### Script Location
+
+```
+scripts/evaluate_lightgcn_embeddings.py
+```
+
+#### Usage
+
+```bash
+python scripts/evaluate_lightgcn_embeddings.py
+```
+
+#### What It Does
+
+1. **Loads cached embeddings** from `~/.cache/agentic_recommender/lightgcn/`
+2. **Loads user purchase history** from `outputs/stage1_merged_data.parquet`
+3. **For each sample user**:
+   - Shows their actual cuisine purchase history with counts
+   - Calculates LightGCN similarity scores for all cuisines
+   - Ranks cuisines by score and shows top-K
+   - Computes Recall@K and Precision@K
+
+#### Sample Output
+
+```
+======================================================================
+EVALUATING USER: cd4e9f9533
+======================================================================
+
+📋 PURCHASE HISTORY:
+   Total orders: 20
+   Unique cuisines: 10
+   Cuisine breakdown:
+      mexikanskt: 5 orders (25.0%)
+      turkiskt: 3 orders (15.0%)
+      ...
+
+🔮 LIGHTGCN TOP-10 PREDICTIONS:
+    1. turkiskt: 4.5996 ✓ (purchased)
+    2. pizza: 4.2781 ✓ (purchased)
+    3. kebab: 4.1570 ✓ (purchased)
+    ...
+
+📊 EVALUATION METRICS (Top-10):
+   Recall@10: 100.00% (10/10 purchased cuisines in top-10)
+   Precision@10: 100.00% (10/10 of top-10 are purchased)
+```
+
+#### Expected Results for Good Embeddings
+
+| Metric | Expected | Warning Sign |
+|--------|----------|--------------|
+| Recall@10 | > 70% | < 30% indicates model not learning |
+| Mean Rank | < 5 | > 10 indicates weak personalization |
+| Precision@10 | 30-60% | 100% may indicate overfitting |
+
+#### Key Metrics Explained
+
+- **Recall@K**: Fraction of purchased cuisines appearing in top-K predictions
+- **Precision@K**: Fraction of top-K predictions that are actually purchased
+- **Mean Rank**: Average position of purchased cuisines in the ranking
+
+Note: Some new cuisines in top-K is expected and desired - these are recommendations!
+
+---
+
+### LightGCN Cache Verification
+
+```bash
+# Check cache exists
+ls -la ~/.cache/agentic_recommender/lightgcn/
+
+# Verify cache structure
+python3 << 'EOF'
+import pickle
+import os
+
+cache_path = os.path.expanduser('~/.cache/agentic_recommender/lightgcn/data_se_embeddings.pkl')
+with open(cache_path, 'rb') as f:
+    cache = pickle.load(f)
+
+print(f"Users: {cache['user_embeddings'].shape}")
+print(f"Cuisines: {cache['cuisine_embeddings'].shape}")
+print(f"Cache key: {cache['cache_key']}")
+EOF
+
+# Test cache loading (should say "Cache key matches, loading embeddings")
+python -m agentic_recommender.workflow.workflow_runner \
+    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --stages run_enhanced_rerank_evaluation 2>&1 | grep -E "(Training|Cache)"
+```
