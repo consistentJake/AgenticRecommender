@@ -18,6 +18,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import sys
 import time
 from datetime import datetime
@@ -1694,6 +1695,18 @@ class WorkflowRunner:
 
     def __init__(self, config_path: str = "workflow_config.yaml"):
         self.config = WorkflowConfig(config_path)
+
+        # Generate run timestamp and create output subfolder
+        self.run_timestamp = datetime.now().strftime("%Y%m%d%H%M")
+        self.run_output_dir = self._setup_run_directory()
+
+        # Rewrite output paths in config to use the timestamped subfolder
+        self._rewrite_output_paths()
+
+        # Copy config files to the run directory for tracing
+        self._copy_config_files()
+
+        # Initialize logger with updated log file path
         self.logger = WorkflowLogger(
             log_file=self.config.get_log_file(),
             verbose=self.config.is_verbose()
@@ -1712,6 +1725,73 @@ class WorkflowRunner:
             'run_enhanced_rerank_evaluation': self.stages.stage_run_enhanced_rerank_evaluation,
         }
 
+    def _setup_run_directory(self) -> str:
+        """Create timestamped output subfolder for this run."""
+        base_dir = self.config.get_output_base_dir()
+        run_dir = os.path.join(base_dir, self.run_timestamp)
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
+        return run_dir
+
+    def _rewrite_output_paths(self) -> None:
+        """Rewrite all output and input paths in config to use the timestamped subfolder."""
+        base_dir = self.config.get_output_base_dir()
+
+        # Rewrite log file path
+        log_file = self.config.config.get('workflow', {}).get('log_file')
+        if log_file:
+            new_log_file = self._rewrite_path(log_file, base_dir)
+            self.config.config['workflow']['log_file'] = new_log_file
+
+        # Rewrite all stage input and output paths
+        stages = self.config.config.get('workflow', {}).get('stages', {})
+        for stage_name, stage_config in stages.items():
+            # Rewrite output paths
+            output_config = stage_config.get('output', {})
+            for key, path in output_config.items():
+                if path and isinstance(path, str):
+                    new_path = self._rewrite_path(path, base_dir)
+                    output_config[key] = new_path
+
+            # Rewrite input paths that reference outputs from this workflow
+            # (paths starting with base_dir are workflow outputs)
+            input_config = stage_config.get('input', {})
+            for key, path in input_config.items():
+                if path and isinstance(path, str) and path.startswith(base_dir):
+                    new_path = self._rewrite_path(path, base_dir)
+                    input_config[key] = new_path
+
+    def _rewrite_path(self, original_path: str, base_dir: str) -> str:
+        """Rewrite a single path to use the timestamped subfolder."""
+        # If path starts with base_dir, replace it with run_output_dir
+        if original_path.startswith(base_dir + "/") or original_path.startswith(base_dir + os.sep):
+            relative_path = original_path[len(base_dir):].lstrip("/").lstrip(os.sep)
+            return os.path.join(self.run_output_dir, relative_path)
+        elif original_path.startswith(base_dir):
+            # Handle case like "outputs/file.json" where base_dir is "outputs"
+            relative_path = original_path[len(base_dir):].lstrip("/").lstrip(os.sep)
+            return os.path.join(self.run_output_dir, relative_path)
+        else:
+            # Path doesn't start with base_dir, just prepend the run directory
+            return os.path.join(self.run_output_dir, os.path.basename(original_path))
+
+    def _copy_config_files(self) -> None:
+        """Copy config files to the run directory for tracing."""
+        # Copy the main config file
+        config_src = self.config.config_path
+        if os.path.exists(config_src):
+            config_filename = os.path.basename(config_src)
+            config_dst = os.path.join(self.run_output_dir, config_filename)
+            shutil.copy2(config_src, config_dst)
+
+        # Also copy any other config files in the same directory
+        config_dir = os.path.dirname(config_src)
+        for filename in os.listdir(config_dir):
+            if filename.endswith('.yaml') or filename.endswith('.yml'):
+                src = os.path.join(config_dir, filename)
+                dst = os.path.join(self.run_output_dir, filename)
+                if not os.path.exists(dst):  # Don't overwrite if already copied
+                    shutil.copy2(src, dst)
+
     def run(self, stages: Optional[List[str]] = None) -> Dict[str, bool]:
         """
         Run the workflow.
@@ -1729,6 +1809,9 @@ class WorkflowRunner:
         self.logger.info("#" + f"  {self.config.config['workflow']['name']}".center(78) + "#")
         self.logger.info("#" + " " * 78 + "#")
         self.logger.info("#" * 80)
+        self.logger.info("")
+        self.logger.info(f"Run timestamp: {self.run_timestamp}")
+        self.logger.info(f"Output directory: {self.run_output_dir}")
 
         # Determine which stages to run
         if stages:
@@ -1818,20 +1901,21 @@ Examples:
 
     args = parser.parse_args()
 
-    # Initialize workflow
-    runner = WorkflowRunner(args.config)
-
-    # List stages if requested
+    # List stages if requested (use WorkflowConfig directly to avoid creating directories)
     if args.list:
+        config = WorkflowConfig(args.config)
         print("\nAvailable Stages:")
         print("-" * 60)
         for stage_name in WorkflowRunner.STAGE_ORDER:
-            cfg = runner.config.get_stage(stage_name)
+            cfg = config.get_stage(stage_name)
             status = "ENABLED" if cfg.enabled else "DISABLED"
             print(f"  [{status:8}] {stage_name}")
             print(f"             {cfg.description}")
             print()
         return
+
+    # Initialize workflow
+    runner = WorkflowRunner(args.config)
 
     # Run workflow
     results = runner.run(stages=args.stages)
