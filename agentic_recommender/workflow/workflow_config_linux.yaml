@@ -149,9 +149,9 @@ workflow:
 
 # LLM Provider Configuration
 llm:
-  provider: "mock"  # Options: mock, gemini, openrouter
+  provider: "openrouter"  # Options: mock, gemini, openrouter
   temperature: 0.3  # Lower temperature for more consistent predictions
-  max_tokens: 512
+  max_tokens: 4096
 
   # Provider-specific settings (used when provider != mock)
   gemini:
@@ -160,7 +160,7 @@ llm:
 
   openrouter:
     model_name: "google/gemini-2.0-flash-001"
-    # api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
+    api_key: "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"  # Or set OPENROUTER_API_KEY env var
 
 # Output directory settings
 output:
