@@ -286,6 +286,10 @@ class PipelineStages:
                     'merged_preview': stage_cfg.output.get('merged_preview'),
                     'stats': stage_cfg.output.get('stats'),
                 }
+                # Include test_data if it should be loaded
+                if stage_cfg.settings.get('load_test_data', False) and stage_cfg.output.get('test_data'):
+                    output_mapping['test_data'] = stage_cfg.output.get('test_data')
+
                 if cache.load_cached_files(output_mapping):
                     self.logger.success("Loaded all outputs from cache")
                     self.logger.stage_end('load_data', success=True)
@@ -363,6 +367,10 @@ class PipelineStages:
                 'merged_preview': stage_cfg.output.get('merged_preview'),
                 'stats': stage_cfg.output.get('stats'),
             }
+            # Include test_data if it was loaded
+            if stage_cfg.settings.get('load_test_data', False) and stage_cfg.output.get('test_data'):
+                output_mapping['test_data'] = stage_cfg.output.get('test_data')
+
             if cache.save_to_cache(output_mapping, input_files, stage_cfg.settings):
                 self.logger.info(f"[CACHE SAVE] Saved to global cache")
 
@@ -1611,6 +1619,7 @@ class PipelineStages:
                     train_df=merged_df,
                     test_df=test_df,
                     prediction_target=prediction_target,
+                    n_samples=config.n_samples,
                 )
                 self.logger.success(f"Created {len(test_samples)} test samples from test file")
 

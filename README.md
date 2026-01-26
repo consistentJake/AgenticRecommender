@@ -275,3 +275,7 @@ ls -la ~/.cache/agentic_recommender/swing/
 - `docs/evaluation_methods_update.md` - Detailed implementation notes
 - `docs/testing_plan_evaluation_methods.md` - Testing procedures
 - `agentic_recommender/evaluation/basket_evaluation.md` - Basket metric formulas
+
+
+
+python -m agentic_recommender.workflow.workflow_runner --config                                       workflow_config_linux.yaml --stages load_data run_enhanced_rerank_evaluation

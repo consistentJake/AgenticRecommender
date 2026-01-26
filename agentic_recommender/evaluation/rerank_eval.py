@@ -597,6 +597,7 @@ def build_test_samples_from_test_file(
     test_df: pd.DataFrame,
     prediction_target: str = "cuisine",
     seed: int = 42,
+    n_samples: int = -1,
 ) -> List[Dict[str, Any]]:
     """
     Build test samples using full training history + test orders (Method 2).
@@ -612,6 +613,7 @@ def build_test_samples_from_test_file(
         test_df: Test data DataFrame (orders to predict)
         prediction_target: "cuisine", "vendor", or "product"
         seed: Random seed
+        n_samples: Number of samples to return (-1 = all samples)
 
     Returns:
         List of samples with:
@@ -716,7 +718,12 @@ def build_test_samples_from_test_file(
     # Shuffle for randomness
     random.shuffle(samples)
 
-    print(f"[build_test_samples_from_test_file] Created {len(samples)} test samples")
+    # Limit samples if requested
+    total_available = len(samples)
+    if n_samples > 0 and n_samples < total_available:
+        samples = samples[:n_samples]
+
+    print(f"[build_test_samples_from_test_file] Created {len(samples)} test samples (from {total_available} available)")
 
     return samples
 
@@ -761,10 +768,14 @@ class EnhancedRerankConfig:
 class EnhancedRerankMetrics:
     """Metrics for enhanced two-round rerank evaluation."""
     # NDCG metrics
+    ndcg_at_1: float = 0.0
+    ndcg_at_3: float = 0.0
     ndcg_at_5: float = 0.0
     ndcg_at_10: float = 0.0
 
     # MRR metrics
+    mrr_at_1: float = 0.0
+    mrr_at_3: float = 0.0
     mrr_at_5: float = 0.0
     mrr_at_10: float = 0.0
 
@@ -780,12 +791,20 @@ class EnhancedRerankMetrics:
     improvement: float = 0.0
 
     # Basket metrics (multi-item ground truth)
+    basket_hit_at_1: float = 0.0
+    basket_hit_at_3: float = 0.0
     basket_hit_at_5: float = 0.0
     basket_hit_at_10: float = 0.0
+    basket_recall_at_1: float = 0.0
+    basket_recall_at_3: float = 0.0
     basket_recall_at_5: float = 0.0
     basket_recall_at_10: float = 0.0
+    basket_precision_at_1: float = 0.0
+    basket_precision_at_3: float = 0.0
     basket_precision_at_5: float = 0.0
     basket_precision_at_10: float = 0.0
+    basket_ndcg_at_1: float = 0.0
+    basket_ndcg_at_3: float = 0.0
     basket_ndcg_at_5: float = 0.0
     basket_ndcg_at_10: float = 0.0
     basket_mrr: float = 0.0
@@ -799,8 +818,12 @@ class EnhancedRerankMetrics:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            'ndcg@1': self.ndcg_at_1,
+            'ndcg@3': self.ndcg_at_3,
             'ndcg@5': self.ndcg_at_5,
             'ndcg@10': self.ndcg_at_10,
+            'mrr@1': self.mrr_at_1,
+            'mrr@3': self.mrr_at_3,
             'mrr@5': self.mrr_at_5,
             'mrr@10': self.mrr_at_10,
             'hit@1': self.hit_at_1,
@@ -811,12 +834,20 @@ class EnhancedRerankMetrics:
             'final_hit@5': self.final_hit_at_5,
             'improvement': self.improvement,
             # Basket metrics
+            'basket_hit@1': self.basket_hit_at_1,
+            'basket_hit@3': self.basket_hit_at_3,
             'basket_hit@5': self.basket_hit_at_5,
             'basket_hit@10': self.basket_hit_at_10,
+            'basket_recall@1': self.basket_recall_at_1,
+            'basket_recall@3': self.basket_recall_at_3,
             'basket_recall@5': self.basket_recall_at_5,
             'basket_recall@10': self.basket_recall_at_10,
+            'basket_precision@1': self.basket_precision_at_1,
+            'basket_precision@3': self.basket_precision_at_3,
             'basket_precision@5': self.basket_precision_at_5,
             'basket_precision@10': self.basket_precision_at_10,
+            'basket_ndcg@1': self.basket_ndcg_at_1,
+            'basket_ndcg@3': self.basket_ndcg_at_3,
             'basket_ndcg@5': self.basket_ndcg_at_5,
             'basket_ndcg@10': self.basket_ndcg_at_10,
             'basket_mrr': self.basket_mrr,
@@ -1396,10 +1427,10 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         r1_ranks = [r['round1_rank'] for r in valid]
 
         # Compute basket metrics if samples have ground_truth_items
-        basket_hit_5, basket_hit_10 = 0.0, 0.0
-        basket_recall_5, basket_recall_10 = 0.0, 0.0
-        basket_precision_5, basket_precision_10 = 0.0, 0.0
-        basket_ndcg_5, basket_ndcg_10 = 0.0, 0.0
+        basket_hit_1, basket_hit_3, basket_hit_5, basket_hit_10 = 0.0, 0.0, 0.0, 0.0
+        basket_recall_1, basket_recall_3, basket_recall_5, basket_recall_10 = 0.0, 0.0, 0.0, 0.0
+        basket_precision_1, basket_precision_3, basket_precision_5, basket_precision_10 = 0.0, 0.0, 0.0, 0.0
+        basket_ndcg_1, basket_ndcg_3, basket_ndcg_5, basket_ndcg_10 = 0.0, 0.0, 0.0, 0.0
         basket_mrr_val = 0.0
         avg_basket_size = 0.0
 
@@ -1407,14 +1438,10 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         has_basket = any('ground_truth_items' in s for s in test_samples)
 
         if has_basket:
-            basket_hits_5 = []
-            basket_hits_10 = []
-            basket_recalls_5 = []
-            basket_recalls_10 = []
-            basket_precisions_5 = []
-            basket_precisions_10 = []
-            basket_ndcgs_5 = []
-            basket_ndcgs_10 = []
+            basket_hits_1, basket_hits_3, basket_hits_5, basket_hits_10 = [], [], [], []
+            basket_recalls_1, basket_recalls_3, basket_recalls_5, basket_recalls_10 = [], [], [], []
+            basket_precisions_1, basket_precisions_3, basket_precisions_5, basket_precisions_10 = [], [], [], []
+            basket_ndcgs_1, basket_ndcgs_3, basket_ndcgs_5, basket_ndcgs_10 = [], [], [], []
             basket_mrrs = []
             basket_sizes = []
 
@@ -1429,33 +1456,54 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
                     gt_items = sample['ground_truth_items']
                     predictions = r.get('final_ranking', [])
 
+                    # Compute for k=1, 3, 5, 10
+                    basket_hits_1.append(compute_basket_hit(predictions, gt_items, 1))
+                    basket_hits_3.append(compute_basket_hit(predictions, gt_items, 3))
                     basket_hits_5.append(compute_basket_hit(predictions, gt_items, 5))
                     basket_hits_10.append(compute_basket_hit(predictions, gt_items, 10))
+                    basket_recalls_1.append(compute_basket_recall(predictions, gt_items, 1))
+                    basket_recalls_3.append(compute_basket_recall(predictions, gt_items, 3))
                     basket_recalls_5.append(compute_basket_recall(predictions, gt_items, 5))
                     basket_recalls_10.append(compute_basket_recall(predictions, gt_items, 10))
+                    basket_precisions_1.append(compute_basket_precision(predictions, gt_items, 1))
+                    basket_precisions_3.append(compute_basket_precision(predictions, gt_items, 3))
                     basket_precisions_5.append(compute_basket_precision(predictions, gt_items, 5))
                     basket_precisions_10.append(compute_basket_precision(predictions, gt_items, 10))
+                    basket_ndcgs_1.append(compute_basket_ndcg(predictions, gt_items, 1))
+                    basket_ndcgs_3.append(compute_basket_ndcg(predictions, gt_items, 3))
                     basket_ndcgs_5.append(compute_basket_ndcg(predictions, gt_items, 5))
                     basket_ndcgs_10.append(compute_basket_ndcg(predictions, gt_items, 10))
                     basket_mrrs.append(compute_basket_mrr(predictions, gt_items))
                     basket_sizes.append(len(gt_items))
 
-            if basket_hits_5:
-                n_basket = len(basket_hits_5)
+            if basket_hits_1:
+                n_basket = len(basket_hits_1)
+                basket_hit_1 = sum(basket_hits_1) / n_basket
+                basket_hit_3 = sum(basket_hits_3) / n_basket
                 basket_hit_5 = sum(basket_hits_5) / n_basket
                 basket_hit_10 = sum(basket_hits_10) / n_basket
+                basket_recall_1 = sum(basket_recalls_1) / n_basket
+                basket_recall_3 = sum(basket_recalls_3) / n_basket
                 basket_recall_5 = sum(basket_recalls_5) / n_basket
                 basket_recall_10 = sum(basket_recalls_10) / n_basket
+                basket_precision_1 = sum(basket_precisions_1) / n_basket
+                basket_precision_3 = sum(basket_precisions_3) / n_basket
                 basket_precision_5 = sum(basket_precisions_5) / n_basket
                 basket_precision_10 = sum(basket_precisions_10) / n_basket
+                basket_ndcg_1 = sum(basket_ndcgs_1) / n_basket
+                basket_ndcg_3 = sum(basket_ndcgs_3) / n_basket
                 basket_ndcg_5 = sum(basket_ndcgs_5) / n_basket
                 basket_ndcg_10 = sum(basket_ndcgs_10) / n_basket
                 basket_mrr_val = sum(basket_mrrs) / n_basket
                 avg_basket_size = sum(basket_sizes) / n_basket
 
         metrics = EnhancedRerankMetrics(
+            ndcg_at_1=sum(dcg(r, 1) for r in final_ranks) / n,
+            ndcg_at_3=sum(dcg(r, 3) for r in final_ranks) / n,
             ndcg_at_5=sum(dcg(r, 5) for r in final_ranks) / n,
             ndcg_at_10=sum(dcg(r, 10) for r in final_ranks) / n,
+            mrr_at_1=mrr(final_ranks, 1),
+            mrr_at_3=mrr(final_ranks, 3),
             mrr_at_5=mrr(final_ranks, 5),
             mrr_at_10=mrr(final_ranks, 10),
             hit_at_1=hit_rate(final_ranks, 1),
@@ -1466,12 +1514,20 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             final_hit_at_5=hit_rate(final_ranks, 5),
             improvement=hit_rate(final_ranks, 5) - hit_rate(r1_ranks, 5),
             # Basket metrics
+            basket_hit_at_1=basket_hit_1,
+            basket_hit_at_3=basket_hit_3,
             basket_hit_at_5=basket_hit_5,
             basket_hit_at_10=basket_hit_10,
+            basket_recall_at_1=basket_recall_1,
+            basket_recall_at_3=basket_recall_3,
             basket_recall_at_5=basket_recall_5,
             basket_recall_at_10=basket_recall_10,
+            basket_precision_at_1=basket_precision_1,
+            basket_precision_at_3=basket_precision_3,
             basket_precision_at_5=basket_precision_5,
             basket_precision_at_10=basket_precision_10,
+            basket_ndcg_at_1=basket_ndcg_1,
+            basket_ndcg_at_3=basket_ndcg_3,
             basket_ndcg_at_5=basket_ndcg_5,
             basket_ndcg_at_10=basket_ndcg_10,
             basket_mrr=basket_mrr_val,
