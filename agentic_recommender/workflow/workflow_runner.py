@@ -18,7 +18,6 @@ Usage:
 import argparse
 import json
 import os
-import shutil
 import sys
 import time
 from datetime import datetime
@@ -28,6 +27,8 @@ from dataclasses import dataclass, asdict
 
 import yaml
 import pandas as pd
+
+from agentic_recommender.workflow.stage_cache import StageCache
 
 
 # =============================================================================
@@ -268,8 +269,31 @@ class PipelineStages:
 
             # Load data
             data_dir = stage_cfg.input.get('data_dir', '/Users/zhenkai/Downloads/data_sg')
-            self.logger.info(f"Loading data from: {data_dir}")
 
+            # Check global cache
+            input_files = [
+                f"{data_dir}/orders_sg_train.txt",
+                f"{data_dir}/vendors_sg.txt",
+                f"{data_dir}/products_sg.txt",
+            ]
+            cache = StageCache('load_data')
+            cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
+
+            if cache_valid:
+                self.logger.info(f"[CACHE HIT] Loading from global cache: {cache_path}")
+                output_mapping = {
+                    'merged_data': stage_cfg.output.get('merged_data'),
+                    'merged_preview': stage_cfg.output.get('merged_preview'),
+                    'stats': stage_cfg.output.get('stats'),
+                }
+                if cache.load_cached_files(output_mapping):
+                    self.logger.success("Loaded all outputs from cache")
+                    self.logger.stage_end('load_data', success=True)
+                    return True
+                else:
+                    self.logger.warning("Cache load failed, recomputing...")
+
+            self.logger.info(f"Loading data from: {data_dir}")
             loader = load_singapore_data(data_dir)
 
             # Load individual files with logging
@@ -291,6 +315,7 @@ class PipelineStages:
             # Save merged data
             output_path = stage_cfg.output.get('merged_data')
             if output_path:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
                 merged_df.to_parquet(output_path)
                 self.logger.file_write(output_path, f"{len(merged_df):,} rows")
 
@@ -319,6 +344,15 @@ class PipelineStages:
                     json.dump(stats, f, indent=2)
                 self.logger.file_write(stats_path, "Dataset statistics")
 
+            # Save to global cache
+            output_mapping = {
+                'merged_data': stage_cfg.output.get('merged_data'),
+                'merged_preview': stage_cfg.output.get('merged_preview'),
+                'stats': stage_cfg.output.get('stats'),
+            }
+            if cache.save_to_cache(output_mapping, input_files, stage_cfg.settings):
+                self.logger.info(f"[CACHE SAVE] Saved to global cache")
+
             self.logger.stage_end('load_data', success=True)
             return True
 
@@ -338,16 +372,26 @@ class PipelineStages:
         try:
             from agentic_recommender.data.representations import EnrichedUser
 
-            # Check if output already exists (skip if so)
-            output_path = stage_cfg.output.get('users_json')
-            if output_path and os.path.exists(output_path):
-                self.logger.info(f"Output file already exists: {output_path}")
-                self.logger.info("Skipping build_users stage. Delete the file to reprocess.")
-                self.logger.stage_end('build_users', success=True)
-                return True
+            # Check global cache
+            input_path = stage_cfg.input.get('merged_data')
+            input_files = [input_path] if input_path else []
+            cache = StageCache('build_users')
+            cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
+
+            if cache_valid:
+                self.logger.info(f"[CACHE HIT] Loading from global cache: {cache_path}")
+                output_mapping = {
+                    'users_json': stage_cfg.output.get('users_json'),
+                    'users_summary': stage_cfg.output.get('users_summary'),
+                }
+                if cache.load_cached_files(output_mapping):
+                    self.logger.success("Loaded all outputs from cache")
+                    self.logger.stage_end('build_users', success=True)
+                    return True
+                else:
+                    self.logger.warning("Cache load failed, recomputing...")
 
             # Load merged data
-            input_path = stage_cfg.input.get('merged_data')
             self.logger.file_read(input_path, "Loading merged data")
             merged_df = pd.read_parquet(input_path)
             self.logger.info(f"Loaded {len(merged_df):,} rows")
@@ -427,6 +471,14 @@ class PipelineStages:
                     json.dump(summary, f, indent=2)
                 self.logger.file_write(summary_path, "User summary statistics")
 
+            # Save to global cache
+            output_mapping = {
+                'users_json': stage_cfg.output.get('users_json'),
+                'users_summary': stage_cfg.output.get('users_summary'),
+            }
+            if cache.save_to_cache(output_mapping, input_files, stage_cfg.settings):
+                self.logger.info(f"[CACHE SAVE] Saved to global cache")
+
             self.logger.stage_end('build_users', success=True)
             return True
 
@@ -448,8 +500,25 @@ class PipelineStages:
         try:
             from agentic_recommender.data.representations import CuisineRegistry
 
-            # Load merged data
+            # Check global cache
             input_path = stage_cfg.input.get('merged_data')
+            input_files = [input_path] if input_path else []
+            cache = StageCache('build_cuisines')
+            cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
+
+            if cache_valid:
+                self.logger.info(f"[CACHE HIT] Loading from global cache: {cache_path}")
+                output_mapping = {
+                    'cuisines_json': stage_cfg.output.get('cuisines_json'),
+                }
+                if cache.load_cached_files(output_mapping):
+                    self.logger.success("Loaded all outputs from cache")
+                    self.logger.stage_end('build_cuisines', success=True)
+                    return True
+                else:
+                    self.logger.warning("Cache load failed, recomputing...")
+
+            # Load merged data
             self.logger.file_read(input_path, "Loading merged data")
             merged_df = pd.read_parquet(input_path)
 
@@ -490,6 +559,13 @@ class PipelineStages:
                     preview_rows=10,
                     description="Preview of cuisine profiles",
                 )
+
+            # Save to global cache
+            output_mapping = {
+                'cuisines_json': stage_cfg.output.get('cuisines_json'),
+            }
+            if cache.save_to_cache(output_mapping, input_files, stage_cfg.settings):
+                self.logger.info(f"[CACHE SAVE] Saved to global cache")
 
             self.logger.stage_end('build_cuisines', success=True)
             return True
@@ -1703,8 +1779,8 @@ class WorkflowRunner:
         # Rewrite output paths in config to use the timestamped subfolder
         self._rewrite_output_paths()
 
-        # Copy config files to the run directory for tracing
-        self._copy_config_files()
+        # Save runtime config to output folder and print to console
+        self._save_runtime_config()
 
         # Initialize logger with updated log file path
         self.logger = WorkflowLogger(
@@ -1774,23 +1850,22 @@ class WorkflowRunner:
             # Path doesn't start with base_dir, just prepend the run directory
             return os.path.join(self.run_output_dir, os.path.basename(original_path))
 
-    def _copy_config_files(self) -> None:
-        """Copy config files to the run directory for tracing."""
-        # Copy the main config file
-        config_src = self.config.config_path
-        if os.path.exists(config_src):
-            config_filename = os.path.basename(config_src)
-            config_dst = os.path.join(self.run_output_dir, config_filename)
-            shutil.copy2(config_src, config_dst)
+    def _save_runtime_config(self) -> None:
+        """Save the runtime config to output folder and print to console."""
+        # Save config to file
+        config_dst = os.path.join(self.run_output_dir, "runtime_config.yaml")
+        with open(config_dst, 'w') as f:
+            yaml.dump(self.config.config, f, default_flow_style=False, sort_keys=False)
 
-        # Also copy any other config files in the same directory
-        config_dir = os.path.dirname(config_src)
-        for filename in os.listdir(config_dir):
-            if filename.endswith('.yaml') or filename.endswith('.yml'):
-                src = os.path.join(config_dir, filename)
-                dst = os.path.join(self.run_output_dir, filename)
-                if not os.path.exists(dst):  # Don't overwrite if already copied
-                    shutil.copy2(src, dst)
+        # Print config to console
+        print("")
+        print("=" * 80)
+        print("RUNTIME CONFIGURATION")
+        print("=" * 80)
+        print(yaml.dump(self.config.config, default_flow_style=False, sort_keys=False))
+        print("=" * 80)
+        print(f"Config saved to: {config_dst}")
+        print("")
 
     def run(self, stages: Optional[List[str]] = None) -> Dict[str, bool]:
         """

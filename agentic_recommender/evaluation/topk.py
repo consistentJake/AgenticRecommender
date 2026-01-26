@@ -458,7 +458,7 @@ class TopKTestDataBuilder:
         Build test samples for evaluation.
 
         Args:
-            n_samples: Number of test samples to create
+            n_samples: Number of test samples to create. Use -1 for all eligible samples.
             seed: Random seed for reproducibility
 
         Returns:
@@ -482,11 +482,15 @@ class TopKTestDataBuilder:
             print(f"Warning: No customers with >= {self.min_history} orders")
             return []
 
-        # Sample customers
-        sampled = random.sample(
-            eligible_customers,
-            min(n_samples, len(eligible_customers))
-        )
+        # Sample customers (n_samples < 0 means use all eligible)
+        if n_samples < 0:
+            sampled = eligible_customers
+            random.shuffle(sampled)  # Shuffle for consistency with seed
+        else:
+            sampled = random.sample(
+                eligible_customers,
+                min(n_samples, len(eligible_customers))
+            )
 
         samples = []
         for customer_id in sampled:

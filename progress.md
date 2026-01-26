@@ -48,3 +48,16 @@ HitRate@K	Whether the correct item is in top-K	Fraction of lists containing the 
 2. how we calculate with lightGCN? so I provide a example code to calcualte lightGCN.  agentic_recommender/similarity/lightGCN.py. This is also something we need to pre-calulated, once the user and item relationships is generated, we calcualte the lightGCN and get the embedding presenatation for each user and item, and cache them. Because we use the same dataset(dataset name is data_se, or data_sg, or other, just cache them with the original name), once we calcualted, in next adn future run we don;'t need to recalcuate just read from the cache. 
 3. how we calculate swing similarity? you can refer and use this agentic_recommender/similarity/methods.py
 
+## Jan 22
+round2_prompt, let's include the timestamp.
+check lightGCN training, do we include the prediction into training
+  "round1_hit@5": 1.0,
+  "final_hit@5": 1.0,
+  include round1 hit@1
+
+use evaulation data instead of training data.
+
+rerun the model mentioned in https://arxiv.org/pdf/2402.01339
+if we can't, we shall use lightGCN.
+
+

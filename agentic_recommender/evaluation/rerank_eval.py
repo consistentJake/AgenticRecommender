@@ -492,6 +492,12 @@ def build_test_samples(
     For each sample:
     - order_history: all orders except the last one
     - ground_truth_cuisine: cuisine of the last order
+
+    Args:
+        orders_df: DataFrame with order data
+        n_samples: Number of test samples to create. Use -1 for all eligible samples.
+        min_history: Minimum number of orders required for a user
+        seed: Random seed for reproducibility
     """
     random.seed(seed)
 
@@ -505,7 +511,12 @@ def build_test_samples(
         print(f"Warning: No customers with >= {min_history} orders")
         return []
 
-    sampled = random.sample(eligible, min(n_samples, len(eligible)))
+    # n_samples < 0 means use all eligible samples
+    if n_samples < 0:
+        sampled = eligible
+        random.shuffle(sampled)  # Shuffle for consistency with seed
+    else:
+        sampled = random.sample(eligible, min(n_samples, len(eligible)))
 
     samples = []
     for customer_id in sampled:
@@ -568,6 +579,8 @@ class EnhancedRerankConfig:
     # LLM settings
     temperature_round1: float = 0.3
     temperature_round2: float = 0.2
+    max_tokens_round1: int = 4096  # Increased to avoid truncation
+    max_tokens_round2: int = 4096  # Increased to avoid truncation
 
     # Test settings
     n_samples: int = 10
@@ -863,11 +876,19 @@ class EnhancedRerankEvaluator:
                 'ground_truth': ground_truth,
                 'candidates': candidates,
                 'candidate_info': candidate_info,
+                # Round 1 results
+                'round1_prompt': round1_result.get('prompt', ''),
+                'round1_raw_response': round1_result.get('raw_response', ''),
                 'round1_ranking': round1_result['ranking'],
                 'round1_reasoning': round1_result.get('reasoning', ''),
+                # LightGCN scores
                 'lightgcn_scores': lightgcn_scores[:10],  # Top 10 for logging
+                # Round 2 results
+                'round2_prompt': round2_result.get('prompt', ''),
+                'round2_raw_response': round2_result.get('raw_response', ''),
                 'final_ranking': round2_result['ranking'],
                 'final_reflection': round2_result.get('reflection', ''),
+                # Metrics
                 'round1_rank': r1_rank,
                 'final_rank': final_rank,
                 'time_ms': elapsed,
@@ -891,7 +912,7 @@ class EnhancedRerankEvaluator:
         """
         Round 1: LLM reranks all candidates based on user history.
 
-        Returns dict with 'ranking' (list) and 'reasoning' (str).
+        Returns dict with 'ranking' (list), 'reasoning' (str), 'prompt' (str), 'raw_response' (str).
         """
         prompt = self._build_round1_prompt(
             order_history, candidates, target_hour, target_day_of_week
@@ -900,10 +921,14 @@ class EnhancedRerankEvaluator:
         response = self.llm.generate(
             prompt,
             temperature=self.config.temperature_round1,
-            max_tokens=1000,
+            max_tokens=self.config.max_tokens_round1,
         )
 
-        return self._parse_round1_response(response, candidates)
+        result = self._parse_round1_response(response, candidates)
+        # Store full prompt and raw response for debugging/analysis
+        result['prompt'] = prompt
+        result['raw_response'] = response
+        return result
 
     def _round2_reflect(
         self,
@@ -915,7 +940,7 @@ class EnhancedRerankEvaluator:
         """
         Round 2: LLM reflects on Round 1 + LightGCN signals.
 
-        Returns dict with 'ranking' (list) and 'reflection' (str).
+        Returns dict with 'ranking' (list), 'reflection' (str), 'prompt' (str), 'raw_response' (str).
         """
         prompt = self._build_round2_prompt(
             order_history, round1_ranking, lightgcn_scores
@@ -924,10 +949,14 @@ class EnhancedRerankEvaluator:
         response = self.llm.generate(
             prompt,
             temperature=self.config.temperature_round2,
-            max_tokens=1000,
+            max_tokens=self.config.max_tokens_round2,
         )
 
-        return self._parse_round2_response(response, candidates)
+        result = self._parse_round2_response(response, candidates)
+        # Store full prompt and raw response for debugging/analysis
+        result['prompt'] = prompt
+        result['raw_response'] = response
+        return result
 
     def _build_round1_prompt(
         self,

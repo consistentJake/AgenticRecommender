@@ -144,7 +144,7 @@ workflow:
         temperature_round2: 0.2  # Round 2: reflection
 
         # Test settings
-        n_samples: -1           # Number of test samples
+        n_samples: 10           # Number of test samples
         min_history: 5          # Min orders per user
 
 # LLM Provider Configuration
@@ -159,7 +159,7 @@ llm:
     # api_key: "your-api-key"  # Or set GEMINI_API_KEY env var
 
   openrouter:
-    model_name: "google/gemini-2.0-flash-001"
+    model_name: "qwen/qwen3-32b"
     api_key: "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"  # Or set OPENROUTER_API_KEY env var
 
 # Output directory settings
