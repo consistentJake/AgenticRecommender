@@ -61,3 +61,34 @@ rerun the model mentioned in https://arxiv.org/pdf/2402.01339
 if we can't, we shall use lightGCN.
 
 
+## Jan 25
+
+ 1. keep two methods: one is training with leave-last-out training data with lightGCN, and input is the     
+  previosu items, do prediction in last item. let's call it PureTrainingData method.therefore the only code  
+  change you need is to update the data loading and how we train the lightGCN.                               
+  2. we will have method 2. train with full lightGCN data, but we are using full history data from training  
+  as the input, and then use the test data as the last item. \                                               
+  3. in test data, one customer have multiple orders, each order can have one or more items, different       
+  order have different order time. Therefore, when we construct the testing data, we use full history from   
+  training as the input, and create one test case based on one order in the testing data, therefore, one     
+  user in testing data can have x test case, x is the order number in test data. \                           
+  4. when we are doing evaluation, let consider this carefully. I create a doc                               
+  '/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/evaluation/basket_evaluation.md'   
+  to handle this case, which is the basket prediction case. think of how to revise the code in               
+  '/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/evaluation', therefore we make     
+  the calcualtion sitaution for a one item in test case, and multiple item of one order in test case.\       
+  5.    1. keep two methods: one is training with leave-last-out training data with lightGCN, and input is the     
+  previosu items, do prediction in last item. let's call it PureTrainingData method.therefore the only code  
+  change you need is to update the data loading and how we train the lightGCN.                               
+  2. we will have method 2. train with full lightGCN data, but we are using full history data from training  
+  as the input, and then use the test data as the last item. \                                               
+  3. in test data, one customer have multiple orders, each order can have one or more items, different       
+  order have different order time. Therefore, when we construct the testing data, we use full history from   
+  training as the input, and create one test case based on one order in the testing data, therefore, one     
+  user in testing data can have x test case, x is the order number in test data. \                           
+  4. when we are doing evaluation, let consider this carefully. I create a doc                               
+  '/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/evaluation/basket_evaluation.md'   
+  to handle this case, which is the basket prediction case. think of how to revise the code in               
+  '/home/zhenkai/personal/Projects/AgenticRecommender/agentic_recommender/evaluation', therefore we make     
+  the calcualtion sitaution for a one item in test case, and multiple item of one order in test case.\       
+  5.   
