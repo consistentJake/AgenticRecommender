@@ -598,6 +598,7 @@ def build_test_samples_from_test_file(
     prediction_target: str = "cuisine",
     seed: int = 42,
     n_samples: int = -1,
+    deterministic: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Build test samples using full training history + test orders (Method 2).
@@ -608,12 +609,16 @@ def build_test_samples_from_test_file(
     IMPORTANT: Only includes users that appear in BOTH train and test data.
     Cold-start users (only in test) are skipped.
 
+    If deterministic=True, samples are sorted by order_id to ensure
+    reproducibility across runs with the same n_samples.
+
     Args:
         train_df: Training data DataFrame (full history)
         test_df: Test data DataFrame (orders to predict)
         prediction_target: "cuisine", "vendor", or "product"
-        seed: Random seed
+        seed: Random seed (used only if deterministic=False)
         n_samples: Number of samples to return (-1 = all samples)
+        deterministic: If True, sort by order_id for reproducibility
 
     Returns:
         List of samples with:
@@ -715,15 +720,21 @@ def build_test_samples_from_test_file(
 
         samples.append(sample)
 
-    # Shuffle for randomness
-    random.shuffle(samples)
+    # Sort or shuffle samples
+    if deterministic:
+        # Sort by order_id for reproducibility - same n_samples always gets same samples
+        samples.sort(key=lambda x: str(x['order_id']))
+    else:
+        # Shuffle for randomness
+        random.shuffle(samples)
 
     # Limit samples if requested
     total_available = len(samples)
     if n_samples > 0 and n_samples < total_available:
         samples = samples[:n_samples]
 
-    print(f"[build_test_samples_from_test_file] Created {len(samples)} test samples (from {total_available} available)")
+    mode = "deterministic" if deterministic else "random"
+    print(f"[build_test_samples_from_test_file] Created {len(samples)} test samples (from {total_available} available, {mode})")
 
     return samples
 
@@ -749,11 +760,13 @@ class EnhancedRerankConfig:
     temperature_round2: float = 0.2
     max_tokens_round1: int = 4096  # Increased to avoid truncation
     max_tokens_round2: int = 4096  # Increased to avoid truncation
+    enable_thinking: bool = True  # For Qwen3 models: enable/disable thinking mode
 
     # Test settings
     n_samples: int = 10
     min_history: int = 5
     seed: int = 42
+    deterministic_sampling: bool = True  # Use deterministic (sorted) sampling for reproducibility
 
     # Evaluation method
     evaluation_method: str = "method1"  # "method1" (leave-last-out) or "method2" (train-test split)
@@ -1159,6 +1172,7 @@ class EnhancedRerankEvaluator:
             prompt,
             temperature=self.config.temperature_round1,
             max_tokens=self.config.max_tokens_round1,
+            enable_thinking=self.config.enable_thinking,
         )
 
         result = self._parse_round1_response(response, candidates)
@@ -1187,6 +1201,7 @@ class EnhancedRerankEvaluator:
             prompt,
             temperature=self.config.temperature_round2,
             max_tokens=self.config.max_tokens_round2,
+            enable_thinking=self.config.enable_thinking,
         )
 
         result = self._parse_round2_response(response, candidates)

@@ -505,6 +505,7 @@ class OpenRouterProvider(LLMProvider):
         max_tokens: int = 512,
         system_prompt: str = None,
         json_mode: bool = False,
+        enable_thinking: bool = True,
         **kwargs
     ) -> str:
         """
@@ -516,6 +517,7 @@ class OpenRouterProvider(LLMProvider):
             max_tokens: Maximum tokens to generate
             system_prompt: Optional system message
             json_mode: If True, append JSON instruction
+            enable_thinking: For Qwen3 models, enable/disable thinking mode
             **kwargs: Additional parameters
 
         Returns:
@@ -528,6 +530,12 @@ class OpenRouterProvider(LLMProvider):
             messages.append({"role": "system", "content": system_prompt})
 
         user_content = prompt
+
+        # For Qwen3 models, add thinking control suffix
+        if "qwen" in self.model_name.lower() and "qwen3" in self.model_name.lower():
+            if not enable_thinking:
+                user_content += " /no_think"
+
         if json_mode:
             user_content += "\n\nRespond only with valid JSON."
         messages.append({"role": "user", "content": user_content})

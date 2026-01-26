@@ -157,7 +157,7 @@ workflow:
         # LLM settings
         temperature_round1: 0.3  # Round 1: reranking
         temperature_round2: 0.2  # Round 2: reflection
-        enable_thinking: true    # For Qwen3 models: enable/disable thinking mode
+        enable_thinking: false   # For Qwen3 models: DISABLED - no thinking mode
 
         # Test settings
         n_samples: 10           # Number of test samples (-1 = all)

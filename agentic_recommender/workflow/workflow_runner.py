@@ -1565,8 +1565,10 @@ class PipelineStages:
                 lightgcn_embedding_dim=settings.get('lightgcn_embedding_dim', 64),
                 temperature_round1=settings.get('temperature_round1', 0.3),
                 temperature_round2=settings.get('temperature_round2', 0.2),
+                enable_thinking=settings.get('enable_thinking', True),
                 n_samples=settings.get('n_samples', 10),
                 min_history=settings.get('min_history', 5),
+                deterministic_sampling=settings.get('deterministic_sampling', True),
                 evaluation_method=evaluation_method,
                 prediction_target=prediction_target,
                 enable_basket_metrics=enable_basket_metrics,
@@ -1620,6 +1622,7 @@ class PipelineStages:
                     test_df=test_df,
                     prediction_target=prediction_target,
                     n_samples=config.n_samples,
+                    deterministic=config.deterministic_sampling,
                 )
                 self.logger.success(f"Created {len(test_samples)} test samples from test file")
 
