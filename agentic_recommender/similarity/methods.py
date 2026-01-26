@@ -7,7 +7,9 @@ Available methods:
 - JaccardMethod: Set overlap similarity
 """
 
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple, Set, Optional
 import math
 
@@ -286,10 +288,74 @@ class CuisineSwingMethod(SimilarityMethod):
     - C(u) = cuisines ordered by user u
     """
 
+    CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "swing"
+
     def __init__(self, config: CuisineSwingConfig = None):
         super().__init__(config or CuisineSwingConfig())
         self.cuisine_users: Dict[str, Set[str]] = {}  # cuisine -> set of user_ids
         self.user_cuisines: Dict[str, Set[str]] = {}  # user_id -> set of cuisines
+
+    def save_to_cache(self, dataset_name: str, method: str = "full") -> bool:
+        """
+        Save fitted model to cache.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method ("method1", "method2", or "full")
+
+        Returns:
+            True if save succeeded
+        """
+        try:
+            self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            if method and method != "full":
+                cache_path = self.CACHE_DIR / f"{dataset_name}_{method}_swing.pkl"
+            else:
+                cache_path = self.CACHE_DIR / f"{dataset_name}_swing.pkl"
+
+            with open(cache_path, 'wb') as f:
+                pickle.dump({
+                    'cuisine_users': self.cuisine_users,
+                    'user_cuisines': self.user_cuisines,
+                    'config': self.config,
+                }, f)
+            print(f"[CuisineSwingMethod] Saved to cache: {cache_path}")
+            return True
+        except Exception as e:
+            print(f"[CuisineSwingMethod] Failed to save cache: {e}")
+            return False
+
+    def load_from_cache(self, dataset_name: str, method: str = "full") -> bool:
+        """
+        Load fitted model from cache.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method ("method1", "method2", or "full")
+
+        Returns:
+            True if cache load succeeded
+        """
+        try:
+            if method and method != "full":
+                cache_path = self.CACHE_DIR / f"{dataset_name}_{method}_swing.pkl"
+            else:
+                cache_path = self.CACHE_DIR / f"{dataset_name}_swing.pkl"
+
+            if not cache_path.exists():
+                return False
+
+            with open(cache_path, 'rb') as f:
+                data = pickle.load(f)
+
+            self.cuisine_users = data['cuisine_users']
+            self.user_cuisines = data['user_cuisines']
+            self._fitted = True
+            print(f"[CuisineSwingMethod] Loaded from cache: {cache_path}")
+            return True
+        except Exception as e:
+            print(f"[CuisineSwingMethod] Failed to load cache: {e}")
+            return False
 
     def fit(self, interactions: List[Tuple[str, str]], **kwargs) -> 'CuisineSwingMethod':
         """

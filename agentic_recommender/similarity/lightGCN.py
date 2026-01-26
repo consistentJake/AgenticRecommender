@@ -246,15 +246,27 @@ class LightGCNEmbeddingManager:
         data_str = str(sorted_interactions)
         return hashlib.md5(data_str.encode()).hexdigest()
 
-    def _get_cache_path(self, dataset_name: str) -> Path:
-        """Get cache file path for a dataset."""
+    def _get_cache_path(self, dataset_name: str, method: str = "full") -> Path:
+        """
+        Get cache file path for a dataset and method.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method ("method1", "method2", or "full")
+
+        Returns:
+            Path to cache file
+        """
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        if method and method != "full":
+            return self.CACHE_DIR / f"{dataset_name}_{method}_lightgcn.pkl"
         return self.CACHE_DIR / f"{dataset_name}_embeddings.pkl"
 
     def load_or_train(
         self,
         dataset_name: str,
         interactions: List[Tuple[str, str]],
+        method: str = "full",
         force_retrain: bool = False,
         verbose: bool = True
     ) -> 'LightGCNEmbeddingManager':
@@ -264,18 +276,20 @@ class LightGCNEmbeddingManager:
         Args:
             dataset_name: Name for cache file (e.g., "data_se")
             interactions: List of (user_id, cuisine) tuples
+            method: Evaluation method for cache naming ("method1", "method2", or "full")
             force_retrain: Force retraining even if cache exists
             verbose: Print progress
 
         Returns:
             self (for chaining)
         """
-        cache_path = self._get_cache_path(dataset_name)
+        cache_path = self._get_cache_path(dataset_name, method)
         new_cache_key = self._compute_cache_key(interactions)
 
         # Try to load from cache
         if not force_retrain and cache_path.exists():
             if verbose:
+                print(f"[LightGCNManager] Loading/training LightGCN with {method} cache")
                 print(f"[LightGCNManager] Found cache at {cache_path}")
             try:
                 with open(cache_path, 'rb') as f:
@@ -523,3 +537,97 @@ class LightGCNEmbeddingManager:
             'n_layers': self.config.n_layers,
             'cache_key': self.cache_key,
         }
+
+
+# =============================================================================
+# HELPER FUNCTIONS FOR DATA PREPARATION
+# =============================================================================
+
+def filter_interactions_leave_last_out(
+    orders_df,  # pd.DataFrame
+    prediction_target: str = "cuisine",
+) -> List[Tuple[str, str]]:
+    """
+    Get (user_id, item) interactions EXCLUDING the last order per user.
+
+    Used for Method 1 (PureTrainingData) to prevent data leakage.
+    The last order per user is held out for testing.
+
+    Args:
+        orders_df: DataFrame with order data (must have customer_id, order_id, and target column)
+        prediction_target: "cuisine", "vendor", or "product"
+
+    Returns:
+        List of (user_id, item) tuples from N-1 orders per user.
+    """
+    # Map prediction target to column
+    target_column = {
+        'cuisine': 'cuisine',
+        'vendor': 'vendor_id',
+        'product': 'product_id',
+    }.get(prediction_target, 'cuisine')
+
+    interactions = []
+
+    # Group by customer
+    for customer_id, group in orders_df.groupby('customer_id'):
+        # Sort by time
+        if 'day_num' in group.columns:
+            sorted_group = group.sort_values(['day_num', 'hour'])
+        else:
+            sorted_group = group
+
+        # Get unique orders
+        unique_orders = sorted_group.drop_duplicates('order_id')
+
+        # Need at least 2 orders to have N-1
+        if len(unique_orders) < 2:
+            continue
+
+        # Exclude last order (last row after sorting)
+        excluded_last = unique_orders.iloc[:-1]
+
+        # Get all items from the remaining orders
+        remaining_order_ids = set(excluded_last['order_id'].unique())
+
+        # Get all rows (items) from non-last orders
+        training_rows = sorted_group[sorted_group['order_id'].isin(remaining_order_ids)]
+
+        for _, row in training_rows.iterrows():
+            item = str(row.get(target_column, 'unknown'))
+            interactions.append((str(customer_id), item))
+
+    return interactions
+
+
+def get_all_interactions(
+    orders_df,  # pd.DataFrame
+    prediction_target: str = "cuisine",
+) -> List[Tuple[str, str]]:
+    """
+    Get ALL (user_id, item) interactions from orders.
+
+    Used for Method 2 (FullHistoryTest) where all training data is used.
+
+    Args:
+        orders_df: DataFrame with order data
+        prediction_target: "cuisine", "vendor", or "product"
+
+    Returns:
+        List of (user_id, item) tuples.
+    """
+    # Map prediction target to column
+    target_column = {
+        'cuisine': 'cuisine',
+        'vendor': 'vendor_id',
+        'product': 'product_id',
+    }.get(prediction_target, 'cuisine')
+
+    interactions = []
+
+    for _, row in orders_df.iterrows():
+        customer_id = str(row['customer_id'])
+        item = str(row.get(target_column, 'unknown'))
+        interactions.append((customer_id, item))
+
+    return interactions

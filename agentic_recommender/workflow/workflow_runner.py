@@ -344,6 +344,19 @@ class PipelineStages:
                     json.dump(stats, f, indent=2)
                 self.logger.file_write(stats_path, "Dataset statistics")
 
+            # Optionally load and save test data (for evaluation method 2)
+            if stage_cfg.settings.get('load_test_data', False):
+                test_output_path = stage_cfg.output.get('test_data')
+                if test_output_path:
+                    self.logger.info("Loading test data...")
+                    try:
+                        test_merged_df = loader.load_merged_test()
+                        Path(test_output_path).parent.mkdir(parents=True, exist_ok=True)
+                        test_merged_df.to_parquet(test_output_path)
+                        self.logger.file_write(test_output_path, f"{len(test_merged_df):,} test rows")
+                    except FileNotFoundError as e:
+                        self.logger.warning(f"Test data not found: {e}")
+
             # Save to global cache
             output_mapping = {
                 'merged_data': stage_cfg.output.get('merged_data'),
@@ -1512,14 +1525,18 @@ class PipelineStages:
                 EnhancedRerankEvaluator,
                 EnhancedRerankConfig,
                 build_test_samples,
+                build_test_samples_from_test_file,
             )
             from agentic_recommender.similarity.lightGCN import (
                 LightGCNEmbeddingManager,
                 LightGCNConfig,
+                filter_interactions_leave_last_out,
+                get_all_interactions,
             )
+            from agentic_recommender.similarity.methods import CuisineSwingMethod, CuisineSwingConfig
             from agentic_recommender.models.llm_provider import OpenRouterProvider
 
-            # Load merged data
+            # Load merged data (training data)
             input_path = stage_cfg.input.get('merged_data')
             self.logger.file_read(input_path, "Loading merged data for enhanced rerank evaluation")
             merged_df = pd.read_parquet(input_path)
@@ -1527,59 +1544,129 @@ class PipelineStages:
 
             # Get settings
             settings = stage_cfg.settings
+            evaluation_method = settings.get('evaluation_method', 'method1')
+            dataset_name = settings.get('dataset_name', 'data_se')
+            enable_basket_metrics = settings.get('enable_basket_metrics', True)
+            prediction_target = settings.get('prediction_target', 'cuisine')
+
             config = EnhancedRerankConfig(
                 n_candidates=settings.get('n_candidates', 20),
                 items_per_seed=settings.get('items_per_seed', 5),
-                dataset_name=settings.get('dataset_name', 'data_se'),
+                dataset_name=dataset_name,
                 lightgcn_epochs=settings.get('lightgcn_epochs', 50),
                 lightgcn_embedding_dim=settings.get('lightgcn_embedding_dim', 64),
                 temperature_round1=settings.get('temperature_round1', 0.3),
                 temperature_round2=settings.get('temperature_round2', 0.2),
                 n_samples=settings.get('n_samples', 10),
                 min_history=settings.get('min_history', 5),
+                evaluation_method=evaluation_method,
+                prediction_target=prediction_target,
+                enable_basket_metrics=enable_basket_metrics,
             )
 
-            # Build test samples
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("BUILDING TEST SAMPLES")
+            self.logger.info(f"EVALUATION METHOD: {evaluation_method.upper()}")
             self.logger.info("=" * 60)
 
-            test_samples = build_test_samples(
-                merged_df,
-                n_samples=config.n_samples,
-                min_history=config.min_history,
-            )
-            self.logger.success(f"Created {len(test_samples)} test samples")
+            # Build test samples and get interactions based on evaluation method
+            if evaluation_method == 'method1':
+                # Method 1: Leave-Last-Out on training data
+                self.logger.info("Method 1: Leave-Last-Out (excluding last order per user)")
 
-            # Save test samples
+                # Build test samples with basket support
+                test_samples = build_test_samples(
+                    merged_df,
+                    n_samples=config.n_samples,
+                    min_history=config.min_history,
+                    prediction_target=prediction_target,
+                    return_basket=enable_basket_metrics,
+                )
+                self.logger.success(f"Created {len(test_samples)} test samples (leave-last-out)")
+
+                # Get interactions excluding last order per user
+                interactions = filter_interactions_leave_last_out(
+                    merged_df,
+                    prediction_target=prediction_target,
+                )
+                self.logger.info(f"Training interactions (N-1 orders): {len(interactions)}")
+
+            elif evaluation_method == 'method2':
+                # Method 2: Full training + test file
+                self.logger.info("Method 2: Full Training + Test File Split")
+
+                # Load test data
+                test_data_path = stage_cfg.input.get('test_data')
+                if not test_data_path:
+                    self.logger.error("Method 2 requires test_data input path!")
+                    self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
+                    return False
+
+                self.logger.file_read(test_data_path, "Loading test data")
+                test_df = pd.read_parquet(test_data_path)
+                self.logger.info(f"Loaded {len(test_df):,} test rows")
+
+                # Build test samples from test file
+                test_samples = build_test_samples_from_test_file(
+                    train_df=merged_df,
+                    test_df=test_df,
+                    prediction_target=prediction_target,
+                )
+                self.logger.success(f"Created {len(test_samples)} test samples from test file")
+
+                # Get ALL interactions from training data
+                interactions = get_all_interactions(
+                    merged_df,
+                    prediction_target=prediction_target,
+                )
+                self.logger.info(f"Training interactions (all): {len(interactions)}")
+
+            else:
+                self.logger.error(f"Unknown evaluation method: {evaluation_method}")
+                self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
+                return False
+
+            # Save test samples (with custom serialization for sets)
             samples_path = stage_cfg.output.get('samples_json')
             if samples_path:
+                # Convert sets to lists for JSON serialization
+                serializable_samples = []
+                for sample in test_samples:
+                    s = sample.copy()
+                    if 'ground_truth_items' in s:
+                        s['ground_truth_items'] = list(s['ground_truth_items'])
+                    serializable_samples.append(s)
                 with open(samples_path, 'w') as f:
-                    json.dump(test_samples, f, indent=2)
+                    json.dump(serializable_samples, f, indent=2, default=str)
                 self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
 
-            # Build cuisine-cuisine swing candidate generator
+            # Build/load cuisine-cuisine swing model with method-specific cache
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("BUILDING CUISINE-CUISINE SWING MODEL")
+            self.logger.info(f"LOADING/TRAINING SWING MODEL ({evaluation_method} cache)")
             self.logger.info("=" * 60)
 
+            swing_config = CuisineSwingConfig(top_k=config.items_per_seed * 2)
+            swing_model = CuisineSwingMethod(swing_config)
+
+            if not swing_model.load_from_cache(dataset_name, evaluation_method):
+                self.logger.info("Training new Swing model...")
+                swing_model.fit(interactions)
+                swing_model.save_to_cache(dataset_name, evaluation_method)
+
+            # Create candidate generator with the swing model
             generator = CuisineBasedCandidateGenerator(config)
-            generator.fit(merged_df)
+            generator.swing_model = swing_model
+            generator._fitted = True
 
             gen_stats = generator.get_stats()
             self.logger.info(f"Generator stats: {gen_stats}")
 
-            # Build/load LightGCN embeddings
+            # Build/load LightGCN embeddings with method-specific cache
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("LOADING/TRAINING LIGHTGCN EMBEDDINGS")
+            self.logger.info(f"LOADING/TRAINING LIGHTGCN ({evaluation_method} cache)")
             self.logger.info("=" * 60)
-
-            # Get all (user_id, cuisine) interactions
-            interactions = generator.get_all_interactions(merged_df)
-            self.logger.info(f"Total interactions for LightGCN: {len(interactions)}")
 
             lightgcn_config = LightGCNConfig(
                 embedding_dim=config.lightgcn_embedding_dim,
@@ -1587,8 +1674,9 @@ class PipelineStages:
             )
             lightgcn_manager = LightGCNEmbeddingManager(lightgcn_config)
             lightgcn_manager.load_or_train(
-                dataset_name=config.dataset_name,
+                dataset_name=dataset_name,
                 interactions=interactions,
+                method=evaluation_method,
                 verbose=True
             )
 

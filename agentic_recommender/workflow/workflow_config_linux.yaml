@@ -21,8 +21,10 @@ workflow:
         merged_data: "outputs/stage1_merged_data.parquet"
         merged_preview: "outputs/stage1_merged_preview.json"  # Top 1000 rows for easy viewing
         stats: "outputs/stage1_stats.json"
+        test_data: "outputs/stage1_test_data.parquet"  # Test data for method2 evaluation
       settings:
         preview_rows: 1000  # Number of rows for JSON preview
+        load_test_data: true  # Load test file for method2 evaluation
 
     # Stage 2: Build enriched user representations
     # NOTE: Set max_users to null to process ALL users for auxiliary matrix calculation
@@ -125,17 +127,30 @@ workflow:
       description: "Two-round LLM reranking with LightGCN reflection"
       input:
         merged_data: "outputs/stage1_merged_data.parquet"
+        test_data: "outputs/stage1_test_data.parquet"  # For method2 only
       output:
         results_json: "outputs/stage8_enhanced_rerank_results.json"
         samples_json: "outputs/stage8_enhanced_rerank_samples.json"
         detailed_json: "outputs/stage8_enhanced_rerank_detailed.json"
       settings:
+        # Evaluation method configuration
+        # method1: Leave-last-out on training data (PureTrainingData)
+        # method2: Train on all training data, test on test file (FullHistoryTest)
+        evaluation_method: "method1"
+
+        # Dataset name for caching
+        dataset_name: "data_se"
+
+        # Basket prediction settings
+        prediction_target: "cuisine"  # cuisine, vendor, or product
+        enable_basket_metrics: true   # Multi-item evaluation
+        filter_seen_items: true       # Exclude items from history
+
         # Candidate generation (cuisine-to-cuisine swing)
         n_candidates: 20        # Total candidates to generate
         items_per_seed: 5       # Top-k similar cuisines per history cuisine
 
         # LightGCN settings
-        dataset_name: "data_se" # For cache file naming
         lightgcn_epochs: 50
         lightgcn_embedding_dim: 64
 
@@ -144,7 +159,7 @@ workflow:
         temperature_round2: 0.2  # Round 2: reflection
 
         # Test settings
-        n_samples: -1           # Number of test samples
+        n_samples: -1           # Number of test samples (-1 = all)
         min_history: 5          # Min orders per user
 
 # LLM Provider Configuration

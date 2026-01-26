@@ -485,23 +485,35 @@ def build_test_samples(
     n_samples: int = 10,
     min_history: int = 5,
     seed: int = 42,
+    prediction_target: str = "cuisine",
+    return_basket: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Build test samples for evaluation.
+    Build test samples for evaluation (Method 1: Leave-Last-Out).
 
     For each sample:
     - order_history: all orders except the last one
-    - ground_truth_cuisine: cuisine of the last order
+    - ground_truth_cuisine: cuisine of the last order (single item, backward compat)
+    - ground_truth_items: Set of all items in last order (if return_basket=True)
 
     Args:
         orders_df: DataFrame with order data
         n_samples: Number of test samples to create. Use -1 for all eligible samples.
         min_history: Minimum number of orders required for a user
         seed: Random seed for reproducibility
+        prediction_target: "cuisine", "vendor", or "product" level prediction
+        return_basket: If True, return all items in last order as ground_truth_items (Set)
     """
     random.seed(seed)
 
     DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    # Map prediction target to column
+    target_column = {
+        'cuisine': 'cuisine',
+        'vendor': 'vendor_id',
+        'product': 'product_id',
+    }.get(prediction_target, 'cuisine')
 
     # Find eligible customers
     customer_order_counts = orders_df.groupby('customer_id')['order_id'].nunique()
@@ -526,11 +538,20 @@ def build_test_samples(
         if 'day_num' in customer_data.columns:
             customer_data = customer_data.sort_values(['day_num', 'hour'])
 
-        # Get unique orders
+        # Get unique orders with their items
         orders = []
+        order_items: Dict[Any, Set[str]] = {}  # order_id -> set of items
         seen_orders = set()
+
         for _, row in customer_data.iterrows():
             order_id = row['order_id']
+            item = str(row.get(target_column, 'unknown'))
+
+            # Track items per order for basket
+            if order_id not in order_items:
+                order_items[order_id] = set()
+            order_items[order_id].add(item)
+
             if order_id in seen_orders:
                 continue
             seen_orders.add(order_id)
@@ -547,15 +568,155 @@ def build_test_samples(
             continue
 
         # Split: history = all but last, ground truth = last
-        # Include target hour/weekday from the ground truth order for prediction context
         last_order = orders[-1]
-        samples.append({
+        last_order_id = last_order['order_id']
+
+        sample = {
             'customer_id': customer_id,
             'order_history': orders[:-1],
-            'ground_truth_cuisine': last_order['cuisine'],
+            'ground_truth_cuisine': last_order['cuisine'],  # Backward compat
             'target_hour': last_order['hour'],
             'target_day_of_week': last_order['day_of_week'],
-        })
+        }
+
+        if return_basket:
+            # Get all items in the last order as ground truth basket
+            ground_truth_basket = order_items.get(last_order_id, {last_order['cuisine']})
+            sample['ground_truth_items'] = ground_truth_basket
+            sample['ground_truth_primary'] = last_order['cuisine']
+            sample['order_id'] = last_order_id
+            sample['basket_size'] = len(ground_truth_basket)
+
+        samples.append(sample)
+
+    return samples
+
+
+def build_test_samples_from_test_file(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    prediction_target: str = "cuisine",
+    seed: int = 42,
+) -> List[Dict[str, Any]]:
+    """
+    Build test samples using full training history + test orders (Method 2).
+
+    Each order in test_df becomes one test case.
+    Ground truth = set of items (cuisines) in that order (basket).
+
+    IMPORTANT: Only includes users that appear in BOTH train and test data.
+    Cold-start users (only in test) are skipped.
+
+    Args:
+        train_df: Training data DataFrame (full history)
+        test_df: Test data DataFrame (orders to predict)
+        prediction_target: "cuisine", "vendor", or "product"
+        seed: Random seed
+
+    Returns:
+        List of samples with:
+        - customer_id
+        - order_history: ALL orders from training data
+        - ground_truth_items: Set[str] of items in test order
+        - ground_truth_primary: str - primary item (for backward compat)
+        - target_hour, target_day_of_week
+        - order_id (for grouping)
+        - basket_size
+    """
+    random.seed(seed)
+
+    DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    # Map prediction target to column
+    target_column = {
+        'cuisine': 'cuisine',
+        'vendor': 'vendor_id',
+        'product': 'product_id',
+    }.get(prediction_target, 'cuisine')
+
+    # Get users in training data
+    train_users = set(train_df['customer_id'].unique())
+
+    # Get users in test data
+    test_users = set(test_df['customer_id'].unique())
+
+    # Only process users that appear in BOTH
+    valid_users = train_users & test_users
+    cold_start_users = test_users - train_users
+
+    if cold_start_users:
+        print(f"[build_test_samples_from_test_file] Skipping {len(cold_start_users)} cold-start users (only in test)")
+
+    print(f"[build_test_samples_from_test_file] Processing {len(valid_users)} users with training history")
+
+    # Build training history for each user
+    user_histories: Dict[Any, List[Dict]] = {}
+
+    for customer_id in valid_users:
+        customer_train = train_df[train_df['customer_id'] == customer_id]
+
+        # Sort by time
+        if 'day_num' in customer_train.columns:
+            customer_train = customer_train.sort_values(['day_num', 'hour'])
+
+        # Get unique orders
+        orders = []
+        seen_orders = set()
+
+        for _, row in customer_train.iterrows():
+            order_id = row['order_id']
+            if order_id in seen_orders:
+                continue
+            seen_orders.add(order_id)
+
+            orders.append({
+                'order_id': order_id,
+                'vendor_id': str(row.get('vendor_id', '')),
+                'cuisine': row.get('cuisine', 'unknown'),
+                'day_of_week': int(row.get('day_of_week', 0)),
+                'hour': int(row.get('hour', 12)),
+            })
+
+        user_histories[customer_id] = orders
+
+    # Build test samples from test orders
+    samples = []
+
+    # Get unique test orders
+    test_order_ids = test_df['order_id'].unique()
+
+    for test_order_id in test_order_ids:
+        order_data = test_df[test_df['order_id'] == test_order_id]
+        customer_id = order_data['customer_id'].iloc[0]
+
+        # Skip cold-start users
+        if customer_id not in valid_users:
+            continue
+
+        # Get all items in this test order (basket)
+        ground_truth_items = set(str(item) for item in order_data[target_column].unique())
+
+        # Get first row for metadata
+        first_row = order_data.iloc[0]
+
+        sample = {
+            'customer_id': customer_id,
+            'order_history': user_histories[customer_id],
+            'ground_truth_items': ground_truth_items,
+            'ground_truth_primary': str(first_row.get(target_column, 'unknown')),
+            'ground_truth_cuisine': str(first_row.get('cuisine', 'unknown')),  # Backward compat
+            'target_hour': int(first_row.get('hour', 12)),
+            'target_day_of_week': int(first_row.get('day_of_week', 0)),
+            'order_id': test_order_id,
+            'basket_size': len(ground_truth_items),
+        }
+
+        samples.append(sample)
+
+    # Shuffle for randomness
+    random.shuffle(samples)
+
+    print(f"[build_test_samples_from_test_file] Created {len(samples)} test samples")
 
     return samples
 
@@ -587,6 +748,14 @@ class EnhancedRerankConfig:
     min_history: int = 5
     seed: int = 42
 
+    # Evaluation method
+    evaluation_method: str = "method1"  # "method1" (leave-last-out) or "method2" (train-test split)
+
+    # Basket prediction settings
+    prediction_target: str = "cuisine"  # "cuisine", "vendor", or "product"
+    enable_basket_metrics: bool = True  # Multi-item evaluation
+    filter_seen_items: bool = True      # Exclude items from history
+
 
 @dataclass
 class EnhancedRerankMetrics:
@@ -599,7 +768,7 @@ class EnhancedRerankMetrics:
     mrr_at_5: float = 0.0
     mrr_at_10: float = 0.0
 
-    # Hit Rate metrics
+    # Hit Rate metrics (single-item)
     hit_at_1: float = 0.0
     hit_at_3: float = 0.0
     hit_at_5: float = 0.0
@@ -609,6 +778,18 @@ class EnhancedRerankMetrics:
     round1_hit_at_5: float = 0.0
     final_hit_at_5: float = 0.0
     improvement: float = 0.0
+
+    # Basket metrics (multi-item ground truth)
+    basket_hit_at_5: float = 0.0
+    basket_hit_at_10: float = 0.0
+    basket_recall_at_5: float = 0.0
+    basket_recall_at_10: float = 0.0
+    basket_precision_at_5: float = 0.0
+    basket_precision_at_10: float = 0.0
+    basket_ndcg_at_5: float = 0.0
+    basket_ndcg_at_10: float = 0.0
+    basket_mrr: float = 0.0
+    avg_basket_size: float = 0.0
 
     # Statistics
     total_samples: int = 0
@@ -629,6 +810,18 @@ class EnhancedRerankMetrics:
             'round1_hit@5': self.round1_hit_at_5,
             'final_hit@5': self.final_hit_at_5,
             'improvement': self.improvement,
+            # Basket metrics
+            'basket_hit@5': self.basket_hit_at_5,
+            'basket_hit@10': self.basket_hit_at_10,
+            'basket_recall@5': self.basket_recall_at_5,
+            'basket_recall@10': self.basket_recall_at_10,
+            'basket_precision@5': self.basket_precision_at_5,
+            'basket_precision@10': self.basket_precision_at_10,
+            'basket_ndcg@5': self.basket_ndcg_at_5,
+            'basket_ndcg@10': self.basket_ndcg_at_10,
+            'basket_mrr': self.basket_mrr,
+            'avg_basket_size': self.avg_basket_size,
+            # Statistics
             'total_samples': self.total_samples,
             'valid_samples': self.valid_samples,
             'avg_time_ms': self.avg_time_ms,
@@ -636,6 +829,19 @@ class EnhancedRerankMetrics:
         }
 
     def __str__(self) -> str:
+        basket_str = ""
+        if self.avg_basket_size > 0:
+            basket_str = f"""
+  --- Basket Metrics ---
+  Basket Hit@5:      {self.basket_hit_at_5:.2%}
+  Basket Hit@10:     {self.basket_hit_at_10:.2%}
+  Basket Recall@5:   {self.basket_recall_at_5:.4f}
+  Basket Recall@10:  {self.basket_recall_at_10:.4f}
+  Basket NDCG@5:     {self.basket_ndcg_at_5:.4f}
+  Basket NDCG@10:    {self.basket_ndcg_at_10:.4f}
+  Basket MRR:        {self.basket_mrr:.4f}
+  Avg Basket Size:   {self.avg_basket_size:.2f}"""
+
         return f"""Enhanced Rerank Evaluation Results:
   NDCG@5:       {self.ndcg_at_5:.4f}
   NDCG@10:      {self.ndcg_at_10:.4f}
@@ -647,7 +853,7 @@ class EnhancedRerankMetrics:
   Hit@10:       {self.hit_at_10:.2%}
   Round1 Hit@5: {self.round1_hit_at_5:.2%}
   Final Hit@5:  {self.final_hit_at_5:.2%}
-  Improvement:  {self.improvement:.2%}
+  Improvement:  {self.improvement:.2%}{basket_str}
   GT in Candidates: {self.gt_in_candidates:.2%}
   Samples: {self.valid_samples}/{self.total_samples}"""
 
@@ -1149,14 +1355,22 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         test_samples: List[Dict],
         total_time: float
     ) -> EnhancedRerankMetrics:
-        """Compute aggregate metrics."""
+        """Compute aggregate metrics including basket metrics."""
+        from .basket_metrics import (
+            compute_basket_hit,
+            compute_basket_recall,
+            compute_basket_precision,
+            compute_basket_ndcg,
+            compute_basket_mrr,
+        )
+
         valid = [r for r in results if r['final_rank'] > 0]
         n = len(valid)
 
         if n == 0:
             return EnhancedRerankMetrics(total_samples=len(test_samples))
 
-        # NDCG helper
+        # NDCG helper (single-item)
         def dcg(rank, k):
             if rank <= 0 or rank > k:
                 return 0.0
@@ -1168,18 +1382,76 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             ideal_dcg = 1.0  # Perfect rank = 1
             return sum(dcg_scores) / (len(ranks) * ideal_dcg) if ranks else 0.0
 
-        # MRR helper
+        # MRR helper (single-item)
         def mrr(ranks, k):
             scores = [1.0/r if 0 < r <= k else 0.0 for r in ranks]
             return sum(scores) / len(scores) if scores else 0.0
 
-        # Hit rate helper
+        # Hit rate helper (single-item)
         def hit_rate(ranks, k):
             hits = [1 if 0 < r <= k else 0 for r in ranks]
             return sum(hits) / len(hits) if hits else 0.0
 
         final_ranks = [r['final_rank'] for r in valid]
         r1_ranks = [r['round1_rank'] for r in valid]
+
+        # Compute basket metrics if samples have ground_truth_items
+        basket_hit_5, basket_hit_10 = 0.0, 0.0
+        basket_recall_5, basket_recall_10 = 0.0, 0.0
+        basket_precision_5, basket_precision_10 = 0.0, 0.0
+        basket_ndcg_5, basket_ndcg_10 = 0.0, 0.0
+        basket_mrr_val = 0.0
+        avg_basket_size = 0.0
+
+        # Check if we have basket ground truth in test samples
+        has_basket = any('ground_truth_items' in s for s in test_samples)
+
+        if has_basket:
+            basket_hits_5 = []
+            basket_hits_10 = []
+            basket_recalls_5 = []
+            basket_recalls_10 = []
+            basket_precisions_5 = []
+            basket_precisions_10 = []
+            basket_ndcgs_5 = []
+            basket_ndcgs_10 = []
+            basket_mrrs = []
+            basket_sizes = []
+
+            # Match results with test samples by customer_id
+            sample_map = {s['customer_id']: s for s in test_samples}
+
+            for r in valid:
+                customer_id = r['customer_id']
+                sample = sample_map.get(customer_id)
+
+                if sample and 'ground_truth_items' in sample:
+                    gt_items = sample['ground_truth_items']
+                    predictions = r.get('final_ranking', [])
+
+                    basket_hits_5.append(compute_basket_hit(predictions, gt_items, 5))
+                    basket_hits_10.append(compute_basket_hit(predictions, gt_items, 10))
+                    basket_recalls_5.append(compute_basket_recall(predictions, gt_items, 5))
+                    basket_recalls_10.append(compute_basket_recall(predictions, gt_items, 10))
+                    basket_precisions_5.append(compute_basket_precision(predictions, gt_items, 5))
+                    basket_precisions_10.append(compute_basket_precision(predictions, gt_items, 10))
+                    basket_ndcgs_5.append(compute_basket_ndcg(predictions, gt_items, 5))
+                    basket_ndcgs_10.append(compute_basket_ndcg(predictions, gt_items, 10))
+                    basket_mrrs.append(compute_basket_mrr(predictions, gt_items))
+                    basket_sizes.append(len(gt_items))
+
+            if basket_hits_5:
+                n_basket = len(basket_hits_5)
+                basket_hit_5 = sum(basket_hits_5) / n_basket
+                basket_hit_10 = sum(basket_hits_10) / n_basket
+                basket_recall_5 = sum(basket_recalls_5) / n_basket
+                basket_recall_10 = sum(basket_recalls_10) / n_basket
+                basket_precision_5 = sum(basket_precisions_5) / n_basket
+                basket_precision_10 = sum(basket_precisions_10) / n_basket
+                basket_ndcg_5 = sum(basket_ndcgs_5) / n_basket
+                basket_ndcg_10 = sum(basket_ndcgs_10) / n_basket
+                basket_mrr_val = sum(basket_mrrs) / n_basket
+                avg_basket_size = sum(basket_sizes) / n_basket
 
         metrics = EnhancedRerankMetrics(
             ndcg_at_5=sum(dcg(r, 5) for r in final_ranks) / n,
@@ -1193,6 +1465,18 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             round1_hit_at_5=hit_rate(r1_ranks, 5),
             final_hit_at_5=hit_rate(final_ranks, 5),
             improvement=hit_rate(final_ranks, 5) - hit_rate(r1_ranks, 5),
+            # Basket metrics
+            basket_hit_at_5=basket_hit_5,
+            basket_hit_at_10=basket_hit_10,
+            basket_recall_at_5=basket_recall_5,
+            basket_recall_at_10=basket_recall_10,
+            basket_precision_at_5=basket_precision_5,
+            basket_precision_at_10=basket_precision_10,
+            basket_ndcg_at_5=basket_ndcg_5,
+            basket_ndcg_at_10=basket_ndcg_10,
+            basket_mrr=basket_mrr_val,
+            avg_basket_size=avg_basket_size,
+            # Statistics
             total_samples=len(test_samples),
             valid_samples=n,
             avg_time_ms=total_time / len(test_samples) if test_samples else 0,

@@ -19,6 +19,7 @@ class DataConfig:
     """Configuration for data loading."""
     data_dir: Path
     orders_file: str = "orders_se_train.txt"
+    orders_test_file: str = "orders_se_test.txt"  # Test orders file
     vendors_file: str = "vendors_se.txt"
     products_file: str = "products_se.txt"
 
@@ -45,9 +46,11 @@ class EnrichedDataLoader:
     def __init__(self, config: DataConfig):
         self.config = config
         self._orders: Optional[pd.DataFrame] = None
+        self._orders_test: Optional[pd.DataFrame] = None
         self._vendors: Optional[pd.DataFrame] = None
         self._products: Optional[pd.DataFrame] = None
         self._merged: Optional[pd.DataFrame] = None
+        self._merged_test: Optional[pd.DataFrame] = None
 
     def load_orders(self) -> pd.DataFrame:
         """Load orders data."""
@@ -135,6 +138,71 @@ class EnrichedDataLoader:
 
         self._merged = merged
         return self._merged
+
+    def load_test_orders(self) -> pd.DataFrame:
+        """Load test orders data."""
+        if self._orders_test is None:
+            path = self.config.data_dir / self.config.orders_test_file
+            if not path.exists():
+                raise FileNotFoundError(f"Test orders file not found: {path}")
+
+            self._orders_test = pd.read_csv(path)
+
+            if self.config.parse_time:
+                self._orders_test = self._parse_time_columns(self._orders_test)
+
+            if self.config.compute_day_name:
+                self._orders_test['day_name'] = self._orders_test['day_of_week'].apply(
+                    lambda x: self.DAY_NAMES[x] if 0 <= x <= 6 else 'Unknown'
+                )
+
+        return self._orders_test
+
+    def load_merged_test(self) -> pd.DataFrame:
+        """
+        Load and merge test data with vendor/product info.
+
+        Uses same merge logic as load_merged() but with test orders.
+        """
+        if self._merged_test is not None:
+            return self._merged_test
+
+        orders = self.load_test_orders()
+        vendors = self.load_vendors()
+        products = self.load_products()
+
+        # Merge orders with vendors
+        merged = orders.merge(
+            vendors[['vendor_id', 'primary_cuisine', 'geohash', 'chain_id']],
+            on='vendor_id',
+            how='left',
+            suffixes=('', '_vendor')
+        )
+
+        # Rename geohash columns for clarity
+        merged = merged.rename(columns={
+            'geohash': 'user_geohash',
+            'geohash_vendor': 'vendor_geohash',
+            'primary_cuisine': 'cuisine'
+        })
+
+        # Merge with products
+        merged = merged.merge(
+            products[['vendor_id', 'product_id', 'name', 'unit_price']],
+            on=['vendor_id', 'product_id'],
+            how='left'
+        )
+        merged = merged.rename(columns={'name': 'product_name'})
+
+        # Fill missing values
+        merged['cuisine'] = merged['cuisine'].fillna('unknown')
+        merged['vendor_geohash'] = merged['vendor_geohash'].fillna('unknown')
+        merged['chain_id'] = merged['chain_id'].fillna('')
+        merged['product_name'] = merged['product_name'].fillna('Unknown Product')
+        merged['unit_price'] = merged['unit_price'].fillna(0.0)
+
+        self._merged_test = merged
+        return self._merged_test
 
     def _parse_time_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Parse time-related columns."""
