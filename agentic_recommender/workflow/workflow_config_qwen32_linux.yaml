@@ -142,7 +142,7 @@ workflow:
         dataset_name: "data_se"
 
         # Basket prediction settings
-        prediction_target: "cuisine"  # cuisine, vendor, or product
+        prediction_target: "cuisine"  # cuisine, vendor, product, or vendor_cuisine
         enable_basket_metrics: true   # Multi-item evaluation
         filter_seen_items: true       # Exclude items from history
 

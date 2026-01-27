@@ -144,7 +144,9 @@ class AsyncRerankEvaluator:
                 # Use tqdm for progress
                 with async_tqdm(total=len(pending), desc="Evaluating") as pbar:
                     prev_count = 0
-                    while not queue.empty() or any(not w.done() for w in workers):
+                    # Wait until all items processed (progress_count equals total)
+                    # Note: Can't check workers.done() - they run forever until cancelled
+                    while self._progress_count < len(pending):
                         await asyncio.sleep(0.5)
                         new_count = self._progress_count
                         if new_count > prev_count:
