@@ -276,24 +276,25 @@ class CuisineSwingConfig(SimilarityConfig):
 
 class CuisineSwingMethod(SimilarityMethod):
     """
-    Cuisine-to-Cuisine Swing similarity.
+    Cuisine-to-Cuisine Swing similarity (also supports vendor_cuisine items).
 
-    Operates at CUISINE level (not vendor level).
+    Operates at ITEM level (cuisine or vendor_cuisine).
 
     Formula:
-    sim(c1, c2) = Σ(u ∈ common_users) 1 / ((|U(c1)|+α1)^β × (|U(c2)|+α1)^β × (|C(u)|+α2))
+    sim(i1, i2) = Σ(u ∈ common_users) 1 / ((|U(i1)|+α1)^β × (|U(i2)|+α1)^β × (|I(u)|+α2))
 
     Where:
-    - U(c) = users who ordered cuisine c
-    - C(u) = cuisines ordered by user u
+    - U(i) = users who ordered item i
+    - I(u) = items ordered by user u
     """
 
     CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "swing"
 
-    def __init__(self, config: CuisineSwingConfig = None):
+    def __init__(self, config: CuisineSwingConfig = None, prediction_target: str = "cuisine"):
         super().__init__(config or CuisineSwingConfig())
-        self.cuisine_users: Dict[str, Set[str]] = {}  # cuisine -> set of user_ids
-        self.user_cuisines: Dict[str, Set[str]] = {}  # user_id -> set of cuisines
+        self.prediction_target = prediction_target
+        self.cuisine_users: Dict[str, Set[str]] = {}  # item -> set of user_ids
+        self.user_cuisines: Dict[str, Set[str]] = {}  # user_id -> set of items
 
     def save_to_cache(self, dataset_name: str, method: str = "full") -> bool:
         """
@@ -305,25 +306,50 @@ class CuisineSwingMethod(SimilarityMethod):
 
         Returns:
             True if save succeeded
+
+        Cache naming:
+            - {dataset}_{method}_{target}_swing.pkl (with method and non-cuisine target)
+            - {dataset}_{method}_swing.pkl (with method, cuisine target)
+            - {dataset}_{target}_swing.pkl (no method, non-cuisine target)
+            - {dataset}_swing.pkl (no method, cuisine target - legacy)
         """
         try:
             self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            if method and method != "full":
-                cache_path = self.CACHE_DIR / f"{dataset_name}_{method}_swing.pkl"
-            else:
-                cache_path = self.CACHE_DIR / f"{dataset_name}_swing.pkl"
+            cache_path = self._get_cache_path(dataset_name, method)
 
             with open(cache_path, 'wb') as f:
                 pickle.dump({
                     'cuisine_users': self.cuisine_users,
                     'user_cuisines': self.user_cuisines,
                     'config': self.config,
+                    'prediction_target': self.prediction_target,
                 }, f)
             print(f"[CuisineSwingMethod] Saved to cache: {cache_path}")
             return True
         except Exception as e:
             print(f"[CuisineSwingMethod] Failed to save cache: {e}")
             return False
+
+    def _get_cache_path(self, dataset_name: str, method: str = "full") -> Path:
+        """
+        Get cache file path for dataset, method, and prediction target.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method ("method1", "method2", or "full")
+
+        Returns:
+            Path to cache file
+        """
+        # Build cache filename with prediction_target for non-default targets
+        if method and method != "full":
+            if self.prediction_target and self.prediction_target != "cuisine":
+                return self.CACHE_DIR / f"{dataset_name}_{method}_{self.prediction_target}_swing.pkl"
+            return self.CACHE_DIR / f"{dataset_name}_{method}_swing.pkl"
+        else:
+            if self.prediction_target and self.prediction_target != "cuisine":
+                return self.CACHE_DIR / f"{dataset_name}_{self.prediction_target}_swing.pkl"
+            return self.CACHE_DIR / f"{dataset_name}_swing.pkl"
 
     def load_from_cache(self, dataset_name: str, method: str = "full") -> bool:
         """
@@ -337,10 +363,7 @@ class CuisineSwingMethod(SimilarityMethod):
             True if cache load succeeded
         """
         try:
-            if method and method != "full":
-                cache_path = self.CACHE_DIR / f"{dataset_name}_{method}_swing.pkl"
-            else:
-                cache_path = self.CACHE_DIR / f"{dataset_name}_swing.pkl"
+            cache_path = self._get_cache_path(dataset_name, method)
 
             if not cache_path.exists():
                 return False
@@ -350,6 +373,9 @@ class CuisineSwingMethod(SimilarityMethod):
 
             self.cuisine_users = data['cuisine_users']
             self.user_cuisines = data['user_cuisines']
+            # Load prediction_target if saved (backward compat)
+            if 'prediction_target' in data:
+                self.prediction_target = data['prediction_target']
             self._fitted = True
             print(f"[CuisineSwingMethod] Loaded from cache: {cache_path}")
             return True

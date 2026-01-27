@@ -493,7 +493,7 @@ def build_test_samples(
 
     For each sample:
     - order_history: all orders except the last one
-    - ground_truth_cuisine: cuisine of the last order (single item, backward compat)
+    - ground_truth_cuisine: item of the last order (single item, backward compat)
     - ground_truth_items: Set of all items in last order (if return_basket=True)
 
     Args:
@@ -501,19 +501,25 @@ def build_test_samples(
         n_samples: Number of test samples to create. Use -1 for all eligible samples.
         min_history: Minimum number of orders required for a user
         seed: Random seed for reproducibility
-        prediction_target: "cuisine", "vendor", or "product" level prediction
+        prediction_target: "cuisine", "vendor", "product", or "vendor_cuisine"
         return_basket: If True, return all items in last order as ground_truth_items (Set)
     """
+    from ..similarity.item_algorithm import VendorCuisineItemAlgorithm
+
     random.seed(seed)
 
     DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-    # Map prediction target to column
+    # Map prediction target to column (None = special handling)
     target_column = {
         'cuisine': 'cuisine',
         'vendor': 'vendor_id',
         'product': 'product_id',
+        'vendor_cuisine': None,  # Special handling below
     }.get(prediction_target, 'cuisine')
+
+    # For vendor_cuisine, create the algorithm instance
+    vendor_cuisine_algo = VendorCuisineItemAlgorithm() if prediction_target == 'vendor_cuisine' else None
 
     # Find eligible customers
     customer_order_counts = orders_df.groupby('customer_id')['order_id'].nunique()
@@ -545,7 +551,12 @@ def build_test_samples(
 
         for _, row in customer_data.iterrows():
             order_id = row['order_id']
-            item = str(row.get(target_column, 'unknown'))
+
+            # Extract item based on prediction_target
+            if prediction_target == 'vendor_cuisine':
+                item = vendor_cuisine_algo.extract_item_from_row(row)
+            else:
+                item = str(row.get(target_column, 'unknown'))
 
             # Track items per order for basket
             if order_id not in order_items:
@@ -556,13 +567,18 @@ def build_test_samples(
                 continue
             seen_orders.add(order_id)
 
-            orders.append({
+            # Store the item in the order dict for vendor_cuisine mode
+            order_entry = {
                 'order_id': order_id,
                 'vendor_id': str(row.get('vendor_id', '')),
                 'cuisine': row.get('cuisine', 'unknown'),
                 'day_of_week': int(row.get('day_of_week', 0)),
                 'hour': int(row.get('hour', 12)),
-            })
+            }
+            # For vendor_cuisine, also store the composite item
+            if prediction_target == 'vendor_cuisine':
+                order_entry['item'] = item
+            orders.append(order_entry)
 
         if len(orders) < min_history:
             continue
@@ -571,19 +587,25 @@ def build_test_samples(
         last_order = orders[-1]
         last_order_id = last_order['order_id']
 
+        # Determine ground truth item
+        if prediction_target == 'vendor_cuisine':
+            ground_truth_item = last_order.get('item', f"{last_order['vendor_id']}||{last_order['cuisine']}")
+        else:
+            ground_truth_item = last_order['cuisine']
+
         sample = {
             'customer_id': customer_id,
             'order_history': orders[:-1],
-            'ground_truth_cuisine': last_order['cuisine'],  # Backward compat
+            'ground_truth_cuisine': ground_truth_item,  # Primary ground truth item
             'target_hour': last_order['hour'],
             'target_day_of_week': last_order['day_of_week'],
         }
 
         if return_basket:
             # Get all items in the last order as ground truth basket
-            ground_truth_basket = order_items.get(last_order_id, {last_order['cuisine']})
+            ground_truth_basket = order_items.get(last_order_id, {ground_truth_item})
             sample['ground_truth_items'] = ground_truth_basket
-            sample['ground_truth_primary'] = last_order['cuisine']
+            sample['ground_truth_primary'] = ground_truth_item
             sample['order_id'] = last_order_id
             sample['basket_size'] = len(ground_truth_basket)
 
@@ -604,7 +626,7 @@ def build_test_samples_from_test_file(
     Build test samples using full training history + test orders (Method 2).
 
     Each order in test_df becomes one test case.
-    Ground truth = set of items (cuisines) in that order (basket).
+    Ground truth = set of items in that order (basket).
 
     IMPORTANT: Only includes users that appear in BOTH train and test data.
     Cold-start users (only in test) are skipped.
@@ -615,7 +637,7 @@ def build_test_samples_from_test_file(
     Args:
         train_df: Training data DataFrame (full history)
         test_df: Test data DataFrame (orders to predict)
-        prediction_target: "cuisine", "vendor", or "product"
+        prediction_target: "cuisine", "vendor", "product", or "vendor_cuisine"
         seed: Random seed (used only if deterministic=False)
         n_samples: Number of samples to return (-1 = all samples)
         deterministic: If True, sort by order_id for reproducibility
@@ -630,16 +652,22 @@ def build_test_samples_from_test_file(
         - order_id (for grouping)
         - basket_size
     """
+    from ..similarity.item_algorithm import VendorCuisineItemAlgorithm
+
     random.seed(seed)
 
     DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-    # Map prediction target to column
+    # Map prediction target to column (None = special handling)
     target_column = {
         'cuisine': 'cuisine',
         'vendor': 'vendor_id',
         'product': 'product_id',
+        'vendor_cuisine': None,  # Special handling below
     }.get(prediction_target, 'cuisine')
+
+    # For vendor_cuisine, create the algorithm instance
+    vendor_cuisine_algo = VendorCuisineItemAlgorithm() if prediction_target == 'vendor_cuisine' else None
 
     # Get users in training data
     train_users = set(train_df['customer_id'].unique())
@@ -676,13 +704,17 @@ def build_test_samples_from_test_file(
                 continue
             seen_orders.add(order_id)
 
-            orders.append({
+            order_entry = {
                 'order_id': order_id,
                 'vendor_id': str(row.get('vendor_id', '')),
                 'cuisine': row.get('cuisine', 'unknown'),
                 'day_of_week': int(row.get('day_of_week', 0)),
                 'hour': int(row.get('hour', 12)),
-            })
+            }
+            # For vendor_cuisine, also store the composite item
+            if prediction_target == 'vendor_cuisine':
+                order_entry['item'] = vendor_cuisine_algo.extract_item_from_row(row)
+            orders.append(order_entry)
 
         user_histories[customer_id] = orders
 
@@ -701,17 +733,24 @@ def build_test_samples_from_test_file(
             continue
 
         # Get all items in this test order (basket)
-        ground_truth_items = set(str(item) for item in order_data[target_column].unique())
-
-        # Get first row for metadata
-        first_row = order_data.iloc[0]
+        if prediction_target == 'vendor_cuisine':
+            ground_truth_items = set()
+            for _, row in order_data.iterrows():
+                item = vendor_cuisine_algo.extract_item_from_row(row)
+                ground_truth_items.add(item)
+            first_row = order_data.iloc[0]
+            primary_item = vendor_cuisine_algo.extract_item_from_row(first_row)
+        else:
+            ground_truth_items = set(str(item) for item in order_data[target_column].unique())
+            first_row = order_data.iloc[0]
+            primary_item = str(first_row.get(target_column, 'unknown'))
 
         sample = {
             'customer_id': customer_id,
             'order_history': user_histories[customer_id],
             'ground_truth_items': ground_truth_items,
-            'ground_truth_primary': str(first_row.get(target_column, 'unknown')),
-            'ground_truth_cuisine': str(first_row.get('cuisine', 'unknown')),  # Backward compat
+            'ground_truth_primary': primary_item,
+            'ground_truth_cuisine': primary_item,  # Backward compat - use the item
             'target_hour': int(first_row.get('hour', 12)),
             'target_day_of_week': int(first_row.get('day_of_week', 0)),
             'order_id': test_order_id,
@@ -1051,44 +1090,58 @@ class EnhancedRerankMetrics:
 
 class CuisineBasedCandidateGenerator:
     """
-    Generate candidate cuisines using cuisine-to-cuisine swing similarity.
+    Generate candidate items using item-to-item swing similarity.
+
+    Supports both cuisine and vendor_cuisine prediction targets.
 
     Process:
     1. Get user's n-1 purchase history (excluding ground truth)
-    2. Deduplicate to unique cuisines
-    3. For each unique cuisine, get top-k similar cuisines
+    2. Deduplicate to unique items
+    3. For each unique item, get top-k similar items
     4. Combine all, deduplicate by max score, return top 20
     """
 
     def __init__(self, config: EnhancedRerankConfig = None):
         self.config = config or EnhancedRerankConfig()
-        self.swing_model = CuisineSwingMethod(CuisineSwingConfig(
-            top_k=self.config.items_per_seed * 2  # Get extra for dedup
-        ))
+        self.prediction_target = getattr(config, 'prediction_target', 'cuisine')
+        self.swing_model = CuisineSwingMethod(
+            CuisineSwingConfig(top_k=self.config.items_per_seed * 2),
+            prediction_target=self.prediction_target
+        )
         self._fitted = False
 
     def fit(self, orders_df: pd.DataFrame):
         """
-        Build cuisine-cuisine swing model from orders.
+        Build item-to-item swing model from orders.
 
         Args:
-            orders_df: DataFrame with customer_id, order_id, cuisine columns
+            orders_df: DataFrame with customer_id, order_id, cuisine, vendor_id columns
         """
-        # Build (user_id, cuisine) interactions
+        from ..similarity.item_algorithm import VendorCuisineItemAlgorithm
+
+        # Build (user_id, item) interactions
         interactions = []
 
-        # Get unique cuisine per order (not per item)
-        order_cuisines = orders_df.groupby(['customer_id', 'order_id'])['cuisine'].first()
+        if self.prediction_target == 'vendor_cuisine':
+            # For vendor_cuisine: extract vendor_id||cuisine per row
+            algo = VendorCuisineItemAlgorithm()
+            # Get unique item per order (first item in each order)
+            for (customer_id, order_id), group in orders_df.groupby(['customer_id', 'order_id']):
+                first_row = group.iloc[0]
+                item = algo.extract_item_from_row(first_row)
+                interactions.append((str(customer_id), item))
+        else:
+            # For cuisine: get unique cuisine per order (not per item)
+            order_cuisines = orders_df.groupby(['customer_id', 'order_id'])['cuisine'].first()
+            for (customer_id, _), cuisine in order_cuisines.items():
+                interactions.append((str(customer_id), cuisine))
 
-        for (customer_id, _), cuisine in order_cuisines.items():
-            interactions.append((str(customer_id), cuisine))
-
-        print(f"[CuisineBasedGenerator] Building swing model from {len(interactions)} interactions...")
+        print(f"[CuisineBasedGenerator] Building swing model from {len(interactions)} interactions (target={self.prediction_target})...")
         self.swing_model.fit(interactions)
         self._fitted = True
 
         stats = self.swing_model.get_stats()
-        print(f"[CuisineBasedGenerator] Fitted: {stats['num_cuisines']} cuisines, {stats['num_users']} users")
+        print(f"[CuisineBasedGenerator] Fitted: {stats['num_cuisines']} items, {stats['num_users']} users")
 
     def generate_candidates(
         self,
@@ -1096,17 +1149,20 @@ class CuisineBasedCandidateGenerator:
         ground_truth: str = None,
     ) -> Tuple[List[str], Dict[str, Any]]:
         """
-        Generate candidate cuisines from user's cuisine history.
+        Generate candidate items from user's item history.
 
         Args:
-            cuisine_history: List of cuisines the user ordered (n-1, excluding last)
-            ground_truth: The actual next cuisine (for evaluation)
+            cuisine_history: List of items the user ordered (n-1, excluding last)
+                            For cuisine mode: ["Thai", "Chinese", ...]
+                            For vendor_cuisine mode: ["V123||Thai", "V456||Chinese", ...]
+            ground_truth: The actual next item (for evaluation)
 
         Returns:
             Tuple of (candidate_list, debug_info)
         """
         debug_info = {
-            'history_cuisines': [],
+            'history_items': [],
+            'history_cuisines': [],  # Backward compat alias
             'candidates_per_seed': {},
             'ground_truth_added': False,
             'ground_truth_rank': -1,
@@ -1116,18 +1172,19 @@ class CuisineBasedCandidateGenerator:
             return [], debug_info
 
         # Deduplicate history while preserving order (most recent first could be weighted)
-        unique_cuisines = list(dict.fromkeys(cuisine_history))
-        debug_info['history_cuisines'] = unique_cuisines
+        unique_items = list(dict.fromkeys(cuisine_history))
+        debug_info['history_items'] = unique_items
+        debug_info['history_cuisines'] = unique_items  # Backward compat
 
         # Get candidates using swing similarity
         candidates_with_scores = self.swing_model.get_candidates_for_history(
-            cuisine_history=unique_cuisines,
+            cuisine_history=unique_items,
             items_per_seed=self.config.items_per_seed,
             total_candidates=self.config.n_candidates
         )
 
         # Store debug info
-        for seed in unique_cuisines:
+        for seed in unique_items:
             similar = self.swing_model.get_similar_cuisines(seed, top_k=self.config.items_per_seed)
             debug_info['candidates_per_seed'][seed] = [(c, round(s, 4)) for c, s in similar]
 
@@ -1155,16 +1212,30 @@ class CuisineBasedCandidateGenerator:
         return candidates, debug_info
 
     def get_all_interactions(self, orders_df: pd.DataFrame) -> List[Tuple[str, str]]:
-        """Extract all (user_id, cuisine) interactions from orders."""
+        """Extract all (user_id, item) interactions from orders."""
+        from ..similarity.item_algorithm import VendorCuisineItemAlgorithm
+
         interactions = []
-        order_cuisines = orders_df.groupby(['customer_id', 'order_id'])['cuisine'].first()
-        for (customer_id, _), cuisine in order_cuisines.items():
-            interactions.append((str(customer_id), cuisine))
+
+        if self.prediction_target == 'vendor_cuisine':
+            # For vendor_cuisine: extract vendor_id||cuisine per row
+            algo = VendorCuisineItemAlgorithm()
+            for (customer_id, order_id), group in orders_df.groupby(['customer_id', 'order_id']):
+                first_row = group.iloc[0]
+                item = algo.extract_item_from_row(first_row)
+                interactions.append((str(customer_id), item))
+        else:
+            # For cuisine: get unique cuisine per order
+            order_cuisines = orders_df.groupby(['customer_id', 'order_id'])['cuisine'].first()
+            for (customer_id, _), cuisine in order_cuisines.items():
+                interactions.append((str(customer_id), cuisine))
+
         return interactions
 
     def get_stats(self) -> Dict[str, Any]:
         return {
             'fitted': self._fitted,
+            'prediction_target': self.prediction_target,
             'swing_stats': self.swing_model.get_stats() if self._fitted else None,
         }
 
@@ -1215,12 +1286,21 @@ class EnhancedRerankEvaluator:
 
             start_time = time.time()
 
-            # Extract cuisine history from order history
-            cuisine_history = [o.get('cuisine', 'unknown') for o in sample['order_history']]
+            # Extract item history from order history
+            # For vendor_cuisine mode, use 'item' field if present, else fall back to 'cuisine'
+            prediction_target = getattr(self.config, 'prediction_target', 'cuisine')
+            if prediction_target == 'vendor_cuisine':
+                # For vendor_cuisine, prefer the 'item' field (vendor_id||cuisine)
+                item_history = [
+                    o.get('item', f"{o.get('vendor_id', 'unknown')}||{o.get('cuisine', 'unknown')}")
+                    for o in sample['order_history']
+                ]
+            else:
+                item_history = [o.get('cuisine', 'unknown') for o in sample['order_history']]
 
             # Generate candidates
             candidates, candidate_info = self.generator.generate_candidates(
-                cuisine_history=cuisine_history,
+                cuisine_history=item_history,
                 ground_truth=sample['ground_truth_cuisine'],
             )
 

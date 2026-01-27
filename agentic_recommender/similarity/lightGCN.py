@@ -246,27 +246,41 @@ class LightGCNEmbeddingManager:
         data_str = str(sorted_interactions)
         return hashlib.md5(data_str.encode()).hexdigest()
 
-    def _get_cache_path(self, dataset_name: str, method: str = "full") -> Path:
+    def _get_cache_path(self, dataset_name: str, method: str = "full", prediction_target: str = "cuisine") -> Path:
         """
-        Get cache file path for a dataset and method.
+        Get cache file path for a dataset, method, and prediction target.
 
         Args:
             dataset_name: Name for cache file (e.g., "data_se")
             method: Evaluation method ("method1", "method2", or "full")
+            prediction_target: "cuisine", "vendor_cuisine", "vendor", or "product"
 
         Returns:
             Path to cache file
+
+        Cache naming:
+            - {dataset}_{method}_{target}_lightgcn.pkl (with method and target)
+            - {dataset}_{target}_lightgcn.pkl (without method, with target)
+            - {dataset}_embeddings.pkl (legacy, cuisine only, no method)
         """
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Build cache filename with prediction_target for non-default targets
         if method and method != "full":
+            if prediction_target and prediction_target != "cuisine":
+                return self.CACHE_DIR / f"{dataset_name}_{method}_{prediction_target}_lightgcn.pkl"
             return self.CACHE_DIR / f"{dataset_name}_{method}_lightgcn.pkl"
-        return self.CACHE_DIR / f"{dataset_name}_embeddings.pkl"
+        else:
+            if prediction_target and prediction_target != "cuisine":
+                return self.CACHE_DIR / f"{dataset_name}_{prediction_target}_lightgcn.pkl"
+            return self.CACHE_DIR / f"{dataset_name}_embeddings.pkl"
 
     def load_or_train(
         self,
         dataset_name: str,
         interactions: List[Tuple[str, str]],
         method: str = "full",
+        prediction_target: str = "cuisine",
         force_retrain: bool = False,
         verbose: bool = True
     ) -> 'LightGCNEmbeddingManager':
@@ -275,15 +289,16 @@ class LightGCNEmbeddingManager:
 
         Args:
             dataset_name: Name for cache file (e.g., "data_se")
-            interactions: List of (user_id, cuisine) tuples
+            interactions: List of (user_id, item) tuples
             method: Evaluation method for cache naming ("method1", "method2", or "full")
+            prediction_target: "cuisine", "vendor_cuisine", "vendor", or "product"
             force_retrain: Force retraining even if cache exists
             verbose: Print progress
 
         Returns:
             self (for chaining)
         """
-        cache_path = self._get_cache_path(dataset_name, method)
+        cache_path = self._get_cache_path(dataset_name, method, prediction_target)
         new_cache_key = self._compute_cache_key(interactions)
 
         # Try to load from cache
@@ -555,17 +570,23 @@ def filter_interactions_leave_last_out(
 
     Args:
         orders_df: DataFrame with order data (must have customer_id, order_id, and target column)
-        prediction_target: "cuisine", "vendor", or "product"
+        prediction_target: "cuisine", "vendor", "product", or "vendor_cuisine"
 
     Returns:
         List of (user_id, item) tuples from N-1 orders per user.
     """
-    # Map prediction target to column
+    from .item_algorithm import VendorCuisineItemAlgorithm
+
+    # Map prediction target to column (None = special handling)
     target_column = {
         'cuisine': 'cuisine',
         'vendor': 'vendor_id',
         'product': 'product_id',
+        'vendor_cuisine': None,  # Special handling below
     }.get(prediction_target, 'cuisine')
+
+    # For vendor_cuisine, create the algorithm instance
+    vendor_cuisine_algo = VendorCuisineItemAlgorithm() if prediction_target == 'vendor_cuisine' else None
 
     interactions = []
 
@@ -594,7 +615,11 @@ def filter_interactions_leave_last_out(
         training_rows = sorted_group[sorted_group['order_id'].isin(remaining_order_ids)]
 
         for _, row in training_rows.iterrows():
-            item = str(row.get(target_column, 'unknown'))
+            if prediction_target == 'vendor_cuisine':
+                # Create composite item: vendor_id||cuisine
+                item = vendor_cuisine_algo.extract_item_from_row(row)
+            else:
+                item = str(row.get(target_column, 'unknown'))
             interactions.append((str(customer_id), item))
 
     return interactions
@@ -611,23 +636,33 @@ def get_all_interactions(
 
     Args:
         orders_df: DataFrame with order data
-        prediction_target: "cuisine", "vendor", or "product"
+        prediction_target: "cuisine", "vendor", "product", or "vendor_cuisine"
 
     Returns:
         List of (user_id, item) tuples.
     """
-    # Map prediction target to column
+    from .item_algorithm import VendorCuisineItemAlgorithm
+
+    # Map prediction target to column (None = special handling)
     target_column = {
         'cuisine': 'cuisine',
         'vendor': 'vendor_id',
         'product': 'product_id',
+        'vendor_cuisine': None,  # Special handling below
     }.get(prediction_target, 'cuisine')
+
+    # For vendor_cuisine, create the algorithm instance
+    vendor_cuisine_algo = VendorCuisineItemAlgorithm() if prediction_target == 'vendor_cuisine' else None
 
     interactions = []
 
     for _, row in orders_df.iterrows():
         customer_id = str(row['customer_id'])
-        item = str(row.get(target_column, 'unknown'))
+        if prediction_target == 'vendor_cuisine':
+            # Create composite item: vendor_id||cuisine
+            item = vendor_cuisine_algo.extract_item_from_row(row)
+        else:
+            item = str(row.get(target_column, 'unknown'))
         interactions.append((customer_id, item))
 
     return interactions

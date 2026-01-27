@@ -1655,14 +1655,15 @@ class PipelineStages:
             # Build/load cuisine-cuisine swing model with method-specific cache
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info(f"LOADING/TRAINING SWING MODEL ({evaluation_method} cache)")
+            self.logger.info(f"LOADING/TRAINING SWING MODEL")
+            self.logger.info(f"  Method: {evaluation_method}, Target: {prediction_target}")
             self.logger.info("=" * 60)
 
             swing_config = CuisineSwingConfig(top_k=config.items_per_seed * 2)
-            swing_model = CuisineSwingMethod(swing_config)
+            swing_model = CuisineSwingMethod(swing_config, prediction_target=prediction_target)
 
             if not swing_model.load_from_cache(dataset_name, evaluation_method):
-                self.logger.info("Training new Swing model...")
+                self.logger.info(f"Training new Swing model (target={prediction_target})...")
                 swing_model.fit(interactions)
                 swing_model.save_to_cache(dataset_name, evaluation_method)
 
@@ -1677,7 +1678,8 @@ class PipelineStages:
             # Build/load LightGCN embeddings with method-specific cache
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info(f"LOADING/TRAINING LIGHTGCN ({evaluation_method} cache)")
+            self.logger.info(f"LOADING/TRAINING LIGHTGCN")
+            self.logger.info(f"  Method: {evaluation_method}, Target: {prediction_target}")
             self.logger.info("=" * 60)
 
             lightgcn_config = LightGCNConfig(
@@ -1689,6 +1691,7 @@ class PipelineStages:
                 dataset_name=dataset_name,
                 interactions=interactions,
                 method=evaluation_method,
+                prediction_target=prediction_target,
                 verbose=True
             )
 
