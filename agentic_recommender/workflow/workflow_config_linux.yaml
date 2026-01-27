@@ -164,6 +164,12 @@ workflow:
         min_history: 5          # Min orders per user
         deterministic_sampling: true  # Use deterministic (sorted) sampling for reproducibility
 
+        # Async/parallel processing settings
+        enable_async: false          # Use async evaluation for parallel LLM requests
+        max_workers: 10              # Concurrent LLM requests (when async enabled)
+        checkpoint_interval: 50      # Log progress every N samples
+        retry_attempts: 3            # Retries per failed request
+
 # LLM Provider Configuration
 llm:
   provider: "openrouter"  # Options: mock, gemini, openrouter

@@ -780,6 +780,9 @@ class EnhancedRerankConfig:
 @dataclass
 class EnhancedRerankMetrics:
     """Metrics for enhanced two-round rerank evaluation."""
+    # ===========================================
+    # FINAL (Round 2) METRICS - backward compatible
+    # ===========================================
     # NDCG metrics
     ndcg_at_1: float = 0.0
     ndcg_at_3: float = 0.0
@@ -798,12 +801,49 @@ class EnhancedRerankMetrics:
     hit_at_5: float = 0.0
     hit_at_10: float = 0.0
 
-    # Round comparison
+    # ===========================================
+    # ROUND 1 METRICS (LLM only, no LightGCN)
+    # ===========================================
+    round1_ndcg_at_1: float = 0.0
+    round1_ndcg_at_3: float = 0.0
+    round1_ndcg_at_5: float = 0.0
+    round1_ndcg_at_10: float = 0.0
+    round1_mrr_at_1: float = 0.0
+    round1_mrr_at_3: float = 0.0
+    round1_mrr_at_5: float = 0.0
+    round1_mrr_at_10: float = 0.0
+    round1_hit_at_1: float = 0.0
+    round1_hit_at_3: float = 0.0
     round1_hit_at_5: float = 0.0
-    final_hit_at_5: float = 0.0
-    improvement: float = 0.0
+    round1_hit_at_10: float = 0.0
 
-    # Basket metrics (multi-item ground truth)
+    # ===========================================
+    # LIGHTGCN METRICS (pure collaborative filtering)
+    # ===========================================
+    lightgcn_ndcg_at_1: float = 0.0
+    lightgcn_ndcg_at_3: float = 0.0
+    lightgcn_ndcg_at_5: float = 0.0
+    lightgcn_ndcg_at_10: float = 0.0
+    lightgcn_mrr_at_1: float = 0.0
+    lightgcn_mrr_at_3: float = 0.0
+    lightgcn_mrr_at_5: float = 0.0
+    lightgcn_mrr_at_10: float = 0.0
+    lightgcn_hit_at_1: float = 0.0
+    lightgcn_hit_at_3: float = 0.0
+    lightgcn_hit_at_5: float = 0.0
+    lightgcn_hit_at_10: float = 0.0
+
+    # ===========================================
+    # ROUND COMPARISON (backward compatible)
+    # ===========================================
+    round1_hit_at_5_legacy: float = 0.0  # Kept for backward compat, same as round1_hit_at_5
+    final_hit_at_5: float = 0.0
+    improvement: float = 0.0  # Final vs Round1
+    improvement_vs_lightgcn: float = 0.0  # Final vs LightGCN
+
+    # ===========================================
+    # BASKET METRICS (Final ranking, multi-item ground truth)
+    # ===========================================
     basket_hit_at_1: float = 0.0
     basket_hit_at_3: float = 0.0
     basket_hit_at_5: float = 0.0
@@ -823,83 +863,190 @@ class EnhancedRerankMetrics:
     basket_mrr: float = 0.0
     avg_basket_size: float = 0.0
 
-    # Statistics
+    # ===========================================
+    # ROUND 1 BASKET METRICS
+    # ===========================================
+    round1_basket_hit_at_1: float = 0.0
+    round1_basket_hit_at_3: float = 0.0
+    round1_basket_hit_at_5: float = 0.0
+    round1_basket_hit_at_10: float = 0.0
+    round1_basket_recall_at_5: float = 0.0
+    round1_basket_recall_at_10: float = 0.0
+    round1_basket_ndcg_at_5: float = 0.0
+    round1_basket_ndcg_at_10: float = 0.0
+    round1_basket_mrr: float = 0.0
+
+    # ===========================================
+    # LIGHTGCN BASKET METRICS
+    # ===========================================
+    lightgcn_basket_hit_at_1: float = 0.0
+    lightgcn_basket_hit_at_3: float = 0.0
+    lightgcn_basket_hit_at_5: float = 0.0
+    lightgcn_basket_hit_at_10: float = 0.0
+    lightgcn_basket_recall_at_5: float = 0.0
+    lightgcn_basket_recall_at_10: float = 0.0
+    lightgcn_basket_ndcg_at_5: float = 0.0
+    lightgcn_basket_ndcg_at_10: float = 0.0
+    lightgcn_basket_mrr: float = 0.0
+
+    # ===========================================
+    # STATISTICS
+    # ===========================================
     total_samples: int = 0
     valid_samples: int = 0
     avg_time_ms: float = 0.0
     gt_in_candidates: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            'ndcg@1': self.ndcg_at_1,
-            'ndcg@3': self.ndcg_at_3,
-            'ndcg@5': self.ndcg_at_5,
-            'ndcg@10': self.ndcg_at_10,
-            'mrr@1': self.mrr_at_1,
-            'mrr@3': self.mrr_at_3,
-            'mrr@5': self.mrr_at_5,
-            'mrr@10': self.mrr_at_10,
-            'hit@1': self.hit_at_1,
-            'hit@3': self.hit_at_3,
-            'hit@5': self.hit_at_5,
-            'hit@10': self.hit_at_10,
-            'round1_hit@5': self.round1_hit_at_5,
-            'final_hit@5': self.final_hit_at_5,
-            'improvement': self.improvement,
-            # Basket metrics
-            'basket_hit@1': self.basket_hit_at_1,
-            'basket_hit@3': self.basket_hit_at_3,
-            'basket_hit@5': self.basket_hit_at_5,
-            'basket_hit@10': self.basket_hit_at_10,
-            'basket_recall@1': self.basket_recall_at_1,
-            'basket_recall@3': self.basket_recall_at_3,
-            'basket_recall@5': self.basket_recall_at_5,
-            'basket_recall@10': self.basket_recall_at_10,
-            'basket_precision@1': self.basket_precision_at_1,
-            'basket_precision@3': self.basket_precision_at_3,
-            'basket_precision@5': self.basket_precision_at_5,
-            'basket_precision@10': self.basket_precision_at_10,
-            'basket_ndcg@1': self.basket_ndcg_at_1,
-            'basket_ndcg@3': self.basket_ndcg_at_3,
-            'basket_ndcg@5': self.basket_ndcg_at_5,
-            'basket_ndcg@10': self.basket_ndcg_at_10,
-            'basket_mrr': self.basket_mrr,
-            'avg_basket_size': self.avg_basket_size,
-            # Statistics
-            'total_samples': self.total_samples,
-            'valid_samples': self.valid_samples,
-            'avg_time_ms': self.avg_time_ms,
-            'gt_in_candidates': self.gt_in_candidates,
-        }
+        """Return metrics sorted by k value, then by method (lightgcn, round1, final)."""
+        # Use ordered dict to maintain consistent JSON output order
+        from collections import OrderedDict
+        result = OrderedDict()
+
+        # ========== SINGLE-ITEM METRICS (grouped by metric type and k) ==========
+        # Hit@k - grouped by k: lightgcn, round1, final
+        for k in [1, 3, 5, 10]:
+            result[f'lightgcn_hit@{k}'] = getattr(self, f'lightgcn_hit_at_{k}')
+            result[f'round1_hit@{k}'] = getattr(self, f'round1_hit_at_{k}')
+            result[f'hit@{k}'] = getattr(self, f'hit_at_{k}')  # final
+
+        # NDCG@k - grouped by k: lightgcn, round1, final
+        for k in [1, 3, 5, 10]:
+            result[f'lightgcn_ndcg@{k}'] = getattr(self, f'lightgcn_ndcg_at_{k}')
+            result[f'round1_ndcg@{k}'] = getattr(self, f'round1_ndcg_at_{k}')
+            result[f'ndcg@{k}'] = getattr(self, f'ndcg_at_{k}')  # final
+
+        # MRR@k - grouped by k: lightgcn, round1, final
+        for k in [1, 3, 5, 10]:
+            result[f'lightgcn_mrr@{k}'] = getattr(self, f'lightgcn_mrr_at_{k}')
+            result[f'round1_mrr@{k}'] = getattr(self, f'round1_mrr_at_{k}')
+            result[f'mrr@{k}'] = getattr(self, f'mrr_at_{k}')  # final
+
+        # ========== IMPROVEMENT METRICS ==========
+        result['improvement_r1_to_final'] = self.improvement
+        result['improvement_lgcn_to_final'] = self.improvement_vs_lightgcn
+
+        # ========== BASKET METRICS (grouped by metric type and k) ==========
+        # Basket Hit@k
+        for k in [1, 3, 5, 10]:
+            result[f'lightgcn_basket_hit@{k}'] = getattr(self, f'lightgcn_basket_hit_at_{k}')
+            result[f'round1_basket_hit@{k}'] = getattr(self, f'round1_basket_hit_at_{k}')
+            result[f'basket_hit@{k}'] = getattr(self, f'basket_hit_at_{k}')  # final
+
+        # Basket Recall@k
+        for k in [1, 3, 5, 10]:
+            result[f'basket_recall@{k}'] = getattr(self, f'basket_recall_at_{k}')
+        for k in [5, 10]:
+            result[f'lightgcn_basket_recall@{k}'] = getattr(self, f'lightgcn_basket_recall_at_{k}')
+            result[f'round1_basket_recall@{k}'] = getattr(self, f'round1_basket_recall_at_{k}')
+
+        # Basket Precision@k (final only)
+        for k in [1, 3, 5, 10]:
+            result[f'basket_precision@{k}'] = getattr(self, f'basket_precision_at_{k}')
+
+        # Basket NDCG@k
+        for k in [1, 3, 5, 10]:
+            result[f'basket_ndcg@{k}'] = getattr(self, f'basket_ndcg_at_{k}')
+        for k in [5, 10]:
+            result[f'lightgcn_basket_ndcg@{k}'] = getattr(self, f'lightgcn_basket_ndcg_at_{k}')
+            result[f'round1_basket_ndcg@{k}'] = getattr(self, f'round1_basket_ndcg_at_{k}')
+
+        # Basket MRR
+        result['lightgcn_basket_mrr'] = self.lightgcn_basket_mrr
+        result['round1_basket_mrr'] = self.round1_basket_mrr
+        result['basket_mrr'] = self.basket_mrr
+
+        # ========== STATISTICS ==========
+        result['avg_basket_size'] = self.avg_basket_size
+        result['total_samples'] = self.total_samples
+        result['valid_samples'] = self.valid_samples
+        result['avg_time_ms'] = self.avg_time_ms
+        result['gt_in_candidates'] = self.gt_in_candidates
+
+        return dict(result)
 
     def __str__(self) -> str:
-        basket_str = ""
-        if self.avg_basket_size > 0:
-            basket_str = f"""
-  --- Basket Metrics ---
-  Basket Hit@5:      {self.basket_hit_at_5:.2%}
-  Basket Hit@10:     {self.basket_hit_at_10:.2%}
-  Basket Recall@5:   {self.basket_recall_at_5:.4f}
-  Basket Recall@10:  {self.basket_recall_at_10:.4f}
-  Basket NDCG@5:     {self.basket_ndcg_at_5:.4f}
-  Basket NDCG@10:    {self.basket_ndcg_at_10:.4f}
-  Basket MRR:        {self.basket_mrr:.4f}
-  Avg Basket Size:   {self.avg_basket_size:.2f}"""
+        # Build side-by-side comparison table
+        lines = []
+        lines.append("")
+        lines.append("=" * 72)
+        lines.append("        METRICS COMPARISON: Round1 vs LightGCN vs Final (Round2)")
+        lines.append("=" * 72)
+        lines.append(f"{'Metric':<16} | {'Round 1':>12} | {'LightGCN':>12} | {'Final (R2)':>12}")
+        lines.append("-" * 72)
 
-        return f"""Enhanced Rerank Evaluation Results:
-  NDCG@5:       {self.ndcg_at_5:.4f}
-  NDCG@10:      {self.ndcg_at_10:.4f}
-  MRR@5:        {self.mrr_at_5:.4f}
-  MRR@10:       {self.mrr_at_10:.4f}
-  Hit@1:        {self.hit_at_1:.2%}
-  Hit@3:        {self.hit_at_3:.2%}
-  Hit@5:        {self.hit_at_5:.2%}
-  Hit@10:       {self.hit_at_10:.2%}
-  Round1 Hit@5: {self.round1_hit_at_5:.2%}
-  Final Hit@5:  {self.final_hit_at_5:.2%}
-  Improvement:  {self.improvement:.2%}{basket_str}
-  GT in Candidates: {self.gt_in_candidates:.2%}
-  Samples: {self.valid_samples}/{self.total_samples}"""
+        # Single-item metrics comparison
+        for k in [1, 3, 5, 10]:
+            r1_ndcg = getattr(self, f'round1_ndcg_at_{k}', 0.0)
+            lgcn_ndcg = getattr(self, f'lightgcn_ndcg_at_{k}', 0.0)
+            final_ndcg = getattr(self, f'ndcg_at_{k}', 0.0)
+            lines.append(f"NDCG@{k:<11} | {r1_ndcg:>12.4f} | {lgcn_ndcg:>12.4f} | {final_ndcg:>12.4f}")
+
+        lines.append("-" * 72)
+
+        for k in [1, 3, 5, 10]:
+            r1_mrr = getattr(self, f'round1_mrr_at_{k}', 0.0)
+            lgcn_mrr = getattr(self, f'lightgcn_mrr_at_{k}', 0.0)
+            final_mrr = getattr(self, f'mrr_at_{k}', 0.0)
+            lines.append(f"MRR@{k:<12} | {r1_mrr:>12.4f} | {lgcn_mrr:>12.4f} | {final_mrr:>12.4f}")
+
+        lines.append("-" * 72)
+
+        for k in [1, 3, 5, 10]:
+            r1_hit = getattr(self, f'round1_hit_at_{k}', 0.0)
+            lgcn_hit = getattr(self, f'lightgcn_hit_at_{k}', 0.0)
+            final_hit = getattr(self, f'hit_at_{k}', 0.0)
+            lines.append(f"Hit@{k:<12} | {r1_hit*100:>11.1f}% | {lgcn_hit*100:>11.1f}% | {final_hit*100:>11.1f}%")
+
+        lines.append("-" * 72)
+        lines.append(f"Improvement (Final vs Round1):   {self.improvement:>+.2%}")
+        lines.append(f"Improvement (Final vs LightGCN): {self.improvement_vs_lightgcn:>+.2%}")
+        lines.append("=" * 72)
+
+        # Basket metrics if available
+        if self.avg_basket_size > 0:
+            lines.append("")
+            lines.append("=" * 72)
+            lines.append("        BASKET METRICS COMPARISON")
+            lines.append("=" * 72)
+            lines.append(f"{'Metric':<20} | {'Round 1':>12} | {'LightGCN':>12} | {'Final':>12}")
+            lines.append("-" * 72)
+
+            for k in [1, 3, 5, 10]:
+                r1_hit = getattr(self, f'round1_basket_hit_at_{k}', 0.0)
+                lgcn_hit = getattr(self, f'lightgcn_basket_hit_at_{k}', 0.0)
+                final_hit = getattr(self, f'basket_hit_at_{k}', 0.0)
+                lines.append(f"Basket Hit@{k:<8} | {r1_hit*100:>11.1f}% | {lgcn_hit*100:>11.1f}% | {final_hit*100:>11.1f}%")
+
+            lines.append("-" * 72)
+
+            for k in [5, 10]:
+                r1_recall = getattr(self, f'round1_basket_recall_at_{k}', 0.0)
+                lgcn_recall = getattr(self, f'lightgcn_basket_recall_at_{k}', 0.0)
+                final_recall = getattr(self, f'basket_recall_at_{k}', 0.0)
+                lines.append(f"Basket Recall@{k:<5} | {r1_recall:>12.4f} | {lgcn_recall:>12.4f} | {final_recall:>12.4f}")
+
+            lines.append("-" * 72)
+
+            for k in [5, 10]:
+                r1_ndcg = getattr(self, f'round1_basket_ndcg_at_{k}', 0.0)
+                lgcn_ndcg = getattr(self, f'lightgcn_basket_ndcg_at_{k}', 0.0)
+                final_ndcg = getattr(self, f'basket_ndcg_at_{k}', 0.0)
+                lines.append(f"Basket NDCG@{k:<7} | {r1_ndcg:>12.4f} | {lgcn_ndcg:>12.4f} | {final_ndcg:>12.4f}")
+
+            lines.append("-" * 72)
+            lines.append(f"Basket MRR          | {self.round1_basket_mrr:>12.4f} | {self.lightgcn_basket_mrr:>12.4f} | {self.basket_mrr:>12.4f}")
+            lines.append("-" * 72)
+            lines.append(f"Avg Basket Size: {self.avg_basket_size:.2f}")
+            lines.append("=" * 72)
+
+        # Statistics
+        lines.append("")
+        lines.append(f"GT in Candidates: {self.gt_in_candidates:.2%}")
+        lines.append(f"Samples: {self.valid_samples}/{self.total_samples}")
+        lines.append(f"Avg Time: {self.avg_time_ms:.2f}ms")
+
+        return "\n".join(lines)
 
 
 class CuisineBasedCandidateGenerator:
@@ -1100,6 +1247,9 @@ class EnhancedRerankEvaluator:
                 candidates
             )
 
+            # Derive LightGCN ranking (already sorted by score descending)
+            lightgcn_ranking = [cuisine for cuisine, _ in lightgcn_scores]
+
             # Round 2: Reflection
             round2_result = self._round2_reflect(
                 order_history=sample['order_history'],
@@ -1118,6 +1268,7 @@ class EnhancedRerankEvaluator:
             # Calculate metrics for this sample
             ground_truth = sample['ground_truth_cuisine']
             r1_rank = self._find_rank(round1_result['ranking'], ground_truth)
+            lightgcn_rank = self._find_rank(lightgcn_ranking, ground_truth)
             final_rank = self._find_rank(round2_result['ranking'], ground_truth)
 
             result = {
@@ -1131,8 +1282,10 @@ class EnhancedRerankEvaluator:
                 'round1_raw_response': round1_result.get('raw_response', ''),
                 'round1_ranking': round1_result['ranking'],
                 'round1_reasoning': round1_result.get('reasoning', ''),
-                # LightGCN scores
+                # LightGCN results
                 'lightgcn_scores': lightgcn_scores[:10],  # Top 10 for logging
+                'lightgcn_ranking': lightgcn_ranking,  # Full ranking from LightGCN
+                'lightgcn_rank': lightgcn_rank,  # GT position in LightGCN ranking
                 # Round 2 results
                 'round2_prompt': round2_result.get('prompt', ''),
                 'round2_raw_response': round2_result.get('raw_response', ''),
@@ -1395,13 +1548,72 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
                 return i + 1
         return 0
 
-    def _compute_metrics(
+    def _compute_single_item_metrics(
+        self,
+        ranks: List[int],
+        prefix: str = ""
+    ) -> Dict[str, float]:
+        """
+        Compute NDCG@k, MRR@k, Hit@k for k=1,3,5,10.
+
+        Args:
+            ranks: List of ranks (1-indexed, 0 if not found)
+            prefix: Prefix for metric names (e.g., 'round1_', 'lightgcn_')
+
+        Returns:
+            Dict like {f'{prefix}ndcg@5': 0.85, ...}
+        """
+        if not ranks:
+            return {}
+
+        # DCG helper (single-item binary relevance)
+        def dcg(rank, k):
+            if rank <= 0 or rank > k:
+                return 0.0
+            return 1.0 / (math.log2(rank + 1))
+
+        def ndcg(ranks_list, k):
+            dcg_scores = [dcg(r, k) for r in ranks_list if r > 0]
+            ideal_dcg = 1.0  # Perfect rank = 1
+            return sum(dcg_scores) / (len(ranks_list) * ideal_dcg) if ranks_list else 0.0
+
+        def mrr(ranks_list, k):
+            scores = [1.0/r if 0 < r <= k else 0.0 for r in ranks_list]
+            return sum(scores) / len(scores) if scores else 0.0
+
+        def hit_rate(ranks_list, k):
+            hits = [1 if 0 < r <= k else 0 for r in ranks_list]
+            return sum(hits) / len(hits) if hits else 0.0
+
+        k_values = [1, 3, 5, 10]
+        metrics = {}
+
+        for k in k_values:
+            metrics[f'{prefix}ndcg_at_{k}'] = ndcg(ranks, k)
+            metrics[f'{prefix}mrr_at_{k}'] = mrr(ranks, k)
+            metrics[f'{prefix}hit_at_{k}'] = hit_rate(ranks, k)
+
+        return metrics
+
+    def _compute_basket_metrics_for_ranking(
         self,
         results: List[Dict],
         test_samples: List[Dict],
-        total_time: float
-    ) -> EnhancedRerankMetrics:
-        """Compute aggregate metrics including basket metrics."""
+        ranking_key: str,
+        prefix: str = ""
+    ) -> Dict[str, float]:
+        """
+        Compute basket metrics for a specific ranking column.
+
+        Args:
+            results: List of result dicts with ranking_key
+            test_samples: Test samples with ground_truth_items
+            ranking_key: Key in results to use for ranking (e.g., 'final_ranking', 'round1_ranking')
+            prefix: Prefix for metric names (e.g., 'round1_basket_', 'lightgcn_basket_')
+
+        Returns:
+            Dict of basket metrics
+        """
         from .basket_metrics import (
             compute_basket_hit,
             compute_basket_recall,
@@ -1410,143 +1622,182 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             compute_basket_mrr,
         )
 
+        # Check if we have basket ground truth
+        has_basket = any('ground_truth_items' in s for s in test_samples)
+        if not has_basket:
+            return {}
+
+        # Build sample map
+        sample_map = {s['customer_id']: s for s in test_samples}
+
+        basket_hits = {1: [], 3: [], 5: [], 10: []}
+        basket_recalls = {1: [], 3: [], 5: [], 10: []}
+        basket_precisions = {1: [], 3: [], 5: [], 10: []}
+        basket_ndcgs = {1: [], 3: [], 5: [], 10: []}
+        basket_mrrs = []
+        basket_sizes = []
+
+        for r in results:
+            customer_id = r['customer_id']
+            sample = sample_map.get(customer_id)
+
+            if sample and 'ground_truth_items' in sample:
+                gt_items = sample['ground_truth_items']
+                predictions = r.get(ranking_key, [])
+
+                for k in [1, 3, 5, 10]:
+                    basket_hits[k].append(compute_basket_hit(predictions, gt_items, k))
+                    basket_recalls[k].append(compute_basket_recall(predictions, gt_items, k))
+                    basket_precisions[k].append(compute_basket_precision(predictions, gt_items, k))
+                    basket_ndcgs[k].append(compute_basket_ndcg(predictions, gt_items, k))
+
+                basket_mrrs.append(compute_basket_mrr(predictions, gt_items))
+                basket_sizes.append(len(gt_items))
+
+        if not basket_hits[1]:
+            return {}
+
+        n = len(basket_hits[1])
+        metrics = {}
+
+        for k in [1, 3, 5, 10]:
+            metrics[f'{prefix}basket_hit_at_{k}'] = sum(basket_hits[k]) / n
+            metrics[f'{prefix}basket_recall_at_{k}'] = sum(basket_recalls[k]) / n
+            metrics[f'{prefix}basket_precision_at_{k}'] = sum(basket_precisions[k]) / n
+            metrics[f'{prefix}basket_ndcg_at_{k}'] = sum(basket_ndcgs[k]) / n
+
+        metrics[f'{prefix}basket_mrr'] = sum(basket_mrrs) / n
+        metrics[f'{prefix}avg_basket_size'] = sum(basket_sizes) / n
+
+        return metrics
+
+    def _compute_metrics(
+        self,
+        results: List[Dict],
+        test_samples: List[Dict],
+        total_time: float
+    ) -> EnhancedRerankMetrics:
+        """Compute aggregate metrics for all three ranking methods."""
         valid = [r for r in results if r['final_rank'] > 0]
         n = len(valid)
 
         if n == 0:
             return EnhancedRerankMetrics(total_samples=len(test_samples))
 
-        # NDCG helper (single-item)
-        def dcg(rank, k):
-            if rank <= 0 or rank > k:
-                return 0.0
-            return 1.0 / (math.log2(rank + 1))
-
-        def ndcg(ranks, k):
-            # Binary relevance: 1 if in top-k, 0 otherwise
-            dcg_scores = [dcg(r, k) for r in ranks if r > 0]
-            ideal_dcg = 1.0  # Perfect rank = 1
-            return sum(dcg_scores) / (len(ranks) * ideal_dcg) if ranks else 0.0
-
-        # MRR helper (single-item)
-        def mrr(ranks, k):
-            scores = [1.0/r if 0 < r <= k else 0.0 for r in ranks]
-            return sum(scores) / len(scores) if scores else 0.0
-
-        # Hit rate helper (single-item)
-        def hit_rate(ranks, k):
-            hits = [1 if 0 < r <= k else 0 for r in ranks]
-            return sum(hits) / len(hits) if hits else 0.0
-
+        # Extract ranks for all three methods
         final_ranks = [r['final_rank'] for r in valid]
-        r1_ranks = [r['round1_rank'] for r in valid]
+        round1_ranks = [r['round1_rank'] for r in valid]
+        lightgcn_ranks = [r.get('lightgcn_rank', 0) for r in valid]
 
-        # Compute basket metrics if samples have ground_truth_items
-        basket_hit_1, basket_hit_3, basket_hit_5, basket_hit_10 = 0.0, 0.0, 0.0, 0.0
-        basket_recall_1, basket_recall_3, basket_recall_5, basket_recall_10 = 0.0, 0.0, 0.0, 0.0
-        basket_precision_1, basket_precision_3, basket_precision_5, basket_precision_10 = 0.0, 0.0, 0.0, 0.0
-        basket_ndcg_1, basket_ndcg_3, basket_ndcg_5, basket_ndcg_10 = 0.0, 0.0, 0.0, 0.0
-        basket_mrr_val = 0.0
-        avg_basket_size = 0.0
+        # Compute single-item metrics for all three methods using helper
+        final_metrics = self._compute_single_item_metrics(final_ranks, prefix='')
+        round1_metrics = self._compute_single_item_metrics(round1_ranks, prefix='round1_')
+        lightgcn_metrics = self._compute_single_item_metrics(lightgcn_ranks, prefix='lightgcn_')
 
-        # Check if we have basket ground truth in test samples
-        has_basket = any('ground_truth_items' in s for s in test_samples)
+        # Compute basket metrics for all three rankings
+        final_basket = self._compute_basket_metrics_for_ranking(
+            valid, test_samples, 'final_ranking', prefix=''
+        )
+        round1_basket = self._compute_basket_metrics_for_ranking(
+            valid, test_samples, 'round1_ranking', prefix='round1_'
+        )
+        lightgcn_basket = self._compute_basket_metrics_for_ranking(
+            valid, test_samples, 'lightgcn_ranking', prefix='lightgcn_'
+        )
 
-        if has_basket:
-            basket_hits_1, basket_hits_3, basket_hits_5, basket_hits_10 = [], [], [], []
-            basket_recalls_1, basket_recalls_3, basket_recalls_5, basket_recalls_10 = [], [], [], []
-            basket_precisions_1, basket_precisions_3, basket_precisions_5, basket_precisions_10 = [], [], [], []
-            basket_ndcgs_1, basket_ndcgs_3, basket_ndcgs_5, basket_ndcgs_10 = [], [], [], []
-            basket_mrrs = []
-            basket_sizes = []
+        # Calculate improvements
+        final_hit_5 = final_metrics.get('hit_at_5', 0.0)
+        round1_hit_5 = round1_metrics.get('round1_hit_at_5', 0.0)
+        lightgcn_hit_5 = lightgcn_metrics.get('lightgcn_hit_at_5', 0.0)
 
-            # Match results with test samples by customer_id
-            sample_map = {s['customer_id']: s for s in test_samples}
+        improvement = final_hit_5 - round1_hit_5
+        improvement_vs_lightgcn = final_hit_5 - lightgcn_hit_5
 
-            for r in valid:
-                customer_id = r['customer_id']
-                sample = sample_map.get(customer_id)
-
-                if sample and 'ground_truth_items' in sample:
-                    gt_items = sample['ground_truth_items']
-                    predictions = r.get('final_ranking', [])
-
-                    # Compute for k=1, 3, 5, 10
-                    basket_hits_1.append(compute_basket_hit(predictions, gt_items, 1))
-                    basket_hits_3.append(compute_basket_hit(predictions, gt_items, 3))
-                    basket_hits_5.append(compute_basket_hit(predictions, gt_items, 5))
-                    basket_hits_10.append(compute_basket_hit(predictions, gt_items, 10))
-                    basket_recalls_1.append(compute_basket_recall(predictions, gt_items, 1))
-                    basket_recalls_3.append(compute_basket_recall(predictions, gt_items, 3))
-                    basket_recalls_5.append(compute_basket_recall(predictions, gt_items, 5))
-                    basket_recalls_10.append(compute_basket_recall(predictions, gt_items, 10))
-                    basket_precisions_1.append(compute_basket_precision(predictions, gt_items, 1))
-                    basket_precisions_3.append(compute_basket_precision(predictions, gt_items, 3))
-                    basket_precisions_5.append(compute_basket_precision(predictions, gt_items, 5))
-                    basket_precisions_10.append(compute_basket_precision(predictions, gt_items, 10))
-                    basket_ndcgs_1.append(compute_basket_ndcg(predictions, gt_items, 1))
-                    basket_ndcgs_3.append(compute_basket_ndcg(predictions, gt_items, 3))
-                    basket_ndcgs_5.append(compute_basket_ndcg(predictions, gt_items, 5))
-                    basket_ndcgs_10.append(compute_basket_ndcg(predictions, gt_items, 10))
-                    basket_mrrs.append(compute_basket_mrr(predictions, gt_items))
-                    basket_sizes.append(len(gt_items))
-
-            if basket_hits_1:
-                n_basket = len(basket_hits_1)
-                basket_hit_1 = sum(basket_hits_1) / n_basket
-                basket_hit_3 = sum(basket_hits_3) / n_basket
-                basket_hit_5 = sum(basket_hits_5) / n_basket
-                basket_hit_10 = sum(basket_hits_10) / n_basket
-                basket_recall_1 = sum(basket_recalls_1) / n_basket
-                basket_recall_3 = sum(basket_recalls_3) / n_basket
-                basket_recall_5 = sum(basket_recalls_5) / n_basket
-                basket_recall_10 = sum(basket_recalls_10) / n_basket
-                basket_precision_1 = sum(basket_precisions_1) / n_basket
-                basket_precision_3 = sum(basket_precisions_3) / n_basket
-                basket_precision_5 = sum(basket_precisions_5) / n_basket
-                basket_precision_10 = sum(basket_precisions_10) / n_basket
-                basket_ndcg_1 = sum(basket_ndcgs_1) / n_basket
-                basket_ndcg_3 = sum(basket_ndcgs_3) / n_basket
-                basket_ndcg_5 = sum(basket_ndcgs_5) / n_basket
-                basket_ndcg_10 = sum(basket_ndcgs_10) / n_basket
-                basket_mrr_val = sum(basket_mrrs) / n_basket
-                avg_basket_size = sum(basket_sizes) / n_basket
-
+        # Build metrics object
         metrics = EnhancedRerankMetrics(
-            ndcg_at_1=sum(dcg(r, 1) for r in final_ranks) / n,
-            ndcg_at_3=sum(dcg(r, 3) for r in final_ranks) / n,
-            ndcg_at_5=sum(dcg(r, 5) for r in final_ranks) / n,
-            ndcg_at_10=sum(dcg(r, 10) for r in final_ranks) / n,
-            mrr_at_1=mrr(final_ranks, 1),
-            mrr_at_3=mrr(final_ranks, 3),
-            mrr_at_5=mrr(final_ranks, 5),
-            mrr_at_10=mrr(final_ranks, 10),
-            hit_at_1=hit_rate(final_ranks, 1),
-            hit_at_3=hit_rate(final_ranks, 3),
-            hit_at_5=hit_rate(final_ranks, 5),
-            hit_at_10=hit_rate(final_ranks, 10),
-            round1_hit_at_5=hit_rate(r1_ranks, 5),
-            final_hit_at_5=hit_rate(final_ranks, 5),
-            improvement=hit_rate(final_ranks, 5) - hit_rate(r1_ranks, 5),
-            # Basket metrics
-            basket_hit_at_1=basket_hit_1,
-            basket_hit_at_3=basket_hit_3,
-            basket_hit_at_5=basket_hit_5,
-            basket_hit_at_10=basket_hit_10,
-            basket_recall_at_1=basket_recall_1,
-            basket_recall_at_3=basket_recall_3,
-            basket_recall_at_5=basket_recall_5,
-            basket_recall_at_10=basket_recall_10,
-            basket_precision_at_1=basket_precision_1,
-            basket_precision_at_3=basket_precision_3,
-            basket_precision_at_5=basket_precision_5,
-            basket_precision_at_10=basket_precision_10,
-            basket_ndcg_at_1=basket_ndcg_1,
-            basket_ndcg_at_3=basket_ndcg_3,
-            basket_ndcg_at_5=basket_ndcg_5,
-            basket_ndcg_at_10=basket_ndcg_10,
-            basket_mrr=basket_mrr_val,
-            avg_basket_size=avg_basket_size,
+            # Final (Round 2) metrics
+            ndcg_at_1=final_metrics.get('ndcg_at_1', 0.0),
+            ndcg_at_3=final_metrics.get('ndcg_at_3', 0.0),
+            ndcg_at_5=final_metrics.get('ndcg_at_5', 0.0),
+            ndcg_at_10=final_metrics.get('ndcg_at_10', 0.0),
+            mrr_at_1=final_metrics.get('mrr_at_1', 0.0),
+            mrr_at_3=final_metrics.get('mrr_at_3', 0.0),
+            mrr_at_5=final_metrics.get('mrr_at_5', 0.0),
+            mrr_at_10=final_metrics.get('mrr_at_10', 0.0),
+            hit_at_1=final_metrics.get('hit_at_1', 0.0),
+            hit_at_3=final_metrics.get('hit_at_3', 0.0),
+            hit_at_5=final_metrics.get('hit_at_5', 0.0),
+            hit_at_10=final_metrics.get('hit_at_10', 0.0),
+            # Round 1 metrics
+            round1_ndcg_at_1=round1_metrics.get('round1_ndcg_at_1', 0.0),
+            round1_ndcg_at_3=round1_metrics.get('round1_ndcg_at_3', 0.0),
+            round1_ndcg_at_5=round1_metrics.get('round1_ndcg_at_5', 0.0),
+            round1_ndcg_at_10=round1_metrics.get('round1_ndcg_at_10', 0.0),
+            round1_mrr_at_1=round1_metrics.get('round1_mrr_at_1', 0.0),
+            round1_mrr_at_3=round1_metrics.get('round1_mrr_at_3', 0.0),
+            round1_mrr_at_5=round1_metrics.get('round1_mrr_at_5', 0.0),
+            round1_mrr_at_10=round1_metrics.get('round1_mrr_at_10', 0.0),
+            round1_hit_at_1=round1_metrics.get('round1_hit_at_1', 0.0),
+            round1_hit_at_3=round1_metrics.get('round1_hit_at_3', 0.0),
+            round1_hit_at_5=round1_metrics.get('round1_hit_at_5', 0.0),
+            round1_hit_at_10=round1_metrics.get('round1_hit_at_10', 0.0),
+            # LightGCN metrics
+            lightgcn_ndcg_at_1=lightgcn_metrics.get('lightgcn_ndcg_at_1', 0.0),
+            lightgcn_ndcg_at_3=lightgcn_metrics.get('lightgcn_ndcg_at_3', 0.0),
+            lightgcn_ndcg_at_5=lightgcn_metrics.get('lightgcn_ndcg_at_5', 0.0),
+            lightgcn_ndcg_at_10=lightgcn_metrics.get('lightgcn_ndcg_at_10', 0.0),
+            lightgcn_mrr_at_1=lightgcn_metrics.get('lightgcn_mrr_at_1', 0.0),
+            lightgcn_mrr_at_3=lightgcn_metrics.get('lightgcn_mrr_at_3', 0.0),
+            lightgcn_mrr_at_5=lightgcn_metrics.get('lightgcn_mrr_at_5', 0.0),
+            lightgcn_mrr_at_10=lightgcn_metrics.get('lightgcn_mrr_at_10', 0.0),
+            lightgcn_hit_at_1=lightgcn_metrics.get('lightgcn_hit_at_1', 0.0),
+            lightgcn_hit_at_3=lightgcn_metrics.get('lightgcn_hit_at_3', 0.0),
+            lightgcn_hit_at_5=lightgcn_metrics.get('lightgcn_hit_at_5', 0.0),
+            lightgcn_hit_at_10=lightgcn_metrics.get('lightgcn_hit_at_10', 0.0),
+            # Round comparison
+            round1_hit_at_5_legacy=round1_hit_5,
+            final_hit_at_5=final_hit_5,
+            improvement=improvement,
+            improvement_vs_lightgcn=improvement_vs_lightgcn,
+            # Final basket metrics
+            basket_hit_at_1=final_basket.get('basket_hit_at_1', 0.0),
+            basket_hit_at_3=final_basket.get('basket_hit_at_3', 0.0),
+            basket_hit_at_5=final_basket.get('basket_hit_at_5', 0.0),
+            basket_hit_at_10=final_basket.get('basket_hit_at_10', 0.0),
+            basket_recall_at_1=final_basket.get('basket_recall_at_1', 0.0),
+            basket_recall_at_3=final_basket.get('basket_recall_at_3', 0.0),
+            basket_recall_at_5=final_basket.get('basket_recall_at_5', 0.0),
+            basket_recall_at_10=final_basket.get('basket_recall_at_10', 0.0),
+            basket_precision_at_1=final_basket.get('basket_precision_at_1', 0.0),
+            basket_precision_at_3=final_basket.get('basket_precision_at_3', 0.0),
+            basket_precision_at_5=final_basket.get('basket_precision_at_5', 0.0),
+            basket_precision_at_10=final_basket.get('basket_precision_at_10', 0.0),
+            basket_ndcg_at_1=final_basket.get('basket_ndcg_at_1', 0.0),
+            basket_ndcg_at_3=final_basket.get('basket_ndcg_at_3', 0.0),
+            basket_ndcg_at_5=final_basket.get('basket_ndcg_at_5', 0.0),
+            basket_ndcg_at_10=final_basket.get('basket_ndcg_at_10', 0.0),
+            basket_mrr=final_basket.get('basket_mrr', 0.0),
+            avg_basket_size=final_basket.get('avg_basket_size', 0.0),
+            # Round 1 basket metrics
+            round1_basket_hit_at_1=round1_basket.get('round1_basket_hit_at_1', 0.0),
+            round1_basket_hit_at_3=round1_basket.get('round1_basket_hit_at_3', 0.0),
+            round1_basket_hit_at_5=round1_basket.get('round1_basket_hit_at_5', 0.0),
+            round1_basket_hit_at_10=round1_basket.get('round1_basket_hit_at_10', 0.0),
+            round1_basket_recall_at_5=round1_basket.get('round1_basket_recall_at_5', 0.0),
+            round1_basket_recall_at_10=round1_basket.get('round1_basket_recall_at_10', 0.0),
+            round1_basket_ndcg_at_5=round1_basket.get('round1_basket_ndcg_at_5', 0.0),
+            round1_basket_ndcg_at_10=round1_basket.get('round1_basket_ndcg_at_10', 0.0),
+            round1_basket_mrr=round1_basket.get('round1_basket_mrr', 0.0),
+            # LightGCN basket metrics
+            lightgcn_basket_hit_at_1=lightgcn_basket.get('lightgcn_basket_hit_at_1', 0.0),
+            lightgcn_basket_hit_at_3=lightgcn_basket.get('lightgcn_basket_hit_at_3', 0.0),
+            lightgcn_basket_hit_at_5=lightgcn_basket.get('lightgcn_basket_hit_at_5', 0.0),
+            lightgcn_basket_hit_at_10=lightgcn_basket.get('lightgcn_basket_hit_at_10', 0.0),
+            lightgcn_basket_recall_at_5=lightgcn_basket.get('lightgcn_basket_recall_at_5', 0.0),
+            lightgcn_basket_recall_at_10=lightgcn_basket.get('lightgcn_basket_recall_at_10', 0.0),
+            lightgcn_basket_ndcg_at_5=lightgcn_basket.get('lightgcn_basket_ndcg_at_5', 0.0),
+            lightgcn_basket_ndcg_at_10=lightgcn_basket.get('lightgcn_basket_ndcg_at_10', 0.0),
+            lightgcn_basket_mrr=lightgcn_basket.get('lightgcn_basket_mrr', 0.0),
             # Statistics
             total_samples=len(test_samples),
             valid_samples=n,
@@ -1555,3 +1806,89 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         )
 
         return metrics
+
+    async def evaluate_async(
+        self,
+        test_samples: List[Dict[str, Any]],
+        output_path: str,
+        api_key: str = None,
+        max_workers: int = 10,
+        checkpoint_interval: int = 50,
+        retry_attempts: int = 3,
+        verbose: bool = True,
+    ) -> Tuple[EnhancedRerankMetrics, List[Dict[str, Any]]]:
+        """
+        Async evaluation with parallel LLM requests.
+
+        Uses worker pool for concurrent processing with JSONL streaming.
+
+        Args:
+            test_samples: List of test samples
+            output_path: Directory to save results
+            api_key: OpenRouter API key (or uses env var)
+            max_workers: Number of concurrent LLM requests
+            checkpoint_interval: Log progress every N samples
+            retry_attempts: Number of retries per failed request
+            verbose: Print progress
+
+        Returns:
+            Tuple of (metrics, detailed_results)
+        """
+        import os
+        from pathlib import Path
+        from .async_evaluator import AsyncRerankEvaluator, AsyncEvalConfig
+        from ..llm.async_provider import AsyncLLMProvider
+
+        # Resolve API key
+        resolved_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        if not resolved_key:
+            raise ValueError("API key required for async evaluation")
+
+        # Get model name from existing provider if available
+        model_name = None
+        if hasattr(self.llm, 'model_name'):
+            model_name = self.llm.model_name
+
+        # Create async config
+        config = AsyncEvalConfig(
+            max_workers=max_workers,
+            checkpoint_interval=checkpoint_interval,
+            retry_attempts=retry_attempts,
+            temperature_round1=self.config.temperature_round1,
+            temperature_round2=self.config.temperature_round2,
+            max_tokens_round1=self.config.max_tokens_round1,
+            max_tokens_round2=self.config.max_tokens_round2,
+            enable_thinking=self.config.enable_thinking,
+        )
+
+        # Create async provider
+        provider = AsyncLLMProvider(
+            api_key=resolved_key,
+            model_name=model_name,
+            max_concurrent=max_workers,
+            retry_attempts=retry_attempts,
+        )
+
+        # Create async evaluator
+        async_eval = AsyncRerankEvaluator(
+            async_provider=provider,
+            candidate_generator=self.generator,
+            lightgcn_manager=self.lightgcn,
+            config=config,
+        )
+
+        # Run async evaluation
+        result = await async_eval.evaluate_async(
+            test_samples=test_samples,
+            output_path=Path(output_path),
+            verbose=verbose,
+        )
+
+        # Get results and compute metrics
+        results = result.get('results', [])
+        total_time = sum(r.get('time_ms', 0) for r in results)
+
+        # Compute metrics using the same method as sync evaluation
+        metrics = self._compute_metrics(results, test_samples, total_time)
+
+        return metrics, results

@@ -1740,30 +1740,59 @@ class PipelineStages:
                 config=config,
             )
 
-            metrics, detailed_results = evaluator.evaluate(
-                test_samples=test_samples,
-                verbose=True
-            )
+            # Check for async mode
+            enable_async = settings.get('enable_async', False)
+            max_workers = settings.get('max_workers', 10)
+            checkpoint_interval = settings.get('checkpoint_interval', 50)
+            retry_attempts = settings.get('retry_attempts', 3)
 
-            # Print results
+            if enable_async and provider_type == 'openrouter':
+                import asyncio
+                self.logger.info("")
+                self.logger.info("*" * 60)
+                self.logger.info("*  ASYNC PARALLEL MODE ENABLED")
+                self.logger.info("*" * 60)
+                self.logger.info(f"*  Concurrent LLM workers: {max_workers}")
+                self.logger.info(f"*  Checkpoint interval: {checkpoint_interval} samples")
+                self.logger.info(f"*  Retry attempts: {retry_attempts}")
+                self.logger.info(f"*  Results streaming to JSONL (memory efficient)")
+                self.logger.info("*" * 60)
+                self.logger.info("")
+
+                # Get output directory for JSONL streaming
+                output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
+
+                metrics, detailed_results = asyncio.run(
+                    evaluator.evaluate_async(
+                        test_samples=test_samples,
+                        output_path=output_dir,
+                        api_key=api_key,
+                        max_workers=max_workers,
+                        checkpoint_interval=checkpoint_interval,
+                        retry_attempts=retry_attempts,
+                        verbose=True
+                    )
+                )
+            else:
+                if enable_async:
+                    self.logger.warning("Async mode only supported with OpenRouter provider")
+                metrics, detailed_results = evaluator.evaluate(
+                    test_samples=test_samples,
+                    verbose=True
+                )
+
+            # Print results with side-by-side comparison
             self.logger.info("")
-            self.logger.info("=" * 60)
+            self.logger.info("=" * 72)
             self.logger.info("ENHANCED RERANK EVALUATION RESULTS")
-            self.logger.info("=" * 60)
-            self.logger.info(f"  NDCG@5:       {metrics.ndcg_at_5:.4f}")
-            self.logger.info(f"  NDCG@10:      {metrics.ndcg_at_10:.4f}")
-            self.logger.info(f"  MRR@5:        {metrics.mrr_at_5:.4f}")
-            self.logger.info(f"  MRR@10:       {metrics.mrr_at_10:.4f}")
-            self.logger.info(f"  Hit@1:        {metrics.hit_at_1:.2%}")
-            self.logger.info(f"  Hit@3:        {metrics.hit_at_3:.2%}")
-            self.logger.info(f"  Hit@5:        {metrics.hit_at_5:.2%}")
-            self.logger.info(f"  Hit@10:       {metrics.hit_at_10:.2%}")
-            self.logger.info(f"  Round1 Hit@5: {metrics.round1_hit_at_5:.2%}")
-            self.logger.info(f"  Final Hit@5:  {metrics.final_hit_at_5:.2%}")
-            self.logger.info(f"  Improvement:  {metrics.improvement:+.2%}")
-            self.logger.info(f"  GT in Candidates: {metrics.gt_in_candidates:.2%}")
-            self.logger.info(f"  Samples: {metrics.valid_samples}/{metrics.total_samples}")
-            self.logger.info(f"  Avg Time: {metrics.avg_time_ms:.2f}ms")
+            self.logger.info("=" * 72)
+            self.logger.info(str(metrics))  # Uses new comparison table format
+            self.logger.info("")
+            self.logger.info("LLM Provider info:")
+            if hasattr(provider, 'get_model_info'):
+                info = provider.get_model_info()
+                self.logger.info(f"  Model: {info.get('model_name', 'unknown')}")
+                self.logger.info(f"  Total calls: {info.get('total_calls', 0)}")
 
             # Save results
             results_path = stage_cfg.output.get('results_json')

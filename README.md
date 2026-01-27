@@ -279,3 +279,8 @@ ls -la ~/.cache/agentic_recommender/swing/
 
 
 python -m agentic_recommender.workflow.workflow_runner --config                                       workflow_config_linux.yaml --stages load_data run_enhanced_rerank_evaluation
+
+
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages load_data run_enhanced_rerank_evaluation
+
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_nothink_linux.yaml --stages load_data run_enhanced_rerank_evaluation
