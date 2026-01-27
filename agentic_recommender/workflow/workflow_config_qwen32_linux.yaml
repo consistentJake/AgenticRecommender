@@ -142,7 +142,7 @@ workflow:
         dataset_name: "data_se"
 
         # Basket prediction settings
-        prediction_target: "cuisine"  # cuisine, vendor, product, or vendor_cuisine
+        prediction_target: "vendor_cuisine"  # cuisine, vendor, product, or vendor_cuisine
         enable_basket_metrics: true   # Multi-item evaluation
         filter_seen_items: true       # Exclude items from history
 
@@ -160,13 +160,13 @@ workflow:
         enable_thinking: true    # For Qwen3 models: enable/disable thinking mode
 
         # Test settings
-        n_samples: 200           # Number of test samples (-1 = all)
+        n_samples: 1000           # Number of test samples (-1 = all)
         min_history: 5          # Min orders per user
         deterministic_sampling: true  # Use deterministic (sorted) sampling for reproducibility
 
         # Async/parallel processing settings
         enable_async: true           # Use async evaluation for parallel LLM requests
-        max_workers: 500              # Concurrent LLM requests (when async enabled)
+        max_workers: 25              # Concurrent LLM requests (when async enabled)
         checkpoint_interval: 50      # Log progress every N samples
         retry_attempts: 3            # Retries per failed request
 
