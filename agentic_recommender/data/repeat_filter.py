@@ -159,12 +159,69 @@ class RepeatDatasetFilter:
             return None
 
 
+SAMPLES_CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "repeat_samples"
+
+
+def _compute_samples_cache_key(
+    filtered_train_df: pd.DataFrame,
+    filtered_test_df: pd.DataFrame,
+    deterministic: bool,
+    seed: int,
+) -> str:
+    """Compute cache key from data shape, content sample, and params."""
+    key_parts = [
+        str(filtered_train_df.shape),
+        str(filtered_test_df.shape),
+        str(filtered_train_df['customer_id'].nunique()),
+        str(filtered_test_df['customer_id'].nunique()),
+        str(filtered_train_df['order_id'].nunique()),
+        str(filtered_test_df['order_id'].nunique()),
+        str(deterministic),
+        str(seed),
+    ]
+    return hashlib.md5("_".join(key_parts).encode()).hexdigest()
+
+
+def _load_samples_cache(
+    dataset_name: str, cache_key: str
+) -> Optional[List[Dict[str, Any]]]:
+    """Load cached test samples if key matches."""
+    try:
+        cache_path = SAMPLES_CACHE_DIR / f"{dataset_name}_repeat_samples.pkl"
+        if not cache_path.exists():
+            return None
+        with open(cache_path, 'rb') as f:
+            data = pickle.load(f)
+        if data.get('cache_key') != cache_key:
+            return None
+        return data['samples']
+    except Exception as e:
+        print(f"[build_repeat_test_samples] Failed to load cache: {e}")
+        return None
+
+
+def _save_samples_cache(
+    dataset_name: str, cache_key: str, samples: List[Dict[str, Any]]
+) -> None:
+    """Save test samples to disk cache."""
+    try:
+        SAMPLES_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path = SAMPLES_CACHE_DIR / f"{dataset_name}_repeat_samples.pkl"
+        with open(cache_path, 'wb') as f:
+            pickle.dump({'cache_key': cache_key, 'samples': samples}, f)
+        print(f"[build_repeat_test_samples] Saved {len(samples)} samples to cache: {cache_path}")
+    except Exception as e:
+        print(f"[build_repeat_test_samples] Failed to save cache: {e}")
+
+
 def build_repeat_test_samples(
     filtered_train_df: pd.DataFrame,
     filtered_test_df: pd.DataFrame,
     n_samples: int = -1,
     deterministic: bool = True,
     seed: int = 42,
+    dataset_name: str = "",
+    use_cache: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Build test samples from filtered repeat dataset.
@@ -178,11 +235,29 @@ def build_repeat_test_samples(
         n_samples: Number of samples to return (-1 = all)
         deterministic: Sort by order_id for reproducibility
         seed: Random seed (used only if deterministic=False)
+        dataset_name: Dataset name for cache file prefix
+        use_cache: Whether to use disk cache
 
     Returns:
         List of test sample dicts
     """
     random.seed(seed)
+
+    # Try loading from cache (caches the full list before n_samples slicing)
+    if use_cache and dataset_name:
+        cache_key = _compute_samples_cache_key(
+            filtered_train_df, filtered_test_df, deterministic, seed
+        )
+        cached = _load_samples_cache(dataset_name, cache_key)
+        if cached is not None:
+            total_available = len(cached)
+            if 0 < n_samples < total_available:
+                sliced = cached[:n_samples]
+            else:
+                sliced = cached
+            print(f"[build_repeat_test_samples] Loaded from cache: {len(sliced)} samples "
+                  f"(from {total_available} available, key={cache_key[:8]}...)")
+            return sliced
 
     # Build training history per user
     user_histories: Dict[Any, List[Dict]] = {}
@@ -254,8 +329,12 @@ def build_repeat_test_samples(
     else:
         random.shuffle(samples)
 
-    # Limit samples
+    # Save full list to cache (before slicing)
     total_available = len(samples)
+    if use_cache and dataset_name:
+        _save_samples_cache(dataset_name, cache_key, samples)
+
+    # Limit samples
     if 0 < n_samples < total_available:
         samples = samples[:n_samples]
 

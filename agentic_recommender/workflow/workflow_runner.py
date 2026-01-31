@@ -1977,10 +1977,14 @@ class PipelineStages:
             n_samples = settings.get('n_samples', 20)
             deterministic = settings.get('deterministic_sampling', True)
 
+            use_samples_cache = settings.get('use_filter_cache', True) and not self.no_cache
+
             test_samples = build_repeat_test_samples(
                 filtered_train, filtered_test,
                 n_samples=n_samples,
                 deterministic=deterministic,
+                dataset_name=dataset_name,
+                use_cache=use_samples_cache,
             )
             self.logger.info(f"Built {len(test_samples)} test samples")
 
@@ -2054,6 +2058,13 @@ class PipelineStages:
 
                 output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
 
+                use_eval_cache = (
+                    settings.get('use_filter_cache', True)
+                    and settings.get('use_lightgcn_cache', True)
+                    and settings.get('use_swing_cache', True)
+                    and not self.no_cache
+                )
+
                 evaluator = AsyncRepeatEvaluator(
                     async_provider=async_provider,
                     lightgcn_manager=lightgcn_manager,
@@ -2061,7 +2072,12 @@ class PipelineStages:
                     geohash_index=geohash_index,
                     train_df=filtered_train,
                     config=eval_config,
+                    use_cache=use_eval_cache,
                 )
+
+                # Pre-compute LightGCN + Swing lookups for all test users
+                self.logger.info("Pre-computing per-user lookups (LightGCN + Swing)...")
+                evaluator.precompute_user_lookups(test_samples)
 
                 eval_output = asyncio.run(
                     evaluator.evaluate_async(

@@ -10,9 +10,11 @@ Metrics: Hit@1/3/5, NDCG@1/3/5, MRR
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
+import pickle
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +31,21 @@ logger = logging.getLogger(__name__)
 
 
 DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+USER_RECORDS_CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "repeat_user_records"
+USER_LOOKUPS_CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "repeat_user_lookups"
+
+
+def _hash_df(df) -> str:
+    """Compute a hash key from DataFrame shape and content summary."""
+    key_parts = [
+        str(df.shape),
+        str(df['customer_id'].nunique()),
+        str(df['order_id'].nunique()),
+    ]
+    if 'vendor_id' in df.columns:
+        key_parts.append(str(df['vendor_id'].nunique()))
+    return hashlib.md5("_".join(key_parts).encode()).hexdigest()
 
 
 @dataclass
@@ -78,6 +95,7 @@ class AsyncRepeatEvaluator:
         geohash_index,
         train_df,
         config: RepeatEvalConfig,
+        use_cache: bool = True,
     ):
         """
         Initialize async repeat evaluator.
@@ -89,6 +107,7 @@ class AsyncRepeatEvaluator:
             geohash_index: GeohashVendorIndex for candidate lookup
             train_df: Training DataFrame (for building similar user records)
             config: RepeatEvalConfig with settings
+            use_cache: Whether to use disk cache for user records and lookups
         """
         self.provider = async_provider
         self.lightgcn = lightgcn_manager
@@ -96,10 +115,14 @@ class AsyncRepeatEvaluator:
         self.geohash_index = geohash_index
         self.train_df = train_df
         self.config = config
+        self._use_cache = use_cache
 
         # Pre-build user training records for similar user lookups
         self._user_records: Dict[str, List[Dict]] = {}
         self._build_user_records()
+
+        # Pre-computed per-user lookups (populated by precompute_user_lookups)
+        self._user_lookups: Optional[Dict[str, Dict]] = None
 
         # State
         self.results_file: Optional[Path] = None
@@ -112,6 +135,31 @@ class AsyncRepeatEvaluator:
 
     def _build_user_records(self):
         """Pre-build training records per user for similar user lookups."""
+        dataset_name = self.config.dataset_name
+
+        # Try loading from cache
+        if self._use_cache and dataset_name:
+            df_key = _hash_df(self.train_df)
+            cache_path = USER_RECORDS_CACHE_DIR / f"{dataset_name}_user_records.pkl"
+            try:
+                if cache_path.exists():
+                    with open(cache_path, 'rb') as f:
+                        data = pickle.load(f)
+                    if data.get('cache_key') == df_key:
+                        self._user_records = data['user_records']
+                        logger.info(
+                            f"Loaded user records from cache: {len(self._user_records)} users "
+                            f"(key={df_key[:8]}...)"
+                        )
+                        print(
+                            f"[AsyncRepeatEvaluator] Loaded user records from cache: "
+                            f"{len(self._user_records)} users (key={df_key[:8]}...)"
+                        )
+                        return
+            except Exception as e:
+                logger.warning(f"Failed to load user records cache: {e}")
+
+        # Build from scratch
         seen_orders: Dict[str, set] = {}
 
         if 'day_num' in self.train_df.columns:
@@ -137,6 +185,149 @@ class AsyncRepeatEvaluator:
                 'day_of_week': int(row.get('day_of_week', 0)),
                 'hour': int(row.get('hour', 12)),
             })
+
+        # Save to cache
+        if self._use_cache and dataset_name:
+            try:
+                USER_RECORDS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                cache_path = USER_RECORDS_CACHE_DIR / f"{dataset_name}_user_records.pkl"
+                with open(cache_path, 'wb') as f:
+                    pickle.dump({
+                        'cache_key': df_key,
+                        'user_records': self._user_records,
+                    }, f)
+                logger.info(f"Saved user records cache: {len(self._user_records)} users → {cache_path}")
+                print(f"[AsyncRepeatEvaluator] Saved user records cache: {len(self._user_records)} users")
+            except Exception as e:
+                logger.warning(f"Failed to save user records cache: {e}")
+
+    def precompute_user_lookups(self, test_samples: List[Dict[str, Any]]) -> None:
+        """Pre-compute LightGCN + Swing lookups for all test users.
+
+        Caches LightGCN top cuisines, Swing similar users, and their full
+        (unfiltered) records per test user. The Round 1 cuisine filtering
+        still happens at runtime via _filter_similar_users_by_cuisines().
+
+        Args:
+            test_samples: List of test sample dicts (need customer_id)
+        """
+        dataset_name = self.config.dataset_name
+        user_ids = sorted(set(str(s['customer_id']) for s in test_samples))
+
+        # Try loading from cache
+        if self._use_cache and dataset_name:
+            cache_key_parts = [
+                "_".join(user_ids),
+                str(self.config.lightgcn_top_k_cuisines),
+                str(self.config.top_similar_users),
+                str(self.lightgcn.cache_key or ""),
+            ]
+            cache_key = hashlib.md5("_".join(cache_key_parts).encode()).hexdigest()
+            cache_path = USER_LOOKUPS_CACHE_DIR / f"{dataset_name}_user_lookups.pkl"
+
+            try:
+                if cache_path.exists():
+                    with open(cache_path, 'rb') as f:
+                        data = pickle.load(f)
+                    if data.get('cache_key') == cache_key:
+                        self._user_lookups = data['lookups']
+                        logger.info(
+                            f"Loaded user lookups from cache: {len(self._user_lookups)} users "
+                            f"(key={cache_key[:8]}...)"
+                        )
+                        print(
+                            f"[AsyncRepeatEvaluator] Loaded user lookups from cache: "
+                            f"{len(self._user_lookups)} users (key={cache_key[:8]}...)"
+                        )
+                        return
+            except Exception as e:
+                logger.warning(f"Failed to load user lookups cache: {e}")
+
+        # Build from scratch
+        print(f"[AsyncRepeatEvaluator] Pre-computing lookups for {len(user_ids)} users...")
+        lookups = {}
+        for i, uid in enumerate(user_ids):
+            top_cuisines = self.lightgcn.get_top_cuisines_for_user(
+                uid, top_k=self.config.lightgcn_top_k_cuisines
+            )
+            similar_users = self.swing.get_top_similar_users(
+                uid, top_k=self.config.top_similar_users
+            )
+            sim_records = {
+                sim_uid: self._user_records.get(sim_uid, [])
+                for sim_uid, _ in similar_users
+            }
+            lookups[uid] = {
+                'lightgcn_top_cuisines': top_cuisines,
+                'similar_users': similar_users,
+                'similar_users_full_records': sim_records,
+            }
+
+            if (i + 1) % 100 == 0:
+                print(f"  ... {i + 1}/{len(user_ids)} users")
+
+        self._user_lookups = lookups
+        print(f"[AsyncRepeatEvaluator] Pre-computed lookups for {len(lookups)} users")
+
+        # Save to cache
+        if self._use_cache and dataset_name:
+            try:
+                USER_LOOKUPS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                with open(cache_path, 'wb') as f:
+                    pickle.dump({
+                        'cache_key': cache_key,
+                        'lookups': lookups,
+                    }, f)
+                logger.info(f"Saved user lookups cache: {len(lookups)} users → {cache_path}")
+                print(f"[AsyncRepeatEvaluator] Saved user lookups cache: {len(lookups)} users")
+            except Exception as e:
+                logger.warning(f"Failed to save user lookups cache: {e}")
+
+    def _filter_similar_users_by_cuisines(
+        self,
+        similar_users: List[Tuple[str, float]],
+        similar_users_full_records: Dict[str, List[Dict]],
+        top_cuisines: List[str],
+    ) -> List[Dict]:
+        """
+        Filter pre-fetched similar users' records by Round 1 predicted cuisines.
+
+        Same logic as _get_similar_users_records() but operates on pre-fetched
+        data instead of calling Swing/user_records directly.
+
+        Args:
+            similar_users: List of (user_id, similarity_score) from Swing
+            similar_users_full_records: Dict of user_id → full order records
+            top_cuisines: Cuisines from Round 1 to filter by
+
+        Returns:
+            List of dicts with user_id, similarity, records
+        """
+        cuisine_set = set(c.lower() for c in top_cuisines)
+        result = []
+        total_records = 0
+        max_total = self.config.max_total_similar_records
+
+        for sim_uid, sim_score in similar_users:
+            records = similar_users_full_records.get(sim_uid, [])
+            filtered = [
+                r for r in records
+                if r.get('cuisine', '').lower() in cuisine_set
+            ]
+            filtered = filtered[-self.config.max_records_per_similar_user:]
+            remaining = max_total - total_records
+            if remaining <= 0:
+                break
+            if len(filtered) > remaining:
+                filtered = filtered[-remaining:]
+            total_records += len(filtered)
+            result.append({
+                'user_id': sim_uid,
+                'similarity': sim_score,
+                'records': filtered,
+            })
+
+        return result
 
     async def evaluate_async(
         self,
@@ -284,11 +475,15 @@ class AsyncRepeatEvaluator:
         start_time = time.time()
         customer_id = str(sample['customer_id'])
 
-        # Get LightGCN top cuisines for this user
-        lightgcn_top_cuisines = self.lightgcn.get_top_cuisines_for_user(
-            customer_id,
-            top_k=self.config.lightgcn_top_k_cuisines,
-        )
+        # Get LightGCN top cuisines for this user (from pre-computed cache or live)
+        lookup = self._user_lookups.get(customer_id) if self._user_lookups else None
+        if lookup:
+            lightgcn_top_cuisines = lookup['lightgcn_top_cuisines']
+        else:
+            lightgcn_top_cuisines = self.lightgcn.get_top_cuisines_for_user(
+                customer_id,
+                top_k=self.config.lightgcn_top_k_cuisines,
+            )
 
         # Round 1: Predict top cuisines
         round1_prompt = self._build_round1_prompt(sample, lightgcn_top_cuisines)
@@ -337,10 +532,17 @@ class AsyncRepeatEvaluator:
             cuisine = self.geohash_index.get_vendor_cuisine(vid)
             candidate_vendors.append(f"{vid}||{cuisine}" if cuisine else vid)
 
-        # Get similar users from Swing
-        similar_users_info = self._get_similar_users_records(
-            customer_id, round1_cuisines
-        )
+        # Get similar users' records filtered by Round 1 cuisines
+        if lookup:
+            similar_users_info = self._filter_similar_users_by_cuisines(
+                lookup['similar_users'],
+                lookup['similar_users_full_records'],
+                round1_cuisines,
+            )
+        else:
+            similar_users_info = self._get_similar_users_records(
+                customer_id, round1_cuisines
+            )
 
         # Round 2: Rank candidate vendors
         round2_prompt = self._build_round2_prompt(
