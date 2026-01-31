@@ -1201,6 +1201,9 @@ class CuisineBasedCandidateGenerator:
 
         candidates = [c for c, _ in candidates_with_scores]
 
+        # Store swing scores for downstream use (e.g., Round 1 prompt)
+        debug_info['candidate_scores'] = {c: round(s, 4) for c, s in candidates_with_scores}
+
         # Add ground truth if not present (for fair evaluation)
         if ground_truth:
             if ground_truth in candidates:
@@ -1319,10 +1322,14 @@ class EnhancedRerankEvaluator:
                 print(f"  Candidates: {len(candidates)}")
                 print(f"  GT rank: {candidate_info['ground_truth_rank']}, added: {candidate_info['ground_truth_added']}")
 
-            # Round 1: LLM reranking
+            # Extract swing scores for Round 1
+            swing_scores = candidate_info.get('candidate_scores', {})
+
+            # Round 1: LLM reranking (with Swing item-to-item similarity)
             round1_result = self._round1_rerank(
                 order_history=sample['order_history'],
                 candidates=candidates,
+                swing_scores=swing_scores,
                 target_hour=sample.get('target_hour'),
                 target_day_of_week=sample.get('target_day_of_week'),
             )
@@ -1341,12 +1348,14 @@ class EnhancedRerankEvaluator:
             # Derive LightGCN ranking (already sorted by score descending)
             lightgcn_ranking = [cuisine for cuisine, _ in lightgcn_scores]
 
-            # Round 2: Reflection
+            # Round 2: Reflection (with LightGCN user-item CF + target time)
             round2_result = self._round2_reflect(
                 order_history=sample['order_history'],
                 round1_ranking=round1_result['ranking'],
                 lightgcn_scores=lightgcn_scores,
                 candidates=candidates,
+                target_hour=sample.get('target_hour'),
+                target_day_of_week=sample.get('target_day_of_week'),
             )
 
             if verbose:
@@ -1400,16 +1409,17 @@ class EnhancedRerankEvaluator:
         self,
         order_history: List[Dict],
         candidates: List[str],
+        swing_scores: Dict[str, float] = None,
         target_hour: int = None,
         target_day_of_week: int = None,
     ) -> Dict[str, Any]:
         """
-        Round 1: LLM reranks all candidates based on user history.
+        Round 1: LLM reranks all candidates based on user history + Swing scores.
 
         Returns dict with 'ranking' (list), 'reasoning' (str), 'prompt' (str), 'raw_response' (str).
         """
         prompt = self._build_round1_prompt(
-            order_history, candidates, target_hour, target_day_of_week
+            order_history, candidates, swing_scores, target_hour, target_day_of_week
         )
 
         response = self.llm.generate(
@@ -1431,6 +1441,8 @@ class EnhancedRerankEvaluator:
         round1_ranking: List[str],
         lightgcn_scores: List[Tuple[str, float]],
         candidates: List[str],
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> Dict[str, Any]:
         """
         Round 2: LLM reflects on Round 1 + LightGCN signals.
@@ -1438,7 +1450,7 @@ class EnhancedRerankEvaluator:
         Returns dict with 'ranking' (list), 'reflection' (str), 'prompt' (str), 'raw_response' (str).
         """
         prompt = self._build_round2_prompt(
-            order_history, round1_ranking, lightgcn_scores
+            order_history, round1_ranking, lightgcn_scores, target_hour, target_day_of_week
         )
 
         response = self.llm.generate(
@@ -1458,10 +1470,11 @@ class EnhancedRerankEvaluator:
         self,
         order_history: List[Dict],
         candidates: List[str],
+        swing_scores: Dict[str, float] = None,
         target_hour: int = None,
         target_day_of_week: int = None,
     ) -> str:
-        """Build Round 1 reranking prompt."""
+        """Build Round 1 reranking prompt with Swing scores."""
         prediction_target = getattr(self.config, 'prediction_target', 'cuisine')
 
         # Format history
@@ -1487,29 +1500,71 @@ class EnhancedRerankEvaluator:
         time_context = ""
         if target_hour is not None and target_day_of_week is not None:
             day_name = self.DAY_NAMES[target_day_of_week]
-            time_context = f"Target time: {day_name} at {target_hour}:00\n"
+            time_context = f"Predict for: {day_name} at {target_hour}:00\n"
 
-        return f"""Based on this user's complete order history, RE-RANK all {len(candidates)} candidate cuisines from most likely to least likely.
+        # Build swing scores section
+        swing_section = ""
+        swing_ranking_str = ""
+        if swing_scores:
+            sorted_swing = sorted(swing_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+            swing_lines = [f"{i+1}. {c}: {s:.3f}" for i, (c, s) in enumerate(sorted_swing)]
+            swing_section = "\n## Item Similarity Scores (based on co-purchase patterns):\n" + "\n".join(swing_lines)
+            swing_ranking_str = "\n\n## Similarity-based Ranking:\n" + ", ".join([c for c, _ in sorted_swing])
 
-## Complete Order History ({len(order_history)} orders, oldest to newest):
+        # Build data format legend for vendor_cuisine mode
+        format_legend = ""
+        if prediction_target == 'vendor_cuisine':
+            format_legend = """
+## Data Format
+Each history entry is: vendor_id||cuisine_type||(day_of_week, hour_of_day)
+Candidates are: vendor_id||cuisine_type
+"""
+
+        # Build consider section
+        if prediction_target == 'vendor_cuisine':
+            consider = """Consider:
+- Temporal patterns: day-of-week and meal-time preferences (e.g., different choices on weekdays vs weekends, lunch vs dinner)
+- Vendor loyalty: repeated orders from the same vendor signal strong preference
+- Item similarity scores: items frequently co-purchased by other users score higher
+- Recency: recent orders may better reflect current preferences"""
+        else:
+            consider = """Consider:
+- Temporal patterns: day-of-week and meal-time preferences (e.g., different choices on weekdays vs weekends, lunch vs dinner)
+- Item similarity scores: items frequently co-purchased by other users score higher
+- Recency: recent orders may better reflect current preferences"""
+
+        return f"""Based on this user's order history, RE-RANK all {len(candidates)} candidates from most likely to least likely for the target time.
+{format_legend}
+## Order History ({len(order_history)} orders, oldest to newest):
 {history_str}
 
-## Prediction Context:
-{time_context}
+## Prediction Target:
+{time_context}{swing_section}{swing_ranking_str}
+
 ## Candidates to Rank:
 {candidates_str}
 
-You must rank ALL {len(candidates)} cuisines. Return your response as JSON:
-{{"ranking": ["most_likely", "second_most_likely", ..., "least_likely"], "reasoning": "brief explanation"}}"""
+{consider}
+
+Rank ALL {len(candidates)} candidates. Return JSON:
+{{"ranking": ["most_likely", ..., "least_likely"], "reasoning": "brief explanation"}}"""
 
     def _build_round2_prompt(
         self,
         order_history: List[Dict],
         round1_ranking: List[str],
         lightgcn_scores: List[Tuple[str, float]],
+        target_hour: int = None,
+        target_day_of_week: int = None,
     ) -> str:
-        """Build Round 2 reflection prompt."""
+        """Build Round 2 reflection prompt with target time."""
         prediction_target = getattr(self.config, 'prediction_target', 'cuisine')
+
+        # Target time context
+        time_context = ""
+        if target_hour is not None and target_day_of_week is not None:
+            day_name = self.DAY_NAMES[target_day_of_week]
+            time_context = f"Predict for: {day_name} at {target_hour}:00\n"
 
         # History summary (last 5)
         recent = order_history[-5:]
@@ -1532,22 +1587,36 @@ You must rank ALL {len(candidates)} cuisines. Return your response as JSON:
         lgcn_ranking = [c for c, _ in lightgcn_scores[:10]]
         lgcn_ranking_str = ", ".join(lgcn_ranking)
 
-        return f"""Review the initial ranking and collaborative filtering signals to produce a FINAL ranking.
+        # Build reflection guidance
+        if prediction_target == 'vendor_cuisine':
+            reflection_guidance = """Reflect on potential errors in your initial ranking:
+- Did you account for the target day/hour?
+- CF signals capture population-level patterns — if CF strongly disagrees, reconsider.
+- Balance vendor loyalty from history with CF discovery of new preferences."""
+        else:
+            reflection_guidance = """Reflect on potential errors in your initial ranking:
+- Did you account for the target day/hour?
+- CF signals capture population-level patterns — if CF strongly disagrees, reconsider."""
 
+        return f"""Review and refine your initial ranking using collaborative filtering signals from similar users.
+
+## Prediction Target:
+{time_context}
 ## User's Recent History (last 5):
 {history_summary}
 
-## Initial LLM Ranking (Round 1, top 10):
+## Your Initial Ranking (Round 1, top 10):
 {r1_str}
 
-## Collaborative Filtering Signals (LightGCN user-cuisine similarity):
+## Collaborative Filtering (user-item similarity from similar users):
 {lgcn_str}
 
-## LightGCN-based Ranking:
+## CF-based Ranking:
 {lgcn_ranking_str}
 
-Consider both your initial intuition AND the collaborative filtering signals from similar users.
-Produce your FINAL ranking of all cuisines.
+{reflection_guidance}
+
+Produce your FINAL ranking of ALL candidates.
 
 Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflection": "how you balanced the signals"}}"""
 
