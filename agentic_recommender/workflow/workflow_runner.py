@@ -2021,6 +2021,7 @@ class PipelineStages:
                 max_workers=max_workers,
                 checkpoint_interval=settings.get('checkpoint_interval', 50),
                 retry_attempts=settings.get('retry_attempts', 3),
+                request_timeout=settings.get('request_timeout', 30.0),
             )
 
             if enable_async and provider_type == 'openrouter':
@@ -2037,10 +2038,15 @@ class PipelineStages:
 
                 self.logger.info(f"Async mode: {max_workers} workers")
 
+                request_timeout = settings.get('request_timeout', 30.0)
+                retry_attempts = settings.get('retry_attempts', 3)
+
                 async_provider = AsyncLLMProvider(
                     api_key=api_key,
                     model_name=llm_config.get('openrouter', {}).get('model_name'),
                     max_concurrent=max_workers,
+                    timeout=request_timeout,
+                    retry_attempts=retry_attempts,
                 )
 
                 output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
@@ -2092,6 +2098,8 @@ class PipelineStages:
             self.logger.info(f"  Avg candidates: {metrics.get('avg_candidates', 0):.1f}")
             self.logger.info(f"  Avg time/sample: {metrics.get('avg_time_ms', 0):.0f}ms")
             self.logger.info(f"  Total/Valid samples: {metrics.get('total_samples', 0)}/{metrics.get('valid_samples', 0)}")
+            if metrics.get('error_samples', 0) > 0:
+                self.logger.info(f"  Error samples (skipped): {metrics['error_samples']}")
             self.logger.info("=" * 72)
 
             # ---- Save results ----

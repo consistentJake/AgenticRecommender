@@ -148,3 +148,13 @@ if we can't, we shall use lightGCN.
  3. we can see there are multiple things we can pre-compute and cache, make the caching as an option in config. and we can do those pre-compute like filtering records in training, in testing data, pre-compute the swing, lightGCN, geohash -> primary cuisine -> vendors mapping, and any others. exlicity in config marking them as using cache true, then we will compute and cache them. if use cache as false, we recompute the cache
  4. we still use the same way of calculating the metrics. we care about the hit rate and ncds, and also the #1 #3 #5 metrics
  5. still using the stage like design we have, in final stage, we still keep the detailed json that contains everything like request to LLM, response from LLM. 
+
+### result:
+doc/design/Repeated_Dataset_Evaluation_Plan260131.md
+
+
+
+ ## later improvement
+ 1. write comment in the place explaining why we use vendor geohash to filter vendors before round2. because we want to preserve the real app secanrio that we are recommending vendors based on area
+ 2. in the details result outputs/202601310519/stage9_repeat_detailed.json, I want you to also add the historical items tuple (vendor id, cuisine, time), associated recorsd we pass into round2 for each similar user, also in tuple format. also record the time spend in waiting llm response.
+ 3. after we fix this, copy the config file using cp command, then just change the model to `google/gemini-2.0-flash-001` and update n_samples as 500. then using multi-thread, multi worker like 50. run the code

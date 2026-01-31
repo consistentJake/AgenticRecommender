@@ -62,6 +62,8 @@ class RepeatEvalConfig:
     max_workers: int = 25
     checkpoint_interval: int = 50
     retry_attempts: int = 3
+    # Request timeout (per LLM attempt, in seconds)
+    request_timeout: float = 30.0
 
 
 class AsyncRepeatEvaluator:
@@ -100,6 +102,8 @@ class AsyncRepeatEvaluator:
 
         # State
         self.results_file: Optional[Path] = None
+        self._detailed_json_path: Optional[Path] = None
+        self._all_results: List[Dict] = []
         self._completed_ids: Set[str] = set()
         self._write_lock = asyncio.Lock()
         self._progress_count = 0
@@ -154,10 +158,13 @@ class AsyncRepeatEvaluator:
         output_path.mkdir(parents=True, exist_ok=True)
 
         self.results_file = output_path / "detailed_results.jsonl"
+        self._detailed_json_path = output_path / "stage9_repeat_detailed.json"
         self._start_time = time.time()
 
         # Resume support
         self._completed_ids = self._load_completed_ids()
+        # Load existing results into memory for incremental JSON writing
+        self._all_results = self._load_all_results_from_jsonl()
         pending = [s for s in test_samples if str(s['customer_id']) + "_" + str(s['order_id']) not in self._completed_ids]
 
         if verbose:
@@ -284,13 +291,25 @@ class AsyncRepeatEvaluator:
 
         # Round 1: Predict top cuisines
         round1_prompt = self._build_round1_prompt(sample, lightgcn_top_cuisines)
+        round1_error = False
 
-        round1_response = await self.provider.generate(
-            round1_prompt,
-            temperature=self.config.temperature_round1,
-            max_tokens=self.config.max_tokens_round1,
-            enable_thinking=self.config.enable_thinking,
-        )
+        round1_start = time.time()
+        try:
+            round1_response = await self.provider.generate(
+                round1_prompt,
+                temperature=self.config.temperature_round1,
+                max_tokens=self.config.max_tokens_round1,
+                enable_thinking=self.config.enable_thinking,
+            )
+        except Exception as e:
+            round1_response = f"ERROR: {e}"
+            round1_error = True
+            logger.warning(f"Round 1 LLM failed for {customer_id}: {e}")
+        round1_llm_ms = (time.time() - round1_start) * 1000
+
+        # Check if provider returned an ERROR string (all retries exhausted)
+        if round1_response.startswith("ERROR:"):
+            round1_error = True
 
         # Parse Round 1
         all_cuisines = list(set(
@@ -300,7 +319,10 @@ class AsyncRepeatEvaluator:
             round1_response, all_cuisines, lightgcn_top_cuisines
         )
 
-        # Candidate selection: geohash lookup with top cuisines
+        # Candidate selection: filter vendors by geohash + predicted cuisines.
+        # We use vendor_geohash to scope candidates to the same delivery area,
+        # mirroring a real app scenario where we only recommend vendors that
+        # can actually deliver to the user's location.
         target_geohash = sample.get('target_vendor_geohash', 'unknown')
         candidate_vendor_ids = self.geohash_index.get_vendors(
             target_geohash,
@@ -323,13 +345,25 @@ class AsyncRepeatEvaluator:
         round2_prompt = self._build_round2_prompt(
             sample, round1_cuisines, candidate_vendors, similar_users_info
         )
+        round2_error = False
 
-        round2_response = await self.provider.generate(
-            round2_prompt,
-            temperature=self.config.temperature_round2,
-            max_tokens=self.config.max_tokens_round2,
-            enable_thinking=self.config.enable_thinking,
-        )
+        round2_start = time.time()
+        try:
+            round2_response = await self.provider.generate(
+                round2_prompt,
+                temperature=self.config.temperature_round2,
+                max_tokens=self.config.max_tokens_round2,
+                enable_thinking=self.config.enable_thinking,
+            )
+        except Exception as e:
+            round2_response = f"ERROR: {e}"
+            round2_error = True
+            logger.warning(f"Round 2 LLM failed for {customer_id}: {e}")
+        round2_llm_ms = (time.time() - round2_start) * 1000
+
+        # Check if provider returned an ERROR string (all retries exhausted)
+        if round2_response.startswith("ERROR:"):
+            round2_error = True
 
         # Parse Round 2
         final_ranking = self._parse_round2_vendor_response(
@@ -341,6 +375,31 @@ class AsyncRepeatEvaluator:
         # Find ground truth rank
         ground_truth = sample['ground_truth']
         ground_truth_rank = self._find_rank(final_ranking, ground_truth)
+
+        # Build order history tuples: (vendor_id, cuisine, "DayName HH:00")
+        history_tuples = [
+            (o.get('vendor_id', ''), o.get('cuisine', ''),
+             f"{DAY_NAMES[o.get('day_of_week', 0)]} {o.get('hour', 12)}:00")
+            for o in sample['order_history']
+        ]
+
+        # Build full similar user records with tuples
+        similar_users_detail = []
+        for u in similar_users_info:
+            record_tuples = [
+                (r.get('vendor_id', ''), r.get('cuisine', ''),
+                 f"{DAY_NAMES[r.get('day_of_week', 0)]} {r.get('hour', 12)}:00")
+                for r in u['records']
+            ]
+            similar_users_detail.append({
+                'user_id': u['user_id'],
+                'similarity': u['similarity'],
+                'record_count': len(u['records']),
+                'records': record_tuples,
+            })
+
+        # Mark as error if either round failed completely
+        has_error = round1_error or round2_error
 
         return {
             'sample_idx': idx,
@@ -355,25 +414,28 @@ class AsyncRepeatEvaluator:
 
             'lightgcn_top_cuisines': lightgcn_top_cuisines[:10],
 
+            'order_history_tuples': history_tuples,
+
             'round1_prompt': round1_prompt,
             'round1_raw_response': round1_response,
             'round1_predicted_cuisines': round1_cuisines,
+            'round1_llm_ms': round1_llm_ms,
+            'round1_error': round1_error,
 
             'candidate_vendors': candidate_vendors,
             'candidate_count': len(candidate_vendors),
 
-            'similar_users': [
-                {'user_id': u['user_id'], 'similarity': u['similarity'],
-                 'record_count': len(u['records'])}
-                for u in similar_users_info
-            ],
+            'similar_users': similar_users_detail,
 
             'round2_prompt': round2_prompt,
             'round2_raw_response': round2_response,
             'final_ranking': final_ranking,
+            'round2_llm_ms': round2_llm_ms,
+            'round2_error': round2_error,
 
             'ground_truth_rank': ground_truth_rank,
             'time_ms': elapsed_ms,
+            'error': has_error,
         }
 
     def _build_round1_prompt(
@@ -671,22 +733,32 @@ Return JSON:
         return completed
 
     async def _write_result(self, result: Dict[str, Any]):
-        """Append result to JSONL file."""
+        """Append result to JSONL file and update detailed JSON."""
         async with self._write_lock:
             with open(self.results_file, 'a') as f:
                 f.write(json.dumps(result, default=str) + '\n')
+            # Keep in-memory list for incremental detailed JSON
+            self._all_results.append(result)
+            # Write full detailed JSON after each sample
+            if self._detailed_json_path:
+                with open(self._detailed_json_path, 'w') as f:
+                    json.dump(self._all_results, f, indent=2, default=str)
 
-    def _read_all_results(self) -> Dict[str, Any]:
-        """Read all results from JSONL file."""
+    def _load_all_results_from_jsonl(self) -> List[Dict]:
+        """Load all existing results from JSONL into memory."""
         results = []
         if self.results_file and self.results_file.exists():
             with open(self.results_file, 'r') as f:
                 for line in f:
                     if line.strip():
                         results.append(json.loads(line))
+        return results
+
+    def _read_all_results(self) -> Dict[str, Any]:
+        """Read all results from in-memory list."""
         return {
-            'results': results,
-            'completed_samples': len(results),
+            'results': self._all_results,
+            'completed_samples': len(self._all_results),
             'results_file': str(self.results_file),
         }
 
@@ -713,14 +785,17 @@ def compute_repeat_metrics(
 
     metrics = {}
 
-    # Filter to samples that had candidates
-    valid_results = [r for r in detailed_results if r.get('candidate_count', 0) > 0]
-    total = len(detailed_results)
+    # Filter out error samples, then filter to samples that had candidates
+    non_error = [r for r in detailed_results if not r.get('error', False)]
+    error_count = len(detailed_results) - len(non_error)
+    valid_results = [r for r in non_error if r.get('candidate_count', 0) > 0]
+    total = len(non_error)
     valid = len(valid_results)
 
     metrics['total_samples'] = total
     metrics['valid_samples'] = valid
     metrics['no_candidate_samples'] = total - valid
+    metrics['error_samples'] = error_count
 
     if valid == 0:
         for k in k_values:
@@ -759,7 +834,7 @@ def compute_repeat_metrics(
         r.get('candidate_count', 0) for r in valid_results
     ) / valid
     metrics['avg_time_ms'] = sum(
-        r.get('time_ms', 0) for r in detailed_results
-    ) / total
+        r.get('time_ms', 0) for r in non_error
+    ) / total if total > 0 else 0.0
 
     return metrics

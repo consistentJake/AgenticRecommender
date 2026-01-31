@@ -214,15 +214,15 @@ workflow:
         temperature_round2: 0.2
 
         # LLM settings
-        enable_thinking: true
+        enable_thinking: false
 
         # Test settings
-        n_samples: 20
+        n_samples: 200
         deterministic_sampling: true
 
         # Async settings
         enable_async: true
-        max_workers: 25
+        max_workers: 50
         checkpoint_interval: 50
         retry_attempts: 3
         request_timeout: 30       # Per-request timeout in seconds
@@ -239,7 +239,7 @@ llm:
     # api_key: "your-api-key"  # Or set GEMINI_API_KEY env var
 
   openrouter:
-    model_name: "qwen/qwen3-32b"
+    model_name: "moonshotai/kimi-k2.5"
     api_key: "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"  # Or set OPENROUTER_API_KEY env var
 
 # Output directory settings

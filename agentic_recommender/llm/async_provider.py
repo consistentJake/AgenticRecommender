@@ -41,7 +41,7 @@ class AsyncLLMProvider:
         api_key: str,
         model_name: str = None,
         max_concurrent: int = 10,
-        timeout: float = 120.0,
+        timeout: float = 30.0,
         retry_attempts: int = 3,
         retry_delay: float = 1.0,
     ):
@@ -52,7 +52,7 @@ class AsyncLLMProvider:
             api_key: OpenRouter API key
             model_name: Model to use (default: qwen/qwen3-32b)
             max_concurrent: Maximum concurrent requests
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (per attempt)
             retry_attempts: Number of retry attempts on failure
             retry_delay: Base delay between retries (exponential backoff)
         """
@@ -96,7 +96,11 @@ class AsyncLLMProvider:
             limit_per_host=self.max_concurrent,
             keepalive_timeout=30,
         )
-        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        timeout = aiohttp.ClientTimeout(
+            total=self.timeout,
+            sock_connect=10,
+            sock_read=self.timeout,
+        )
         self.session = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
@@ -157,13 +161,17 @@ class AsyncLLMProvider:
 
         for attempt in range(self.retry_attempts):
             try:
-                return await self._generate_single(
-                    prompt=prompt,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    system_prompt=system_prompt,
-                    enable_thinking=enable_thinking,
-                    **kwargs
+                # asyncio.wait_for as safety net in case aiohttp timeout doesn't trigger
+                return await asyncio.wait_for(
+                    self._generate_single(
+                        prompt=prompt,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_prompt,
+                        enable_thinking=enable_thinking,
+                        **kwargs
+                    ),
+                    timeout=self.timeout + 5,  # slightly longer than aiohttp timeout
                 )
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_error = e
