@@ -1,0 +1,2033 @@
+arXiv:2402.14440v1 [cs.IR] 22 Feb 2024
+
+Recommender for Its Purpose: Repeat and Exploration in Food
+Delivery Recommendations
+Jiayu Li
+
+Aixin Sun∗
+
+Weizhi Ma
+
+jy-li20@mails.tsinghua.edu.cn
+DCST, Tsinghua University
+Beijing, China
+
+axsun@ntu.edu.sg
+SCSE, Nanyang Technological
+University
+Singapore
+
+mawz@tsinghua.edu.cn
+AIR, Tsinghua University
+Beijing, China
+
+Peijie Sun
+
+Min Zhang∗
+
+sun.hfut@gmail.com
+DCST, Tsinghua University
+Beijing, China
+
+z-m@tsinghua.edu.cn
+DCST, Tsinghua University
+Beijing, China
+
+ABSTRACT
+
+KEYWORDS
+
+Recommender systems have been widely used for various scenarios,
+such as e-commerce, news, and music, providing online contents
+to help and enrich users’ daily life. Different scenarios hold distinct
+and unique characteristics, calling for domain-specific investigations and corresponding designed recommender systems. Therefore,
+in this paper, we focus on food delivery recommendations to unveil unique features in this domain, where users order food online
+and enjoy their meals shortly after delivery. We first conduct an
+in-depth analysis on food delivery datasets. The analysis shows that
+repeat orders are prevalent for both users and stores, and situations’
+differently influence repeat and exploration consumption in the
+food delivery recommender systems. Moreover, we revisit the ability of existing situation-aware methods for repeat and exploration
+recommendations respectively, and find them unable to effectively
+solve both tasks simultaneously. Based on the analysis and experiments, we have designed two separate recommendation models –
+ReRec for repeat orders and ExpRec for exploration orders; both are
+simple in their design and computation. We conduct experiments
+on three real-world food delivery datasets, and our proposed models outperform various types of baselines on repeat, exploration,
+and combined recommendation tasks. This paper emphasizes the
+importance of dedicated analyses and methods for domain-specific
+characteristics for the recommender system studies.
+
+Food Delivery Recommendation, Repeat Consumption, User Behavior Modeling, Context-aware Recommendation
+
+CCS CONCEPTS
+• Information systems → Recommender systems; Personalization.
+∗ Aixin Sun and Min Zhang are the corresponding authors.
+
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+© 2024 Association for Computing Machinery.
+ACM ISBN 978-1-4503-XXXX-X/18/06. . . $15.00
+https://doi.org/XXXXXXX.XXXXXXX
+
+ACM Reference Format:
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang. 2024. Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations. In Proceedings of Make sure to enter the correct conference title
+from your rights confirmation emai (Conference acronym ’XX). ACM, New
+York, NY, USA, 11 pages. https://doi.org/XXXXXXX.XXXXXXX
+
+1
+
+INTRODUCTION
+
+Recommenders have become pervasive in our daily life, ranging
+from e-commerce and advertising to music and social media. Extensive research has been conducted on scenario-agnostic generic
+recommender systems, providing valuable insights for understanding user preferences in common. However, significant variations
+exist in task settings and user behavior patterns across different recommendation scenarios. For instance, delivery location is a required
+input for food delivery recommenders, while location is not essential for music recommendation. Regarding user behaviors, repeat
+consumption of the same items is common in grocery shopping [3],
+while users usually do not read similar news repeatedly. Analyzing scenario-specific characteristics and designing corresponding
+recommenders is valuable for both research and practice.
+In this paper, we take the food delivery scenario as a case study
+to investigate user behavior patterns and influential factors. Based
+on the investigation, dedicated recommenders are further designed
+to make better use of the scenario-specific characteristics.
+In this specific and important scenario, where users order food
+online and enjoy their meals after delivery, is selected for our case
+study for two reasons. First, food delivery platforms have gained
+widespread popularity globally, with hundreds of Apps providing
+services for billions of users.1 It is one of the recommendation
+services that has significantly benefited our daily lives. Second, food
+delivery is an interesting research scenario: Recommendations are
+naturally situation-sensitive since users’ food preferences usually
+vary with time; and delivery distance is also an important factor for
+when the food can arrive. Moreover, people often make similar food
+choices, which may contribute to noticeable repeat consumption.
+1 https://www.businessofapps.com/data/food-delivery-app-market/
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+These characteristics distinguish food delivery recommendations
+from many others, making it worthy of in-depth study.
+However, speculations about ubiquitous repeat and exploration
+consumption, as well as the impact of situations for repeat and
+new consumption, have not been confirmed with real data on food
+delivery platforms. In this paper, we conduct in-depth analyses of
+food delivery datasets for three cities located in Asia and Europe
+from two food delivery platforms, as shown in Section 4. Our analyses show similar findings in interactions across all three datasets,
+including: (i) Repeat and exploration orders are both prevalent for
+users and stores.2 (ii) Historical situations exert a stronger influence
+on users’ choices for repeat consumption compared to exploration
+consumption. (iii) Collaborative situations, on the contrary, have a
+greater impact on users’ exploration consumption.
+Building upon these findings, we re-evaluate the efficacy of current situation-aware recommenders in recommending repeat and
+new stores in the food delivery scenario in Section 4.4. Results show
+that sequential recommenders shine for repeat consumption, while
+collaborative filtering-based recommenders achieve better recommendations for exploration, consistent with our analyses. More
+importantly, recommending new stores for users is considerably
+more challenging than suggesting repeat stores. Thus, integrating
+the modeling or evaluation of repeat and exploration consumption
+may result in overlooking the exploration recommendation task.
+In fact, we argue that the two tasks are fundamentally different
+due to distinct candidate items, i.e., the stores a user has interacted
+with before (a small set) the versus stores a user has never interacted with (a much larger set). Nevertheless, existing solutions,
+designed for generic recommendation tasks, do not adequately address such specific factors (i.e., importance of situations and distinct
+repeat/exploration consumption) crucial for food delivery recommendations.
+Inspired by the above findings, we propose two simple yet effective situation-aware methods for repeat and exploration recommendations, respectively, in Section 5. The repeat recommender,
+RepRec, relies on the similarity between historical and current
+situations to recommend stores from historical interactions. The
+exploration recommender, ExpRec, utilizes various information,
+especially global situation representation and collaborative users,
+as exploration triggers to recommend new items. In practice, the
+repeat and exploration recommendations can be presented to users
+distinctly, such as through segregated display cards or slots. This
+proactive approach not only ensures a streamlined user experience
+but also acknowledges the unique nature of each recommendation
+type. Whereas, if a unified recommendation list is needed for App
+displa, an intent-aware ensemble module is proposed to aggregate
+the repeat and exploration recommendations. Extensive experiments have been conducted on real-world food delivery datasets
+from three Asian and European cities released by two platforms.
+Our proposed simple and efficient models, RepRec, ExpRec, and
+Ensemble module, outperform the baselines of various types in
+respective tasks.
+The main contributions of this paper are summarized as follows.
+
+2 As explained in Section 3, the recommended items in this study refer to stores (e.g.,
+
+restaurants) rather than specific food orders (e.g., the dishes ordered from a restaurant).
+
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang
+
+• We conduct an in-depth analysis on real-world food delivery datasets
+covering three cities in different countries, which reveals ubiquity of repeat orders, distinct influences of situations on repeat
+and exploration consumption, and necessity for separate design
+for repeat and exploration in food delivery recommendations.
+• We formulate the food delivery recommendation task as two
+sub-tasks and design recommenders for repeat consumption and
+exploration consumption respectively based on scenario-specific
+requirements.
+• We conduct experiments to evaluate our simple recommenders
+against state-of-the-art models considering repeat/exploration
+patterns and situation-awareness. Results show that our recommenders, proposed for the practical scenario, beat generic models
+with better efficiency.
+
+2
+
+RELATED WORK
+
+In recommendation systems, users’ intentions for repeat consumption vary across scenarios [2]. We review related studies on repeat
+and exploration in Section 2.1. Empirical studies also demonstrate
+that users’ preferences are influenced by dynamic situations, including factors such as location, temporal information, and activities [16, 22]. We review the related studies in Section 2.2.
+
+2.1
+
+Repeat and Exploration in Recommendation
+
+Repeat-aware recommenders have been widely discussed in music
+listening [28, 33], e-commerce [24, 34], and grocery shopping [3, 12]
+scenarios. Some studies focus on modeling the repeat patterns of
+users or items in historical sequences of interactions. Examples include predicting the interest sustainability of items [10], modeling
+the item necessity intensity with random point process [34], and enhancing item embedding with corresponding personalized or global
+repeat-consumption intervals [3, 24, 26]. Another line of research
+pays attention to separating repeat consumption recommendation
+from all by specific modules. For instance, in RepeatNet [29], a
+repeat mode and an explore mode are respectively proposed to decode users’ repeat and exploration preferences from a shared user
+sequential embedding. NovelNet [21] utilizes a pointer network to
+model repeat consumption behaviors and an attention module for
+exploration recommendation.
+When it comes to recommending new items to users, diverse
+perspectives have emerged. One is serendipity recommendation,
+which explore items that are unexpected yet match the users’ interests [13]. A key focus of these recommenders lies in modeling the
+possible directions of new interest for users. For example, serendipity vectors are generated to represent users’ exploration preferences
+in [20]. Zhang et al. [38] use the similarity of time and locations
+to provide serendipity locations for the next POI recommendation.
+Review text is also adopted to measure and predict serendipity
+of items [9]. Another view on exploration in recommendations
+comes from Reinforcement learning (RL) methods [1], where the
+dynamic exploration process of users are simulated with an RL
+environment. However, the majority of RL-based recommenders
+utilize interaction-level training and test settings, which are entirely
+different from mainstream recommendation models.
+
+Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations
+
+Analyses in sequential [18] and next-basket recommendation [19]
+show a trade-off between repeat and exploration in recommendations. Previous studies have predominantly focused on either exploration or repeat, often lacking an analysis of the similarities and
+differences between these two types of interactions. Furthermore,
+these studies did not consider the impact of situation/context, especially dynamic context, on repeat and exploration behaviors—crucial
+factors in food delivery systems. In this paper, we conduct an indepth analysis of the distinct roles of situations in repeat and exploration, and design corresponding methods for both tasks.
+
+2.2
+
+Situation-aware Recommendation
+
+Context-Aware Recommender Systems (CARS) can be applied for
+modeling situations in user interactions. CARS can be categorized
+into two types based on the way of information utilization: CFenhanced models and sequential-based models. CF-enhanced CARS
+models the relations between features, such as second-order interaction terms in FM [30], attention-based pooling in AFM [37], and
+two-stream MLP in FinalMLP [23]. Sequential CARS leverages users’
+historical behaviors and context to predict users’ preference [41],
+preference evolving [40], and long-short term interest [5]. Recent
+studies have paid attention to some specific types of situations.
+For example, temporal features are widely considered in sequential recommenders, such as the time intervals of interactions [34],
+multi-scale temporal embeddings [6], and dynamic user profiles
+with semantic time features [27]. Spatial situations are also employed in POI recommendation and location-based services, where
+they capture dynamic changes in preferences [15] or model complex
+relationships between time, locations, and users [14, 22].
+A series of recent works paid attention to recommenders in
+the food delivery scenarios. The main focus is to employ spatialtemporal features. For example, food delivery duration is predicted
+and used to enhance recommendations in [36]. Various popular
+neural network architectures are integrated with time-spatial aware
+structures to capture the situation-sensitive preference changes,
+including multi-head attention [22], multi-layer transformation [8],
+contrastive learning [11], and graph-based embedding [39].
+Existing situation-aware recommenders often lack thorough
+analysis and modeling of user behavior patterns, particularly in distinguishing between repeat and new consumption. The distinctions
+and similarities in the impact of situations on repeat and exploration consumption remain unclear. Recognizing the significance
+of both repeat consumption patterns and situations in food delivery recommendations, we conduct a comprehensive analysis that
+considers both aspects. Based on this analysis, we propose simple
+yet effective models to enhance performance for both repeat and
+exploration recommendation tasks.
+
+3
+
+THE RESEARCH PROBLEM
+
+In food delivery services, an interaction is recorded when a user
+initiates an order for food from a store, providing details such as
+the desired food, time, and location of delivery. Formally,
+Definition 1 (Food Delivery Interaction). A food delivery
+interaction 𝑥 is a 4-tuple 𝑥 = (𝑢, 𝑠, 𝑡, ℓ), representing user 𝑢 ordered
+food from store 𝑠 at time 𝑡 with delivery location ℓ. We denote the set
+of all interactions as X.
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+Table 1: Statistics of three datasets from three cities around
+the world on two platforms. Rep.% represents the percentage
+of repeat consumption.
+Dataset
+
+#User
+
+#Store
+
+#Order
+
+Rep.%
+
+City
+
+DHRD-SE
+DHRD-SG
+TRD (Meituan)
+
+7,900
+46,129
+76,118
+
+1,131
+7,296
+3,169
+
+128,329
+791,088
+839,011
+
+56.5%
+42.3%
+38.0%
+
+Stockholm
+Singapore
+Beijing
+
+Note that location ℓ refers to the location where the food shall
+be delivered to. This location is usually different from the store’s
+physical location, which is an attribute of the store.
+Because store recommendation is considered an urgent practical
+task in food delivery applications [39], we focus on recommending stores instead of food to users, i.e., stores rather than food are
+treated as items in recommender systems. Accordingly, we define
+the research problem as follows.
+Definition 2 (Food Delivery Recommendation). Given a set
+of historical food delivery interactions X, the task is to recommend a
+𝑁 ⊂ 𝑆 for a user 𝑢 when she needs food recommenlist of stores {𝑠𝑖 }𝑖=1
+dations at time 𝑡 with delivery location ℓ.
+In our problem definition, in addition to user id 𝑢, both time 𝑡
+and delivery location ℓ are known to the recommendation model
+as input, which are denoted as situations. Such setting simulates
+the practical scenario of food delivery service: the recommender
+works only when a user 𝑢 opens a food delivery app at time 𝑡 and
+specifies delivery location ℓ.
+
+4
+
+REPEAT, EXPLORATION, AND SITUATIONS
+
+To analyze common behavior patterns and preferences among users
+in the food delivery scenario, we leverage datasets collected by two
+renowned platforms across three distinct cities worldwide:
+Delivery Hero Recommendation Dataset (DHRD) [4]. The
+DHRD dataset comprises data from over 4.5 million orders placed
+by more than 1 million users on the Delivery Hero platform spanning a period of three months. We utilize the data of two cities in
+our research, namely DHRD-SE of Stockholm, and DHRD-SG of
+Singapore, respectively.3 We also refer to the datasets as D-SE and
+D-SG, respectively, for short, when the context is clear.
+Takeout Recommendation Dataset (TRD).4 The TRD dataset
+encompasses one-month orders from 0.2 million users in Beijing
+using the Meituan Takeout app.
+To observe stable user behavior patterns in the datasets, we
+filter users with fewer than ten orders in DHRD, and fewer than
+five orders in TRD, based on the data distribution. Statistics of the
+filtered datasets used in our experiments are reported in Table 1.
+
+4.1
+
+Noticeable Repeat Consumption
+
+People are creatures of habit, and having a habitual diet is common
+in our daily lives. Therefore, in the food delivery scenario, a reasonable conjecture is that users often repeatedly place orders from
+the same store, i.e., the existence of repeat consumption. As our
+key focus is store recommendation, we generalize the concept of
+3 Data of Taipei was not used in this research due to a timezone mismatch in the data.
+4 https://zenodo.org/records/8025855
+
+DHRD-SE
+DHRD-SG
+TRD
+
+13
+
+60%
+
+11
+
+40%
+20%
+0
+
+5
+
+10
+
+15
+
+20
+
+DHRD-SE
+DHRD-SG
+TRD
+25
+30
+
+The n-th order of user
+
+(a) Repeat ratio against orders.
+
+9
+7
+5
+3
+1
+0
+
+5
+
+10
+
+15
+
+20
+
+The n-th order of user
+
+25
+
+30
+
+100%
+100%
+
+Exploration ratio (re = 1 rr)
+80%
+
+60%
+
+40%
+
+80%
+70%
+60%
+
+20%
+0%
+DHRD-SE
+DHRD-SG
+TRD
+
+40%
+25%
+20%
+0%
+
+0%
+
+20%
+
+40%
+
+60%
+
+Repeat ratio (rr)
+
+80%
+
+100%
+
+Stores (%) with repeat ratio>rr
+
+15
+
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang
+
+Users (%) with repeat ratio>rr
+
+80%
+
+# Explored Stores
+
+Orders (%) being repeat
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+100%
+100%
+
+Exploration ratio (re = 1 rr)
+80%
+
+60%
+
+40%
+
+20%
+0%
+DHRD-SE
+DHRD-SG
+TRD
+
+40%
+
+60%
+
+80%
+
+85%
+80%
+60%
+40%
+20%
+0%
+
+0%
+
+20%
+
+Repeat ratio (rr)
+
+100%
+
+(b) Explored stores against orders. (c) Repeat/Exploration ratio of users. (d) Repeat/Exploration ratio of stores.
+
+Figure 1: Statistics on repeat consumption: (a) The percentages of orders being repeat at the 𝑛-th order of all users, (b) The
+number of explored stores at the 𝑛-th order of all users, (c) The cumulative distribution of repeat/exploration ratio in the last
+two weeks of users, and (d) that of all stores.
+“same food” to “same store”. And all orders except for repeat ones
+are defined as exploration consumption.
+To validate our conjecture on repeat consumption, we plot the
+percentage of repeat consumption of users’ 𝑛-th order (1 ≤ 𝑛 ≤
+30) in Figure 1a. At fifteenth order (𝑛 = 15), 68.6% Stockholm
+users, 55.1% Singapore users, and 56.8% Beijing users choose a store
+which they have previously ordered from (i.e., from the first 14
+orders). We also show the number of stores that users have already
+explored in Figure 1b, revealing that while the number of explored
+stores grows with orders, it remains limited compared to the entire
+dataset. We further calculate the ratio of repeat and exploration
+consumption (denoted as 𝑟𝑟 and 𝑟𝑒 , respectively) for orders placed in
+the last two weeks. The cumulative distributions of users and stores
+with repeat (exploration) ratio greater (less) than 𝑟𝑟 (𝑟𝑒 ) are shown
+in Figures 1c and 1d, respectively. It shows that over 70% users
+and over 85% stores have experienced repeat consumption in the
+last two weeks. On the other, almost all stores had new customers,
+and more than half of users explored new stores. Nevertheless,
+compared with general sequential recommendation datasets [19],
+the repeat ratio in the food delivery scenario is noticeable.
+
+Observation 1. Repeat and exploration orders are both prevalent
+in the food delivery scenario among users and stores.
+
+4.2
+
+Historical Situations
+
+Users’ own interaction history reflects their preferences and habits,
+which inspire various sequential recommendation methods. We begin by analyzing the influences of historical situations, specifically
+examining the associations between users’ historical situations and
+store selections for repeat and exploration consumption.
+We quantify the association between historical situations and
+stores through the correlations between historical situation similarity and store similarity. Given an interaction 𝑥 = (𝑢, 𝑠, 𝑡, ℓ) of user 𝑢
+at time 𝑡, let all historical interactions of user 𝑢 be 𝑥®𝑢 = {𝑥 1, ..., 𝑥𝑛 }
+with 𝑥𝑖 = (𝑢, 𝑠𝑖 , 𝑡𝑖 , ℓ𝑖 ), 𝑡𝑖 < 𝑡. The situation similarity between current 𝑥 and a historical interaction 𝑥𝑖 ∈ 𝑥®𝑢 is measured by the
+differences in time and locations. For time difference, the date, hour,
+and day of week are extracted from the timestamps 𝑡 and 𝑡𝑖 , and the
+differences are calculated and normalized for each aspect. As for
+locations, since the datasets only present encoded IDs, we assess
+whether location IDs are the same for 𝑥 and 𝑥𝑖 .
+1
+𝑆𝑖𝑚 𝜇,𝑖 = 1 − (𝐷 (𝑑𝑎𝑡𝑒) + 𝐷 (ℎ𝑜𝑢𝑟 ) + 𝐷 (𝑑𝑎𝑦𝑂 𝑓 𝑊 𝑒𝑒𝑘) + I(ℓ = ℓi ))
+4
+(1)
+Here, 𝐷 indicates the normalized difference, and I is the indicator
+function. Store similarity of 𝑠 and 𝑠𝑖 is calculated by the differences
+of store attributes, including the store brand/chain, primary cuisine
+types, and location IDs.
+3
+
+𝑆𝑖𝑚𝜏,𝑖 =
+
+1 ∑︁ 𝑘
+I(𝑠 = 𝑠𝑖𝑘 )
+3
+
+(2)
+
+𝑘=1
+
+Observation 1 emphasizes users’ noticeable repetition habits in
+food delivery. Moreover, as the explored stores are limited in users’
+orders and users’ unexplored stores are much more than consumed
+ones, the candidate search space for repeat recommendation is
+much smaller than exploration recommendation. Therefore, recommending for repeat and exploration should be treated separately in
+the food delivery scenario.
+However, there is a lack of in-depth analysis of distinct characteristics of users’ preferences for repeat and exploration consumption,
+as well as how to design corresponding recommendation strategies.
+As users’ situations (time and location) are important factors for
+food selections, we explore the disparities in situations’ influence
+on user choices between repeat and new consumption. Next, we
+examine the influences of situations from two common aspects in
+recommendation: users’ own history and collaborative information
+from similar users, in Sections 4.2 and 4.3, respectively.
+
+Here, 𝑠 𝑘 denotes the 𝑘-th attribute of store 𝑠. Finally, the influence
+of historical situations, 𝐼𝑛𝑓ℎ𝑖𝑠 , is indicated by Pearson correlation
+between the situation similarity sequence {𝑆𝑖𝑚 𝜇,𝑖 }𝑛𝑖=1 and the store
+similarity sequence {𝑆𝑖𝑚𝜏,𝑖 }𝑛𝑖=1 . Higher 𝐼𝑛𝑓ℎ𝑖𝑠 indicates closer relations between situation similarity and store preference similarity,
+i.e., greater influence of historical situations on store selections.
+The distribution densities of 𝐼𝑛𝑓ℎ𝑖𝑠 of all repeat and exploration
+consumption in three datasets are shown in Figure 2.5 Despite the
+diverse culinary cultures and different food delivery platforms in
+the three cities corresponding to datasets, the distinctions between
+repeat and exploration consumption remain consistent: The influences of historical situations are notably higher for repeat consumption than exploration on average. Moreover, repeat interactions
+5 Consumption with at least five historical interactions is included to avoid unstable
+
+correlations.
+
+Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations
+
+explore
+repeat
+
+1.2
+
+0.036 0.175
+
+0.8
+0.6
+0.4
+0.2
+0.0
+
+explore
+repeat
+
+1.0
+
+Density
+
+Density
+
+1.0
+
+0.052
+
+1.2
+
+0.211
+
+0.8
+0.6
+0.4
+0.2
+
+1.0
+
+0.5
+
+0.0
+
+0.5
+
+(a) DHRD-SE (Stockholm)
+
+1.0
+
+0.0
+
+explore
+repeat
+
+1.0
+
+Density
+
+1.2
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+0.107
+
+0.262
+
+0.0
+
+0.5
+
+0.8
+0.6
+0.4
+0.2
+
+1.0
+
+0.5
+
+0.0
+
+0.5
+
+0.0
+
+1.0
+
+1.0
+
+(b) DHRD-SG (Singapore)
+
+0.5
+
+1.0
+
+(c) TRD (Beijing)
+
+Figure 2: Distributions of the influences of historical situations, 𝐼𝑛𝑓ℎ𝑖𝑠 , on repeat and exploration consumption, where influences
+are quantified with the correlations between historical situation similarities and store similarities.
+
+Observation 2. In general, historical situations exert a greater
+influence on users’ choices for repeat consumption compared to exploration consumption.
+
+-
+
+Collaborative Situations
+
+In addition to users’ own historical interactions, collaborative information from other users is generally essential for modeling
+user preferences in recommender systems. We now explore the
+influences of collaborative situations, specifically examining the
+relationships between collaborative users’ situations and store selections for both repeat and exploration consumption.
+The collaborative users are derived by the similarity of their store
+choices. Specifically, for each user, we represent her store preference
+using the relative frequency of each store she has interacted with
+before. User similarity is then calculated based on the correlation
+of the store preference vectors. The 𝐾 most similar users (𝐾 = 10
+in our analysis) are considered to be a user’s collaborative users.
+The influences of collaborative situations are quantified by correlations between the similarity of situations and the similarity
+of stores among collaborative users. Given a user’s interaction
+𝑥 = (𝑢, 𝑠, 𝑡, ℓ), the collaborative interaction set 𝑋𝑐 = {(𝑢𝑖 , 𝑠𝑖 , 𝑡𝑖 , ℓ𝑖 )}
+includes recent interactions made by 𝐾 collaborative users of 𝑢,
+with 𝑡𝑖 ∈ (𝑡 − 𝑡𝛿 , 𝑡). In our analysis, we set 𝑡𝛿 to be one week.6
+Afterward, similarities of situations and stores are measured in the
+same way as in Eq. 1 and 2, and their Pearson correlation represents
+the influences of collaborative situations, 𝐼𝑛𝑓𝑐𝑜𝑙 .
+The distribution densities of 𝐼𝑛𝑓𝑐𝑜𝑙 of repeat and exploration
+consumption are shown in Figure 3. Contrary to 𝐼𝑛𝑓ℎ𝑖𝑠 , the influence of collaborative situations (𝐼𝑛𝑓𝑐𝑜𝑙 ) on exploration consumption
+consistently surpasses that on repeat consumption across different
+datasets, indicating a greater impact of collaborative influences in
+exploration consumption. In other words, interactions by collaborative users in similar situations contribute more to predicting a
+user’s exploration to some extent.
+6We only consider recent interactions from all collaborative users to factor in the
+
+temporal dynamics of the user-item interactions along global timeline [32].
+
+NDCG@3
+
+4.3
+
+Table 2: Performance of CF-enhanced (SOnly and FM) and
+sequential (HisPop and DIN) recommenders, considering
+situations. Rep. and Exp. are short for Repeat and Exploration.
+The best results are in boldface and second best underlined.
+Group/Dataset
+
+SOnly
+
+FM
+
+HisPop
+
+DIN
+
+Rep.
+
+D-SE
+D-SG
+TRD
+
+–
+–
+–
+
+0.6996
+0.6038
+0.5583
+
+0.7059
+0.5941
+0.5752
+
+0.7629
+0.6819
+0.7211
+
+Exp.
+
+D-SE
+D-SG
+TRD
+
+0.1010
+0.1458
+0.1090
+
+0.0764
+0.1888
+0.0962
+
+–
+–
+–
+
+0.0639
+0.1409
+0.0877
+
+Rep.
+
+D-SE
+D-SG
+TRD
+
+–
+–
+-
+
+0.5620
+0.4920
+0.4619
+
+0.6433
+0.4999
+0.4829
+
+0.6229
+0.5626
+0.5954
+
+Exp.
+
+D-SE
+D-SG
+TRD
+
+0.0826
+0.1056
+0.0801
+
+0.0533
+0.1362
+0.0715
+
+–
+–
+–
+
+0.0425
+0.0996
+0.0539
+
+HR@3
+
+are less likely to exhibit negative correlations between historical
+situations and stores. In other words, for repeat consumption, users
+tend to order food from similar stores when they find themselves in
+similar situations as in the past. However, the influence of historical
+habits tends to weaken when exploring new stores.
+
+Observation 3. In general, collaborative situations exert a greater
+influence on users’ choices for exploration consumption compared to
+repeat consumption.
+
+4.4
+
+Revisit Existing Solutions
+
+Observations 2 and 3 indicate distinct influences of situations on
+users’ repeat and exploration consumption in food delivery scenario.
+Next, we explore the extent to which these distinct influences are
+reflected in existing situation-aware recommenders.
+Situations can be viewed as context information; hence, we evaluate the performance of two classical Context-Aware Recommender
+Systems (CARS): a CF-enhanced model, FM [30], and a sequential
+CARS, DIN [41]. We also include two straightforward methods for
+comparison: Based on situations only, SOnly embeds both items
+and situations and uses the dot product of their embeddings to
+recommend items under the current situation, optimized with a
+BPRMF [31]-similar structure with situations replacing users. HisPop utilizes the weighted frequency of each store in a user’s historical interactions as the probability for recommending the store.
+The weights are generated by situation similarity as in Eq. 1. These
+two methods strive for simplicity by exclusively considering the
+impact of collaborative and historical situations, respectively. In
+SOnly, recommendations are identical within the same situation.
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+1.5
+1.0
+0.5
+0.0
+
+explore
+repeat
+
+2.0
+
+Density
+
+Density
+
+0.041 0.093
+
+0.060 0.118
+
+1.5
+1.0
+0.5
+
+1.0
+
+0.5
+
+0.0
+
+0.5
+
+(a) DHRD-SE (Stockholm)
+
+1.0
+
+0.0
+
+explore
+repeat
+
+2.0
+
+Density
+
+explore
+repeat
+
+2.0
+
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang
+
+1.5
+
+0.042 0.135
+
+1.0
+0.5
+
+1.0
+
+0.5
+
+0.0
+
+0.5
+
+1.0
+
+0.0
+
+1.0
+
+(b) DHRD-SG (Singapore)
+
+0.5
+
+0.0
+
+0.5
+
+1.0
+
+(c) TRD (Beijing)
+
+Figure 3: Distributions of the influences of collaborative situations, 𝐼𝑛𝑓𝑐𝑜𝑙 , on repeat and exploration consumption. Influences
+are quantified with the correlations between situation similarities and store similarities of interactions of collaborative users.
+Conversely, HisPop relies solely on users’ historical interactions,
+limiting recommendations to previously interacted stores.7
+We conduct top-𝑘 food delivery recommendation tasks for repeat and exploration consumption interactions separately.8 The
+performances of the four methods are reported in Table 2.
+For repeat recommendation, sequential models outperform CFbased models on all three datasets. Notably, even HisPop, which
+solely relies on data statistics without training, surpasses FM in
+most cases. For exploration consumption, surprisingly, the nonpersonalized SOnly, which represents the global preferences of the
+whole community, always achieve the best or second-best performances. FM also outperforms DIN on exploration. The results align
+with our earlier analysis: historical situation sequences contributes
+to repeat consumption more, while collaborative situations impact
+exploration consumption more.
+Furthermore, it is not surprising that the values of metrics for
+repeat recommendation are significantly higher than those for exploration in Table 2, since repeat store recommendation involves
+a much smaller candidate set than exploration recommendation.
+However, existing studies on food delivery recommendations do not
+treat recommending repeat stores and exploration stores separately.
+We emphasize that using one overall metric for a single list of
+recommendations, which includes a combination of repeat and exploration stores, may overlook the varying strengths of different
+recommenders in these two distinct tasks. Additionally, enhancing
+repeat recommendation accuracy can lead to a more substantial
+overall metric improvement but may potentially compromise the
+performance of the more challenging exploration task. To the best
+of our knowledge, though similar observations (i.e., repeat consumption is easier to predict than exploration) have been made in
+earlier studies in sequential recommendation [19] and next-basket
+recommendation [18], the recommenders remain to be designed as
+a unified model, rather than treating repeat and exploration as two
+separate subtasks.
+In summary, existing situation-aware recommenders primarily
+rely on either sequence-based or CF-based models, treating repeat
+and exploration consumption equally. These methods overlook the
+distinct impact of situations in repeat and exploration consumption,
+
+7 Results of more existing recommenders are shown in Table 3, indicating similar
+
+inspiration.
+8 For the sake of coherence, we focus only on results and inspiration here. We follow
+Section 6.1 for dataset split, negative sampling, and model training strategy.
+
+thus struggling to excel in both tasks simultaneously. This underscores the need to design distinct situation-aware recommenders
+for repeat and exploration separately to serve users better.
+
+5
+
+SITUATION-AWARE RECOMMENDER
+
+Repeat consumption recommendation focuses on stores where a
+user has previously placed orders, typically constituting a small
+set. Exploration recommendations involve suggesting new stores,
+and the candidate set encompasses nearly all the stores in a city
+(i.e., except the stores a user has placed orders before). Given this
+fundamental difference in the recommendation spaces of candidate
+items, we approach food delivery recommendation as two distinct
+sub-tasks. This separation allows us to not only address the unique
+challenges of each sub-task but also fully leverage insights on the
+influences of historical situations and collaborative situations.
+Accordingly, as illustrated in Figure 4, we design two situationaware recommenders: RepRec for repeat consumption, and ExpRec for exploration consumption. Depending on the App interface
+design, if only one list will be presented to users, an Ensemble
+module will combine the recommended stores from both recommenders.
+
+5.1
+
+RepRec for Repeat Consumption
+
+As detailed in Section 4.2, the similarity of historical situations is
+correlated with the similarity of store selections for repeat consumption. The RepRec for repeat consumption is designed based
+on this finding, illustrated on the left-hand side of Figure 4.
+For a user 𝑢 at time 𝑡𝑛 and delivery location ℓ𝑛 , her historical interactions are denoted as {𝑥 1, 𝑥 2, ..., 𝑥𝑛−1 }, with 𝑥𝑖 = (𝑢, 𝑠𝑖 , 𝑡𝑖 , ℓ𝑖 ), 𝑡𝑖 <
+𝑡. The goal of RepRec is to recommend a store from 𝑢 ′𝑠 historically
+interacted stores {𝑠 1, 𝑠 2, ...𝑠𝑎 }, 𝑎 ≤ 𝑛 − 1.
+First, situations (𝑡𝑖 , ℓ𝑖 ) are embedded into a vector 𝜇®𝑖 , and the
+attention weight of each historical interaction is illustrated with
+the similarity between current and historical situations in Eq. 3,
+where · indicates inner product, and || is the norm of vector.
+𝑤 𝜇𝑖 =
+
+𝜇®𝑖 · 𝜇®𝑛
+| 𝜇®𝑖 | ∗ | 𝜇®𝑛 |
+
+(3)
+
+Then, an embedding layer is applied for stores, providing store
+representation 𝑠®𝑖 . The predicted representation for the next repeat
+store is generated with a situation-based attention layer,
+𝑠®𝑟 =
+
+𝑛−1
+∑︁
+𝑖=1
+
+𝑤 𝜇𝑖 𝑠®𝑖
+
+(4)
+
+Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations
+
+Historical stores
+(Repeat)
+
+……
+
+……
+
+New stores
+
+……
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+Historical situations
+
+Collaborative users
+
+Pr , Pe , P: Predicted scores from ReRec, ExpRec, and Ensemble Sr , Se : Predicted store representation from ReRec and ExpRec Wr , We : Ensemble weights for repeat and exploration
+Wμ: Situation similarity weights
+
+eμ : Global situation eh: Historical representation
+
+RepRec (Repeat)
+
+ExpRec (Exploration)
+
+Pr pr,1 pr,2 … pr,a
+sr
+
+Pe pe,1 pe,2
+
+Situations
+wμn-1
+
+tn
+
+ln
+
+…
+
+se
+
+pe,b
+
+……
+
+Exploration Trigger inference
+
+wμ2
+
+eμ
+
+wμ1
+
+Sequential
+Encoder
+
+Wμ
+
+……
+
+eu|μ
+
+eh
+
+ecu|μ
+
+Situation Conditioned
+User Encoder
+
+u
+
+……
+
+ecu|μ: Situation-conditioned collaborative users
+
+Ensemble (Combined)
+
+…
+
+…
+
+Situationbased
+Attention
+
+eu|μ: Situation-conditioned user id
+
+……
+
+P p1 … pa pa+1 … pa+b
+Wr wr,1 … wr,a 0
+
+…
+
+0
+
+We 0
+
+…
+
+We,b
+
+…
+
+0
+
+We,1
+
+Exp-Rep Ensemble
+Ep Rp
+Intent
+Predictor
+
+Pr pr,1 … pr,a 0
+
+…
+
+0
+
+Pe 0
+
+…
+
+pe,b
+
+…
+
+0
+
+pe,1
+
+Figure 4: The framework of our proposed recommenders considering both situations and repeat/exploration patterns for food
+delivery. Based on the observations made in Section 4, RepRec and ExpRec are designed for repeat and exploration consumption,
+respectively. The Ensemble module combines their outputs if a unified recommendation list is needed.
+Finally, the predicted score of each candidate store is produced
+𝑎 . This straightforward design increases
+by 𝑝®𝑟 = {𝑝𝑟,𝑖 = 𝑠®𝑖 · 𝑠®𝑟 }𝑖=1
+the likelihood of recommending stores with more similar historical
+situations, aligning with the observed influence pattern of historical
+interactions on repeat consumption in Observation 2.
+
+5.2
+
+ExpRec for Exploration Consumption
+
+Exploration recommendation is a more challenging task. Users’
+exploration consumption could be a result of many factors, such
+as promotional activities by stores, recommendations from friends,
+or entering a new situation, which may or may not be observable
+from past interactions.
+As shown in the middle part of Figure 4, we consider these potential factors as triggers and incorporate them into the model
+input. We then utilize a trigger inference module to integrate all
+triggering information. Specifically, four types of information are
+considered in the exploration module: current situation 𝑒®𝜇 , historical situations and items 𝑒®ℎ , situation-aware user representation
+𝑒®𝑢 |𝜇 , and situation-aware collaborative users’ representation 𝑒®𝑐𝑢 |𝜇 .
+Motivated by the impressive performance of SOnly in Table 2, the
+embedding of the current situation (𝑡𝑛 , ℓ𝑛 ) serves as a part of input
+𝑒®𝜇 ∈ R 𝐷 ×1 . As users’ historical interactions reflect their inherent
+preferences, historical interactions, i.e., the sequence information of
+historical stores and situations are concatenated and encoded with
+a gated recurrent unit (GRU) [7] model into a vector 𝑒®ℎ ∈ R 𝐷 ×1 .
+For user representations, since users’ preferences are influenced
+by situations, we propose a situation-conditioned user encoder to
+generate situation-aware user embedding 𝑒𝑢 |𝜇 , following the lightweight conditional neural network [25]: With 𝑒®𝜇 as the conditioning
+vector, user embedding 𝑢® as the input, a pre-defined group of 𝑀
+basic activation functions {𝐴1, 𝐴2, ..., 𝐴𝑀 } (e.g., 𝑠𝑖𝑔𝑚𝑜𝑖𝑑, 𝑟𝑒𝑙𝑢, ...),
+the situation-conditioned user representation is
+𝑎® = 𝑠𝑜 𝑓 𝑡𝑚𝑎𝑥 (Θ𝜇 𝑒®𝜇 + 𝛽®𝜇 ),
+
+𝑒®𝑢 |𝜇 =
+
+𝑀
+∑︁
+𝑗=1
+
+𝑎 𝑗 𝐴 𝑗 (𝑢)
+®
+
+(5)
+
+Where Θ𝜇 ∈ R 𝑀 ×𝐷 and 𝛽®𝜇 ∈ R 𝑀 ×1 are learnable parameters, and
+𝑎 𝑗 denotes the 𝑗-th dimension of 𝑎.
+® For each user 𝑢, 𝐾 collaborative
+users are selected as in Section 4.3, embedded, and encoded with
+𝐾 . Then 𝑒®
+the situation-conditioned user encoder into {®
+𝑒𝑐𝑢𝑖 |𝜇 }𝑘=1
+𝑐𝑢 |𝜇
+is obtained by weighted summing based on similarities with 𝑢.
+With representations of these four types of potential triggers,
+ExpRec aggregates them for a predicted representation 𝑠®𝑒 to recommend an exploration store with a trigger inference layer. This layer
+aims to estimate the likelihood of users engaging in exploration
+behavior triggered by different information in the current situation.
+To maintain model simplicity, the weights for each input trigger
+are directly obtained:
+
+
+𝑤® 𝑒 = 𝑠𝑜 𝑓 𝑡𝑚𝑎𝑥 Θ𝑒 (®
+𝑒 𝜇 ⊕ 𝑒®𝑢 |𝜇 ) + 𝛽®𝑒
+(6)
+𝑠®𝑒 = 𝑤 1𝑒 𝑒®𝜇 + 𝑤 2𝑒 𝑒®ℎ + 𝑤 3𝑒 𝑒®𝑢 |𝜇 + 𝑤 4𝑒 𝑒®𝑐𝑢 |𝜇
+
+(7)
+
+where Θ𝑒 ∈ R 4×𝐷 and 𝛽®𝑒 ∈ R 4×1 are learnable parameters, and
+𝑤𝑖𝑒 denotes the 𝑖-th dimension of 𝑤® 𝑒 . Lastly, predicted exploration
+recommendation scores are generated by 𝑝®𝑒 = {𝑝𝑒,𝑖 = 𝑠®𝑒 · 𝑠®𝑖 }𝑏𝑖=1 .
+
+5.3
+
+Repeat & Exploration Combined
+
+In practice, recommendations of repeat stores and new stores can be
+displayed with two different cards or slots on an App, presenting diverse choices for users. However, as most existing solutions employ
+a unified model to handle both repeat and exploration consumption,
+we devise an ensemble module to combine the recommended stores
+of RepRec and ExpRec for a fair comparison with existing models.
+In the combination process, determining whether a user intends
+to engage in repeat or exploration consumption is crucial. However, predicting this intent is a challenging task. Inspired by Li
+et al. [17], in our ensemble module, we first predict users’ intent,
+then generate item-level ensemble weights based on the predicted
+intent to obtain the final recommendations from prediction scores
+by RepRec and ExpRec. In intent predictor, historical intents of
+user 𝑢 are encoded with a sequential encoder, concatenated with
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+current situation embedding and user embedding, then utilized to
+predict the probability of repeat intent 𝐸𝑝 and exploration intent
+𝑅𝑝 (𝐸𝑝 + 𝑅𝑝 = 1). Afterwards, the Exp-Rep ensemble module adopts
+the structure of IntEL [17]. It applies a self-attention layer taking
+prediction scores 𝑝®𝑒 and 𝑝®𝑟 as input, followed by a cross-attention
+layer incorporating intents (𝐸𝑝 , 𝑅𝑝 ) and a projection layer for itemlevel weights 𝑤® 𝑟 and 𝑤® 𝑒 . Finally, predictions for the 𝑎 repeat stores
+and 𝑏 new stores are generated,
+
+𝑤𝑟,𝑖 · 𝑝𝑟,𝑖
+𝑖 ≤𝑎
+𝑝𝑖 =
+(8)
+𝑤𝑒,𝑖 −𝑎 · 𝑝𝑒,𝑖 −𝑎
+𝑖 >𝑎
+
+6 EXPERIMENTS
+6.1 Experimental Setup
+6.1.1 Dataset Split and Evaluation Metric. We employ the datasets
+introduced in Section 4 and partition them into training, validation,
+and test sets following the global timeline. Interactions within the
+last two weeks constitute the test set, while those in the preceding
+two weeks serve as the validation set for DHRD-SE and DHRDSG. The remaining interactions form the training set. In the TRD
+dataset, the last week and the preceding three days are designated
+as the test and validation sets, respectively.
+For a fair comparison of different methods on repeat, exploration,
+and the combined recommendation sub-tasks, negative samples
+are separately constructed for evaluation on three sub-tasks. For
+repeat recommendation, the candidates are users’ historically interacted stores. For the sub-task of exploration, 999 random new
+stores are sampled as negative candidates for recommendation. In
+the combined recommendation sub-task, besides the current ground
+truth, we select users’ interacted stores and supplement them with
+randomly sampled new stores until the total number of candidates
+reaches 1000. In both exploration and combined recommendation
+sub-tasks, the recommender is expected to make the correct prediction among 1000 stores. We evaluate all three sub-tasks by HR@3
+and NDCG@3; both are commonly used evaluation metrics.
+6.1.2 Baseline Methods. To validate the effectiveness of our proposed methods to leverage situation information and recommend
+for repeat and exploration consumption, we compare with 9 baselines in various groups. Among them, ReCANet, RepeatNet, and
+TSRec are repeat-aware recommenders, while SNPR is a serendipityoriented recommender. FM and FinalMLP are CF-based CARS, and
+DIN and SDIM are sequence-based CARS. DPVP is dedicated to
+food delivery recommendations.
+• ReCANet [3] leverages interaction intervals of historical items to
+predict users’ preferences, with a specific focus on recommending
+repeat items.
+• RepeatNet [29] is the first neural recommender to explicitly emphasize repeat consumption, with repeat and exploration modes
+to separately decode from a shared historical representation.
+• TSRec [24] is one of SOTA repeat-aware recommenders, where
+both temporal pattern and sequential pattern of repeat consumption are considered.
+• SNPR [38] is a POI recommender to recommend serendipity locations aware of global similarities of time and spatial attributes.
+• FM [30] is one of the most classic CF-enhance CARS to combine
+attributes in first and second orders.
+
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang
+
+• FinalMLP [23] is a CF-enhanced CARS with two MLP-based
+structures to capture and fuse high-level feature interactions.
+• DIN [41], a classic sequential CARS, uses local activation units
+to assign weights for users’ historical interactions dynamically.
+• SDIM [5] is a SOTA sequential CARS. SDIM models users’ dynamic long short-term context-aware behavior sequences with
+hash-based attention modules.
+• DPVP [39] utilizes time-aware graphs and subgraphs to model
+users’ preferences for locations, stores, and food. DPVP is a SOTA
+food delivery recommender with codes available.
+Note that RL-based exploration recommenders are not evaluated
+because their interaction-based training and evaluation settings are
+entirely different from the rest of the models [1].
+6.1.3 Implementation Details. We implement all methods with Pytorch. Among baseline models, source codes from their original papers are utilized for RepeatNet, TSRec, and DPVP, while other methods are implemented with Rechorus [35] and FuxiCTR [42] frameworks. Adam is used as the optimizer, and early stop is adopted if
+HR@3 on the validation dataset continues to drop for 10 epochs.
+We set the embedding size to 64 and training batch size to 256 for
+all methods. Learning rate, weight decay, and model-related hyperparameters are tuned for our methods and all baselines. Codes and
+hyper-parameter settings are publicly available.9
+
+6.2
+
+Overall Performance
+
+The top-3 recommendation performances of our proposed methods
+(named Ours for RepRec, ExpRec, and Combined) and all baselines
+are reported in Table 3. In general, our proposed methods achieve
+the best performances on all three sub-tasks across three datasets.
+The improvements over the second-best baselines are statistically
+significant for 16 out of 18 comparisons.
+For repeat consumption, repeat-aware models and sequencebased CARS yield comparable results. This suggests that users’
+repeat behavior patterns and situational context are equally important in repeat consumption recommendations. Thus, our simple RepRec, considering both factors, gains the best performance.
+Meanwhile, the only two non-sequential models, CF and FinalMLP,
+perform the worst. This result aligns with Observation 2 that the
+historical behaviors of users are essential for future repeat choices.
+As for exploration recommendation, the serendipity recommender
+SNPR is the best baseline for DHRD-SE and TRD, as exploration
+tendency is explicitly used as supervision signals. However, FinalMLP outperforms SNPR on DHRD-SG, possibly due to the crucial role of situational context in it. Comparing CARS, the CF-based
+FinalMLP presents better exploration recommendations than Seq.based SDIM, in line with Observation 3 that collaborative situations
+are important for exploration.
+At last, the combined recommendations of all candidates show
+different trends on different datasets. Although repeat-aware models and Seq.-based CARS are generally weak at exploration, they
+achieve the best combined results among baselines. It is because
+they achieve great performances on the repeat recommendation
+sub-task and repeat consumption is easy and takes up a great proportion. In all, no baseline consistently outperforms others on all
+9 https://github.com/JiayuLi-997/FoodDeliveryRecommender
+
+Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+Repeat-aware Models
+
+Seren.
+
+CF-based CARS
+
+Seq.-based CARS
+
+Food
+Delivery
+
+Group/Dataset
+
+ReCANet RepeatNet TSRec
+
+SNPR
+
+FM
+
+FinalMLP
+
+DIN
+
+SDIM
+
+DPVP
+
+HR
+
+D-SE
+D-SG
+TRD
+
+0.7702
+0.6626
+0.7181
+
+0.7694
+0.6682
+0.7235
+
+0.7753
+0.6483
+0.7469
+
+0.7239
+0.6295
+0.6402
+
+0.6996
+0.6038
+0.5583
+
+0.7057
+0.6016
+0.5725
+
+0.7629
+0.6819
+0.7211
+
+0.7709
+0.6792
+0.7357
+
+0.6768
+0.6812
+0.7183
+
+0.7833
+0.7092**
+0.7585*
+
+NDCG
+
+D-SE
+D-SG
+TRD
+
+0.6389
+0.5435
+0.5837
+
+0.6365
+0.5459
+0.5853
+
+0.6478
+0.5015
+0.6079
+
+0.5968
+0.5412
+0.5481
+
+0.5620
+0.4920
+0.4619
+
+0.5710
+0.4766
+0.4884
+
+0.6229
+0.5626
+0.5954
+
+0.6268
+0.5581
+0.5994
+
+0.5504
+0.5596
+0.5459
+
+0.6588*
+0.5932**
+0.6346*
+
+HR
+
+D-SE
+D-SG
+TRD
+
+-
+
+0.0448
+0.1139
+0.0755
+
+0.0838
+0.1609
+0.0699
+
+0.1098
+0.1890
+0.1211
+
+0.0764
+0.1888
+0.0962
+
+0.0770
+0.2042
+0.1181
+
+0.0639
+0.1409
+0.0877
+
+0.0740
+0.1791
+0.1140
+
+0.0939
+0.1433
+0.1035
+
+0.1315**
+0.2407**
+0.1463**
+
+NDCG
+
+D-SE
+D-SG
+TRD
+
+-
+
+0.0259
+0.0745
+0.0512
+
+0.0581
+0.1128
+0.0365
+
+0.0863
+0.1442
+0.0925
+
+0.0533
+0.1362
+0.0715
+
+0.0530
+0.1601
+0.0878
+
+0.0425
+0.0996
+0.0539
+
+0.0524
+0.1377
+0.0812
+
+0.0698
+0.1091
+0.0805
+
+0.0984**
+0.1768**
+0.1097**
+
+HR
+
+D-SE
+D-SG
+TRD
+
+0.5217
+0.3422
+0.3783
+
+0.5272
+0.3674
+0.3838
+
+0.5257
+0.3493
+0.3815
+
+0.4764
+0.3402
+0.3463
+
+0.4364
+0.3338
+0.2786
+
+0.4371
+0.2920
+0.2179
+
+0.5149
+0.3900
+0.3898
+
+0.5030
+0.3775
+0.3907
+
+0.4581
+0.3618
+0.3502
+
+0.5314
+0.4124**
+0.4010*
+
+D-SE
+D-SG
+TRD
+
+0.4345
+0.2865
+0.3079
+
+0.4360
+0.3001
+0.3103
+
+0.4530
+0.2994
+0.3030
+
+0.4095
+0.2798
+0.2842
+
+0.3604
+0.2663
+0.2224
+
+0.3539
+0.2289
+0.1688
+
+0.4322
+0.3190
+0.3167
+
+0.4142
+0.2981
+0.3139
+
+0.3732
+0.2829
+0.2754
+
+0.4673*
+0.3291**
+0.3352**
+
+DHRD-SE
+
+three recommendation sub-tasks on any dataset. Therefore, if evaluations are solely conducted on the combined results, the differences
+between repeat and exploration sub-tasks will be overlooked, and
+the results could be dominated by the relatively simple repeat recommendation task. Our proposed ensemble method, based on the
+best repeat and exploration recommendations, achieves the best
+recommendation performances on combined candidates.
+
+6.3
+
+Parameter Efficiency
+
+As we claimed, RepRec and ExpRec are designed to adhere domainspecific characteristics with simple and effective structures. To
+illustrate the simplicity of our methods, we compare the parameter
+numbers of our methods and best baselines for repeat and exploration sub-tasks in Table 4. It indicates that parameter numbers
+of our proposed methods, especially the RepRec, are much less
+than baseline models. Therefore, in terms of efficiency, our simple
+methods for repeat and exploration demonstrate a high degree of
+parameter efficiency when compared with the best baselines. Therefore, our proposed methods, especially the RepRec, are parameter
+efficient.
+
+0.146
+0.135 0.136
+
+0.131
+
+0.12
+0.11
+
+0.18 0.175
+0.171
+
+0.099
+
+0.10
+
+0.16
+
+ExRec
+
+w/o cu
+
+0.09
+
+w/o his
+
+0.101
+
+TRD
+
+w/o u id
+
+0.10
+
+0.13
+
+0.20
+
+0.109 0.109
+
+0.11
+
+0.241 0.15
+0.14
+
+ExRec
+
+4.04M
+5.46M
+16.56M
+
+0.222
+
+w/o cu
+
+2.03M
+4.05M
+9.06M
+
+w/o his
+
+1.57M
+3.72M
+6.90M
+
+0.22
+
+0.116
+
+w/o u id
+
+0.14M
+0.69M
+0.50M
+
+0.233
+
+w/o situ
+
+DHRD-SE
+DHRD-SG
+TRD
+
+0.12
+
+ExRec
+
+Best Exp. B.
+
+w/o cu
+
+Best Rep. B.
+
+w/o u id
+
+ExpRec
+
+w/o situ
+
+RepRec
+
+0.13
+
+HR@3
+
+Dataset
+
+DHRD-SG
+0.132 0.24
+
+Ours
+
+w/o situ
+
+Table 4: Number of parameters of our methods and best baselines. (B.: Baseline, Rep.: Repeat, Exp.: Exploration.)
+
+w/o his
+
+Combined
+
+Exploration
+
+Repeat
+
+Setting
+
+NDCG
+
+Table 3: Top-3 recommendation performances on repeat, exploration, and combined candidate sets on three datasets. The best
+results are in boldface, and second best underlined. */** indicate 𝑝 ≤ 0.05/0.01 for the paired t-test of Ours and the best baseline.
+Results of RepRec, ExpRec, and the Ensemble recommendations are shown as Ours in each test group, respectively.
+
+Figure 5: Performances of ExpRec and its variants without a
+specific trigger input. w/o is short for without.
+
+6.4
+
+Ablation Study on ExpRec
+
+As discussed in Section 5.2, various potential triggers are incorporated for exploration recommendation. Here, we validate the
+importance of different triggers. The performance on the exploration recommendation task of different variants of ExpRec, each
+excluding one specific trigger input at a time, is depicted in Figure 5.
+The results indicate that removing any input leads to a decrease
+in performance, underscoring the importance of all triggers. Especially, situations emerge as crucial inputs across all three datasets,
+with their omission resulting in the most or second-most substantial
+performance decline. Interestingly, trigger influence varies across
+datasets. User IDs and collaborative users emerge as important triggers on the DHRD-SE dataset, which has a small scale and limited
+stores. On DHRD-SG and TRD datasets with a larger candidate pool
+for exploration, users’ historical interactions play a crucial role in
+revealing users’ preferences. Specifically, the user ID trigger contributes relatively less to the DHRD-SG dataset. This is because a
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+significant portion of exploration behavior is accounted for by situational context and history, potentially diminishing the importance
+of user ID-related information.
+
+7
+
+CONCLUSION
+
+Behavior patterns and influencing factors vary across different recommendation scenarios. Therefore, recommender systems should
+be tailored to the distinctive characteristics of each specific scenario. In this paper, we focus on the food delivery scenario, an
+interesting and representative scenario where repeat consumption and situation influences are two crucial factors. Our in-depth
+analysis reveals consistent observations across real-world food
+delivery datasets from different platforms and countries: Repeat
+consumption is prevalent, where choices for repeat orders are more
+strongly influenced by historical situations; and exploratory selections, which are also ubiquitous, are more sensitive to collaborative
+situations. Furthermore, we formally frame repeat and exploration
+recommendation as two distinct tasks, recognize their differences
+in candidate pools, and acknowledge that exploration recommendation is a much more challenging task. Inspired by the findings,
+we design two simple yet effective situation-aware models, RepRec
+and ExpRec, respectively. Extensive experiments indicate that our
+proposed methods outperform various types of baselines on repeat,
+exploration, and combined recommendation sub-tasks.
+As emphasized, various recommendation domains display distinct task settings. Therefore, the proposed models may not be universally suitable for generic recommendation scenarios. However,
+the robust performance of our simple models compared to existing
+recommenders suggests a need to prioritize domain-specific characteristics in the area of recommender systems research. Moreover,
+we believe the methodology of data-driven analyses and dedicated
+design for recommendations will inspire more scenario-specific
+studies in the future.
+
+Jiayu Li, Aixin Sun, Weizhi Ma, Peijie Sun, and Min Zhang
+
+REFERENCES
+[1] M Mehdi Afsar, Trafford Crump, and Behrouz Far. 2022. Reinforcement learning
+based recommender systems: A survey. Comput. Surveys 55, 7 (2022), 1–38.
+[2] Ashton Anderson, Ravi Kumar, Andrew Tomkins, and Sergei Vassilvitskii. 2014.
+The dynamics of repeat consumption. In Proceedings of the 23rd international
+conference on World wide web. 419–430.
+[3] Mozhdeh Ariannezhad, Sami Jullien, Ming Li, Min Fang, Sebastian Schelter, and
+Maarten de Rijke. 2022. ReCANet: A repeat consumption-aware neural network
+for next basket recommendation in grocery shopping. In Proceedings of the 45th
+International ACM SIGIR Conference on Research and Development in Information
+Retrieval. 1240–1250.
+[4] Yernat Assylbekov, Raghav Bali, Luke Bovard, and Christian Klaue. 2023. Delivery
+Hero Recommendation Dataset: A Novel Dataset for Benchmarking Recommendation Algorithms. In Proceedings of the 17th ACM Conference on Recommender
+Systems. 1042–1044.
+[5] Yue Cao, Xiaojiang Zhou, Jiaqi Feng, Peihao Huang, Yao Xiao, Dayao Chen, and
+Sheng Chen. 2022. Sampling is all you need on modeling long-term user behaviors
+for CTR prediction. In Proceedings of the 31st ACM International Conference on
+Information & Knowledge Management. 2974–2983.
+[6] Sung Min Cho, Eunhyeok Park, and Sungjoo Yoo. 2020. MEANTIME: Mixture of
+attention mechanisms with multi-temporal embeddings for sequential recommendation. In Proceedings of the 14th ACM Conference on Recommender Systems.
+515–520.
+[7] Junyoung Chung, Caglar Gulcehre, KyungHyun Cho, and Yoshua Bengio. 2014.
+Empirical evaluation of gated recurrent neural networks on sequence modeling.
+arXiv preprint arXiv:1412.3555 (2014).
+[8] Boya Du, Shaochuan Lin, Jiong Gao, Xiyu Ji, Mengya Wang, Taotao Zhou, Hengxu
+He, Jia Jia, and Ning Hu. 2023. BASM: A Bottom-up Adaptive Spatiotemporal
+Model for Online Food Ordering Service. In 2023 IEEE 39th International Conference on Data Engineering (ICDE). IEEE, 3549–3562.
+[9] Zhe Fu, Xi Niu, and Li Yu. 2023. Wisdom of crowds and fine-grained learning for
+serendipity recommendations. In Proceedings of the 46th International ACM SIGIR
+Conference on Research and Development in Information Retrieval. 739–748.
+[10] Dongmin Hyun, Junsu Cho, Chanyoung Park, and Hwanjo Yu. 2020. Interest
+Sustainability-Aware Recommender System. In 2020 IEEE International Conference
+on Data Mining (ICDM). IEEE, 192–201.
+[11] Guyu Jiang, Xiaoyun Li, Rongrong Jing, Ruoqi Zhao, Xingliang Ni, Guodong
+Cao, and Ning Hu. 2023. CSPM: A Contrastive Spatiotemporal Preference Model
+for CTR Prediction in On-Demand Food Delivery Services. In Proceedings of the
+32nd ACM International Conference on Information and Knowledge Management.
+3978–3982.
+[12] Ori Katz, Oren Barkan, Noam Koenigstein, and Nir Zabari. 2022. Learning to
+Ride a Buy-Cycle: A Hyper-Convolutional Model for Next Basket Repurchase
+Recommendation. In Proceedings of the 16th ACM Conference on Recommender
+Systems. 316–326.
+[13] Denis Kotkov, Alan Medlar, and Dorota Glowacka. 2023. Rethinking Serendipity in Recommender Systems. In Proceedings of the 2023 Conference on Human
+Information Interaction and Retrieval. 383–387.
+[14] Yantong Lai, Yijun Su, Lingwei Wei, Gaode Chen, Tianci Wang, and Daren Zha.
+2023. Multi-view Spatial-Temporal Enhanced Hypergraph Network for Next POI
+Recommendation. In International Conference on Database Systems for Advanced
+Applications. Springer, 237–252.
+[15] Pengxiang Lan, Yihao Zhang, Haoran Xiang, Yuhao Wang, and Wei Zhou. 2023.
+Spatio-Temporal Position-Extended and Gated-Deep Network for Next POI Recommendation. In International Conference on Database Systems for Advanced
+Applications. Springer, 505–520.
+[16] Jiayu Li, Zhiyu He, Yumeng Cui, Chenyang Wang, Chong Chen, Chun Yu, Min
+Zhang, Yiqun Liu, and Shaoping Ma. 2022. Towards Ubiquitous Personalized Music Recommendation with Smart Bracelets. Proceedings of the ACM on Interactive,
+Mobile, Wearable and Ubiquitous Technologies 6, 3 (2022), 1–34.
+[17] Jiayu Li, Peijie Sun, Zhefan Wang, Weizhi Ma, Yangkun Li, Min Zhang, Zhoutian
+Feng, and Daiyue Xue. 2023. Intent-Aware Ranking Ensemble for Personalized
+Recommendation. In Proceedings of the 46th International ACM SIGIR Conference
+on Research and Development in Information Retrieval (SIGIR ’23). Association for
+Computing Machinery, New York, NY, USA, 1004–1013. https://doi.org/10.1145/
+3539618.3591702
+[18] Ming Li, Sami Jullien, Mozhdeh Ariannezhad, and Maarten de Rijke. 2023. A next
+basket recommendation reality check. ACM Transactions on Information Systems
+41, 4 (2023), 1–29.
+[19] Ming Li, Ali Vardasbi, Andrew Yates, and Maarten de Rijke. 2023. Repetition
+and Exploration in Sequential Recommendation. In Proceedings of the 46th International ACM SIGIR Conference on Research and Development in Information
+Retrieval (SIGIR ’23). Association for Computing Machinery, New York, NY, USA,
+2532–2541. https://doi.org/10.1145/3539618.3591914
+[20] Xueqi Li, Wenjun Jiang, Weiguang Chen, Jie Wu, Guojun Wang, and Kenli Li.
+2020. Directional and explainable serendipity recommendation. In Proceedings of
+The Web Conference 2020. 122–132.
+
+Recommender for Its Purpose: Repeat and Exploration in Food Delivery Recommendations
+
+[21] Yuncong Li, Cunxiang Yin, Yancheng He, Guoqiang Xu, Jing Cai, Leeven Luo,
+and Sheng-hua Zhong. 2022. Modeling User Repeat Consumption Behavior for
+Online Novel Recommendation. In Proceedings of the 16th ACM Conference on
+Recommender Systems. 14–24.
+[22] Shaochuan Lin, Jiayan Pei, Taotao Zhou, Hengxu He, Jia Jia, and Ning Hu. 2023.
+Exploring the Spatiotemporal Features of Online Food Recommendation Service.
+In Proceedings of the 46th International ACM SIGIR Conference on Research and
+Development in Information Retrieval. 3354–3358.
+[23] Kelong Mao, Jieming Zhu, Liangcai Su, Guohao Cai, Yuru Li, and Zhenhua Dong.
+2023. FinalMLP: An Enhanced Two-Stream MLP Model for CTR Prediction.
+In Thirty-Seventh AAAI Conference on Artificial Intelligence, AAAI 2023, ThirtyFifth Conference on Innovative Applications of Artificial Intelligence, IAAI 2023,
+Thirteenth Symposium on Educational Advances in Artificial Intelligence, EAAI
+2023, Washington, DC, USA, February 7-14, 2023, Brian Williams, Yiling Chen, and
+Jennifer Neville (Eds.). AAAI Press, 4552–4560. https://doi.org/10.1609/AAAI.
+V37I4.25577
+[24] Shigang Quan, Shui Liu, Zhenzhe Zheng, and Fan Wu. 2023. Enhancing RepeatAware Recommendation from a Temporal-Sequential Perspective. In Proceedings
+of the 32nd ACM International Conference on Information and Knowledge Management. 2095–2105.
+[25] Alberto Gil Couto Pimentel Ramos, Abhinav Mehrotra, Nicholas Donald Lane,
+and Sourav Bhattacharya. 2021. Conditioning sequence-to-sequence networks
+with learned activations. In International Conference on Learning Representations.
+[26] Jérémie Rappaz, Julian McAuley, and Karl Aberer. 2021. Recommendation on
+live-streaming platforms: Dynamic availability and repeat consumption. In Proceedings of the 15th ACM Conference on Recommender Systems. 390–399.
+[27] Ahmed Rashed, Shereen Elsayed, and Lars Schmidt-Thieme. 2022. Context and
+attribute-aware sequential recommendation via cross-attention. In Proceedings of
+the 16th ACM Conference on Recommender Systems. 71–80.
+[28] Markus Reiter-Haas, Emilia Parada-Cabaleiro, Markus Schedl, Elham Motamedi,
+Marko Tkalcic, and Elisabeth Lex. 2021. Predicting music relistening behavior using the ACT-R framework. In Proceedings of the 15th ACM Conference on
+Recommender Systems. 702–707.
+[29] Pengjie Ren, Zhumin Chen, Jing Li, Zhaochun Ren, Jun Ma, and Maarten De Rijke.
+2019. Repeatnet: A repeat aware neural recommendation machine for sessionbased recommendation. In Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 33. 4806–4813.
+[30] Steffen Rendle. 2010. Factorization machines. In 2010 IEEE International conference
+on data mining. IEEE, 995–1000.
+[31] Steffen Rendle, Christoph Freudenthaler, Zeno Gantner, and Lars Schmidt-Thieme.
+2012. BPR: Bayesian personalized ranking from implicit feedback. arXiv preprint
+arXiv:1205.2618 (2012).
+[32] Aixin Sun. 2023. Take a Fresh Look at Recommender Systems from an Evaluation
+Standpoint. In Proceedings of the 46th International ACM SIGIR Conference on
+Research and Development in Information Retrieval (SIGIR ’23). Association for
+Computing Machinery, New York, NY, USA, 2629–2638. https://doi.org/10.1145/
+3539618.3591931
+[33] Kosetsu Tsukuda and Masataka Goto. 2020. Explainable recommendation for
+repeat consumption. In Proceedings of the 14th ACM Conference on Recommender
+Systems. 462–467.
+[34] Chenyang Wang, Min Zhang, Weizhi Ma, Yiqun Liu, and Shaoping Ma. 2019. Modeling item-specific temporal dynamics of repeat consumption for recommender
+systems. In The world wide web conference. 1977–1987.
+[35] Chenyang Wang, Min Zhang, Weizhi Ma, Yiqun Liu, and Shaoping Ma. 2020.
+Make it a chorus: knowledge-and time-aware item modeling for sequential recommendation. In Proceedings of the 43rd International ACM SIGIR Conference on
+Research and Development in Information Retrieval. 109–118.
+[36] Haishuai Wang, Zhao Li, Xuanwu Liu, Donghui Ding, Zehong Hu, Peng Zhang,
+Chuan Zhou, and Jiajun Bu. 2021. Fulfillment-time-aware personalized ranking
+for on-demand food recommendation. In Proceedings of the 30th ACM International
+Conference on Information & Knowledge Management. 4184–4192.
+[37] Jun Xiao, Hao Ye, Xiangnan He, Hanwang Zhang, Fei Wu, and Tat-Seng Chua.
+2017. Attentional factorization machines: Learning the weight of feature interactions via attention networks. arXiv preprint arXiv:1708.04617 (2017).
+[38] Mingwei Zhang, Yang Yang, Rizwan Abbas, Ke Deng, Jianxin Li, and Bin Zhang.
+2021. SNPR: A serendipity-oriented next POI recommendation model. In Proceedings of the 30th ACM International Conference on Information & Knowledge
+Management. 2568–2577.
+[39] Yuting Zhang, Yiqing Wu, Ran Le, Yongchun Zhu, Fuzhen Zhuang, Ruidong
+Han, Xiang Li, Wei Lin, Zhulin An, and Yongjun Xu. 2023. Modeling Dual
+Period-Varying Preferences for Takeaway Recommendation. In Proceedings of the
+29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD
+’23). Association for Computing Machinery, New York, NY, USA, 5628–5638.
+https://doi.org/10.1145/3580305.3599866
+[40] Guorui Zhou, Na Mou, Ying Fan, Qi Pi, Weijie Bian, Chang Zhou, Xiaoqiang
+Zhu, and Kun Gai. 2019. Deep interest evolution network for click-through rate
+prediction. In Proceedings of the AAAI conference on artificial intelligence, Vol. 33.
+5941–5948.
+
+Conference acronym ’XX, June 03–05, 2018, Woodstock, NY
+
+[41] Guorui Zhou, Xiaoqiang Zhu, Chenru Song, Ying Fan, Han Zhu, Xiao Ma, Yanghui
+Yan, Junqi Jin, Han Li, and Kun Gai. 2018. Deep interest network for click-through
+rate prediction. In Proceedings of the 24th ACM SIGKDD international conference
+on knowledge discovery & data mining. 1059–1068.
+[42] Jieming Zhu, Jinyang Liu, Shuai Yang, Qi Zhang, and Xiuqiang He. 2021. Open
+benchmarking for click-through rate prediction. In Proceedings of the 30th ACM
+International Conference on Information & Knowledge Management. 2759–2769.
+
+
