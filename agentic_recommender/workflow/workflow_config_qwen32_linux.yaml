@@ -160,7 +160,7 @@ workflow:
         enable_thinking: true    # For Qwen3 models: enable/disable thinking mode
 
         # Test settings
-        n_samples: 1000           # Number of test samples (-1 = all)
+        n_samples: 5           # Number of test samples (-1 = all)
         min_history: 5          # Min orders per user
         deterministic_sampling: true  # Use deterministic (sorted) sampling for reproducibility
 

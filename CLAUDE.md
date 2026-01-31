@@ -48,6 +48,64 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | Prompt templates | `agentic_recommender/core/templates/rerank/` |
 | Stage cache | `agentic_recommender/workflow/stage_cache.py` |
 
+## Output Structure
+
+Each run creates a timestamped subfolder under `outputs/`:
+```
+outputs/
+├── stage1_merged_data.parquet          # Cached stage outputs (root level)
+├── stage2_enriched_users.json
+├── stage3_cuisine_profiles.json
+├── stage8_enhanced_rerank_detailed.json
+└── 202601262250/                       # Per-run timestamped folder
+    ├── runtime_config.yaml             # Config snapshot for this run
+    ├── workflow.log                    # Run log
+    ├── stage1_merged_data.parquet     # Merged orders+vendors+products
+    ├── stage1_merged_preview.json     # First N rows preview
+    ├── stage1_stats.json              # Row/unique counts
+    ├── stage1_test_data.parquet       # Test split (method2)
+    ├── stage8_enhanced_rerank_samples.json    # Test samples used
+    ├── stage8_enhanced_rerank_results.json    # Aggregate metrics (Hit@K, NDCG, MRR, basket)
+    ├── stage8_enhanced_rerank_detailed.json   # Per-sample results
+    ├── stage8_enhanced_rerank_detailed_preview.json
+    └── detailed_results.jsonl         # Streaming results (async)
+```
+
+## Testing: Validate by Stage
+
+After making changes, test stage-by-stage by checking outputs. Run individual stages to isolate issues.
+
+**Stage 1 — load_data:** Check `stage1_stats.json` for expected counts (617K rows, 109K customers, 39 cuisines).
+```bash
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages load_data
+```
+
+**Stage 2 — build_users:** Check `stage2_users_summary.json` (18K+ users with min 5 orders).
+```bash
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages build_users
+```
+
+**Stage 3 — build_cuisines:** Check `stage3_cuisine_profiles.json` has 39 cuisine entries.
+```bash
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages build_cuisines
+```
+
+**Stage 8 — run_enhanced_rerank_evaluation:** Check `stage8_enhanced_rerank_results.json` for Hit@K, NDCG, MRR metrics.
+```bash
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages run_enhanced_rerank_evaluation
+```
+
+### Existing Test Code (reference)
+
+| Tests | Location | Scope |
+|-------|----------|-------|
+| Finetune unit tests | `finetune/tests/test_utils.py` | Tokenization, metrics, data loading |
+| Finetune integration | `finetune/tests/test_integration_model.py` | Model forward pass, generation |
+| LightGCN eval script | `scripts/evaluate_lightgcn_embeddings.py` | Embedding quality validation |
+| Result analysis | `resultExploration/result_analysis.ipynb` | Interactive result inspection |
+| Data overlap analysis | `agentic_recommender/data/data_overlap_analysis.ipynb` | Train/test leakage checks |
+| Deprecated stage tests | `deprecated/deprecation_260113/agentic_recommender/tests/` | Data loader, similarity, TopK eval (may need updates) |
+
 ## MACRec Reference
 
 - **Paper**: `papers/MacRec.pdf`
@@ -58,3 +116,4 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 
 - **Keep this file updated.** When entry points, configs, run commands, architecture, or key file locations change, update CLAUDE.md immediately.
 - **Keep it lightweight.** Only critical, actionable information belongs here.
+- **Test after changes.** Run the affected stage(s) and verify outputs before committing. Use the stage-by-stage commands above.
