@@ -207,3 +207,13 @@ Dataset stats: 3.4M training rows, 591K test rows, 78 cuisines, 105K users, 7153
 | GT found | 80.0%               |
 | Avg rank | 1.8                 |
 | Errors   | 0/5                 |
+
+
+
+## improve metrics
+ in stage 9'/home/zhenkai/personal/Projects/AgenticRecommender/outputs/data_sg/202601310805/stage9  
+  _repeat_detailed.json' can we update the recording code that update that 1) what is the ground     
+  truth rank in round1. 2) what is the ground truth rank in the provide lightGCN. 3) can we          
+  document in '/home/zhenkai/personal/Projects/AgenticRecommender/outputs/data_sg/202601310805/stag  
+  e9_repeat_results.json' that round 1's metrics, round2's metrics. seeing the improve of the        
+  metrics from round1 to round2. we want the same set of metrics currently defined.  

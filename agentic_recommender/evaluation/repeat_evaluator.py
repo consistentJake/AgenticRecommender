@@ -579,6 +579,21 @@ class AsyncRepeatEvaluator:
         ground_truth = sample['ground_truth']
         ground_truth_rank = self._find_rank(final_ranking, ground_truth)
 
+        # Round 1 cuisine rank: position of GT cuisine in round1_predicted_cuisines
+        ground_truth_cuisine = sample.get('ground_truth_cuisine', '').lower()
+        round1_gt_cuisine_rank = 0
+        for i, c in enumerate(round1_cuisines):
+            if c.lower() == ground_truth_cuisine:
+                round1_gt_cuisine_rank = i + 1
+                break
+
+        # LightGCN cuisine rank: position of GT cuisine in lightgcn_top_cuisines
+        lightgcn_gt_cuisine_rank = 0
+        for i, (cuisine, score) in enumerate(lightgcn_top_cuisines[:10]):
+            if cuisine.lower() == ground_truth_cuisine:
+                lightgcn_gt_cuisine_rank = i + 1
+                break
+
         # Build order history tuples: (vendor_id, cuisine, "DayName HH:00")
         history_tuples = [
             (o.get('vendor_id', ''), o.get('cuisine', ''),
@@ -637,6 +652,8 @@ class AsyncRepeatEvaluator:
             'round2_error': round2_error,
 
             'ground_truth_rank': ground_truth_rank,
+            'round1_ground_truth_cuisine_rank': round1_gt_cuisine_rank,
+            'lightgcn_ground_truth_cuisine_rank': lightgcn_gt_cuisine_rank,
             'time_ms': elapsed_ms,
             'error': has_error,
         }
@@ -976,12 +993,62 @@ Return JSON:
         }
 
 
+def _compute_ranking_metrics(
+    ranks: List[int],
+    valid: int,
+    k_values: List[int],
+    prefix: str = '',
+) -> Dict[str, float]:
+    """
+    Compute Hit@K, NDCG@K, MRR from a list of ranks.
+
+    Args:
+        ranks: List of 1-indexed ranks (0 = not found)
+        valid: Number of valid samples (denominator)
+        k_values: K values for Hit@K and NDCG@K
+        prefix: Prefix for metric keys (e.g. 'round1_')
+
+    Returns:
+        Dict of metric_name → value
+    """
+    m: Dict[str, float] = {}
+
+    if valid == 0:
+        for k in k_values:
+            m[f'{prefix}hit@{k}'] = 0.0
+            m[f'{prefix}ndcg@{k}'] = 0.0
+        m[f'{prefix}mrr'] = 0.0
+        return m
+
+    for k in k_values:
+        hits = sum(1 for rank in ranks if 0 < rank <= k)
+        m[f'{prefix}hit@{k}'] = hits / valid
+
+        ndcg_sum = sum(
+            1.0 / math.log2(rank + 1) if 0 < rank <= k else 0.0
+            for rank in ranks
+        )
+        m[f'{prefix}ndcg@{k}'] = ndcg_sum / valid
+
+    rr_sum = sum(1.0 / rank if rank > 0 else 0.0 for rank in ranks)
+    m[f'{prefix}mrr'] = rr_sum / valid
+
+    return m
+
+
 def compute_repeat_metrics(
     detailed_results: List[Dict[str, Any]],
     k_values: List[int] = None,
 ) -> Dict[str, Any]:
     """
     Compute Hit@K, NDCG@K, MRR metrics from detailed results.
+
+    Computes three sets of metrics:
+    - round1_*: GT cuisine rank in Round 1 predicted cuisines
+    - lightgcn_*: GT cuisine rank in LightGCN top cuisines
+    - (unprefixed): GT vendor rank in Round 2 final ranking (backward-compat)
+
+    Also computes improvement deltas between rounds.
 
     Args:
         detailed_results: List of per-sample result dicts
@@ -996,7 +1063,7 @@ def compute_repeat_metrics(
     if not detailed_results:
         return {'error': 'No results to compute metrics from'}
 
-    metrics = {}
+    metrics: Dict[str, Any] = {}
 
     # Filter out error samples, then filter to samples that had candidates
     non_error = [r for r in detailed_results if not r.get('error', False)]
@@ -1011,36 +1078,36 @@ def compute_repeat_metrics(
     metrics['error_samples'] = error_count
 
     if valid == 0:
-        for k in k_values:
-            metrics[f'hit@{k}'] = 0.0
-            metrics[f'ndcg@{k}'] = 0.0
-        metrics['mrr'] = 0.0
+        for prefix in ['round1_', 'lightgcn_', '']:
+            for k in k_values:
+                metrics[f'{prefix}hit@{k}'] = 0.0
+                metrics[f'{prefix}ndcg@{k}'] = 0.0
+            metrics[f'{prefix}mrr'] = 0.0
         return metrics
 
-    # Compute metrics
-    ranks = [r.get('ground_truth_rank', 0) for r in valid_results]
+    # Round 1 cuisine metrics
+    round1_ranks = [r.get('round1_ground_truth_cuisine_rank', 0) for r in valid_results]
+    metrics.update(_compute_ranking_metrics(round1_ranks, valid, k_values, prefix='round1_'))
 
+    # LightGCN cuisine metrics
+    lightgcn_ranks = [r.get('lightgcn_ground_truth_cuisine_rank', 0) for r in valid_results]
+    metrics.update(_compute_ranking_metrics(lightgcn_ranks, valid, k_values, prefix='lightgcn_'))
+
+    # Round 2 vendor metrics (backward-compatible, unprefixed)
+    final_ranks = [r.get('ground_truth_rank', 0) for r in valid_results]
+    metrics.update(_compute_ranking_metrics(final_ranks, valid, k_values, prefix=''))
+
+    # Improvement deltas (final vs round1 / lightgcn) for each k
     for k in k_values:
-        # Hit@K: 1 if ground truth is in top K
-        hits = sum(1 for rank in ranks if 0 < rank <= k)
-        metrics[f'hit@{k}'] = hits / valid
-
-        # NDCG@K
-        ndcg_sum = sum(
-            1.0 / math.log2(rank + 1) if 0 < rank <= k else 0.0
-            for rank in ranks
+        metrics[f'improvement_r1_to_final_hit@{k}'] = (
+            metrics[f'hit@{k}'] - metrics[f'round1_hit@{k}']
         )
-        metrics[f'ndcg@{k}'] = ndcg_sum / valid
+        metrics[f'improvement_lgcn_to_final_hit@{k}'] = (
+            metrics[f'hit@{k}'] - metrics[f'lightgcn_hit@{k}']
+        )
 
-    # MRR
-    rr_sum = sum(
-        1.0 / rank if rank > 0 else 0.0
-        for rank in ranks
-    )
-    metrics['mrr'] = rr_sum / valid
-
-    # Additional stats
-    found = [r for r in ranks if r > 0]
+    # Additional stats (backward-compat)
+    found = [r for r in final_ranks if r > 0]
     metrics['ground_truth_found_rate'] = len(found) / valid if valid > 0 else 0.0
     metrics['avg_rank_when_found'] = sum(found) / len(found) if found else 0.0
     metrics['avg_candidates'] = sum(
