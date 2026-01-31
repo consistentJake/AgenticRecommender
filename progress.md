@@ -112,3 +112,39 @@ if we can't, we shall use lightGCN.
   vendor_id||cuisine, but in LLM prompt, we must make sure we give the LLM `vendor_id||cuisine||(weekday, hour)`. so, think of how to optimize the user profile data      
   structure we create, that we can easily pull out the information we want for lightGCN/swing clculation (most likely it is user:item -> frequence) and information for   
   the final LLM request, user: full historic recores( item + time tuples)  
+
+
+  ## Jan 31
+
+## Improvement task
+  1. In the following, we only consider `vendor_id||primary_cuisine` as the `item`, therefore one order is one single datapoints, even one order can have multiple records ,each record contains a product, we consider these records form one single data point which is one order. we consider different customer_id as the `user`. I think we currently implement the logic that selecting `prediction_target=vendor_cuisine`  is considering `vendor_id||primary_cuisine` as the `item`. 
+  2. We consider `primary_cuisine` as the item's category. Therefore even we have maybe thousands of items, there are limited categorys(limited number of primary cuisine of vendors)
+  3. we want to only work on repeated dataset. Now we switch to predict repeated orders. In order to do this, we need to first build a user filter first, we still consider training data contains user's full historical items, testing data, different order present different test cases. We now only consider users:
+  a) contains more than 5 historical items, meaning at least 5 orders
+  b) only keep test orders whose vendor was visited in the training dataset for the same user. A user can have multiple test orders, but we only keep those test orders whose vendor is one of the vendor within the hisotrical items in its user training data.
+  think carefully about design this filtering and keep the filtered dataset somewhere we can cache it, test it throughtly.
+  4. We want the first round to be based on the lightGCN trainined based on item categories, that's being said, after filtering out training data, based on rule that there should be at least 5 histoircal items, we construct the lightGCN ground of customer -- item-categories, which is basically customer --- primary cuisine. Primary cuisine is much less than vendor_id|| primary cuisine. 
+  5. Now in first round, when we talk to LLM, we present still the user's historical items information, will be in format of `vendor_id || primary_cuisine || (weekday, hour) `, and the top 10 primary cuisines that the user historically purchased, and ranked them by the  calculation result based on lightGCNs training for this user(each item categroy (primary cuisine) and user are both emebedding, we use dot product to calculate their relationship score), and we will give the test order's weekday, hour so that llm should predict the top chioces of 3 primary cuisine
+  6. base on the first round's 3 primary cuisine, we need to select a list of candidate vendors. One good way is that, we have to pre-compute and cache these informations:
+  a) a vendor's metadata: geohash, primary cuisine.
+  b) geohash -> list of cuisine -> list of vendors. meaning, with in the trianing dataset, we group vendors first by geohash, then by its primary cuisine. then we can easily use this map to find out that given a geohash, we know what vendors are under this geohash, and if we give a list of cuisines, we know what restaurant are there.
+
+  once we have these information pre-computed, for preparing candidate items (vendors), we will go into the user's historical items, given the test order's geohash information, we only select the vendors that meet these conditions:
+  a) same geohash as the test order, meaning we limit the location of the vendors
+  b) vendors whose primary cuisine is in the list of 3 primary cuisines we selected from round1 response. 
+
+  7. after we select the candidate vendors, we wnat to present collobrative information for round 2 prediction. What we do is, we use swing similarity between users, find the top 5 similar users for this test order user, and then within their historical vendors (from training dataset), we select the records (vendor, primary cuisine, weekyday+hour) whose primary cuisine are within the round 1 result top 3 primary cuisine. adding these records as the collborative filtering information in the round 2 request. at most 20 candidate vendors
+
+  8. therefore, round 2 requests contains:
+  a) round 1 predicition of primary cuisine, with order
+  b) selected vendors candidates given by step 6
+  c) additionaly information of simialr user from step 7, we should controle the similiar users' selected historical records no more than 5 records per similar user.
+  d) provide the order weekday+hour, and ask LLM to rank the candidate vendors.
+
+
+ ## requirement
+ 1. make sure we keep each of the number criterial, like x records per user, top x simialr user, being configable in the config file.
+ 2. after we make the code implementation of each update. we should plan to test it before we move the coding in next task
+ 3. we can see there are multiple things we can pre-compute and cache, make the caching as an option in config. and we can do those pre-compute like filtering records in training, in testing data, pre-compute the swing, lightGCN, geohash -> primary cuisine -> vendors mapping, and any others. exlicity in config marking them as using cache true, then we will compute and cache them. if use cache as false, we recompute the cache
+ 4. we still use the same way of calculating the metrics. we care about the hit rate and ncds, and also the #1 #3 #5 metrics
+ 5. still using the stage like design we have, in final stage, we still keep the detailed json that contains everything like request to LLM, response from LLM. 
