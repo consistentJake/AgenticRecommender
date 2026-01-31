@@ -3,7 +3,8 @@
 ## Quick Start
 
 **Entry point:** `agentic_recommender/workflow/workflow_runner.py`
-**Config:** `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml`
+**Config (data_se):** `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml`
+**Config (data_sg):** `agentic_recommender/workflow/workflow_config_qwen32_linux_sg.yaml`
 
 ```bash
 # From project root:
@@ -40,7 +41,8 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | What | Where |
 |------|-------|
 | Workflow runner | `agentic_recommender/workflow/workflow_runner.py` |
-| Config (Qwen32) | `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml` |
+| Config (Qwen32, data_se) | `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml` |
+| Config (Qwen32, data_sg) | `agentic_recommender/workflow/workflow_config_qwen32_linux_sg.yaml` |
 | Rerank evaluator | `agentic_recommender/evaluation/rerank_eval.py` |
 | LightGCN | `agentic_recommender/similarity/lightGCN.py` |
 | Swing similarity | `agentic_recommender/similarity/methods.py` |
@@ -54,28 +56,24 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 
 ## Output Structure
 
-Each run creates a timestamped subfolder under `outputs/`:
+Outputs are organized by dataset under `outputs/{dataset_name}/`:
 ```
 outputs/
-├── stage1_merged_data.parquet          # Cached stage outputs (root level)
-├── stage2_enriched_users.json
-├── stage3_cuisine_profiles.json
-├── stage8_enhanced_rerank_detailed.json
-└── 202601262250/                       # Per-run timestamped folder
-    ├── runtime_config.yaml             # Config snapshot for this run
-    ├── workflow.log                    # Run log
-    ├── stage1_merged_data.parquet     # Merged orders+vendors+products
-    ├── stage1_merged_preview.json     # First N rows preview
-    ├── stage1_stats.json              # Row/unique counts
-    ├── stage1_test_data.parquet       # Test split (method2)
-    ├── stage8_enhanced_rerank_samples.json    # Test samples used
-    ├── stage8_enhanced_rerank_results.json    # Aggregate metrics (Hit@K, NDCG, MRR, basket)
-    ├── stage8_enhanced_rerank_detailed.json   # Per-sample results
-    ├── stage8_enhanced_rerank_detailed_preview.json
-    ├── detailed_results.jsonl         # Streaming results (async)
-    ├── stage9_repeat_results.json     # Stage 9: Hit@K, NDCG, MRR for repeat orders
-    ├── stage9_repeat_samples.json     # Test samples used
-    └── stage9_repeat_detailed.json    # Per-sample results
+├── data_se/                            # Sweden dataset outputs
+│   ├── stage1_merged_data.parquet      # Cached stage outputs
+│   ├── stage2_enriched_users.json
+│   ├── stage3_cuisine_profiles.json
+│   ├── workflow.log
+│   └── 202601262250/                   # Per-run timestamped folder
+│       ├── runtime_config.yaml
+│       ├── workflow.log
+│       ├── stage1_merged_data.parquet
+│       ├── stage8_enhanced_rerank_results.json
+│       ├── stage9_repeat_results.json
+│       └── ...
+└── data_sg/                            # Singapore dataset outputs
+    ├── stage1_merged_data.parquet
+    └── {timestamp}/...
 ```
 
 ## Testing: Validate by Stage

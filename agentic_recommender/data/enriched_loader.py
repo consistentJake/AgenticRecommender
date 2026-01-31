@@ -18,14 +18,43 @@ from dataclasses import dataclass
 class DataConfig:
     """Configuration for data loading."""
     data_dir: Path
-    orders_file: str = "orders_se_train.txt"
-    orders_test_file: str = "orders_se_test.txt"  # Test orders file
-    vendors_file: str = "vendors_se.txt"
-    products_file: str = "products_se.txt"
+    orders_file: str = ""
+    orders_test_file: str = ""
+    vendors_file: str = ""
+    products_file: str = ""
 
     # Processing options
     parse_time: bool = True
     compute_day_name: bool = True
+
+    def __post_init__(self):
+        """Auto-detect file names from directory if not explicitly set."""
+        if not self.orders_file or not self.vendors_file or not self.products_file:
+            self._auto_detect_files()
+
+    def _auto_detect_files(self):
+        """Detect file names by looking for orders_*_train.txt pattern."""
+        import glob
+        data_dir = Path(self.data_dir)
+
+        # Find orders train file: orders_*_train.txt
+        train_files = list(data_dir.glob("orders_*_train.txt"))
+        if train_files:
+            self.orders_file = train_files[0].name
+            # Derive region suffix (e.g., "sg" from "orders_sg_train.txt")
+            suffix = self.orders_file.replace("orders_", "").replace("_train.txt", "")
+            if not self.orders_test_file:
+                self.orders_test_file = f"orders_{suffix}_test.txt"
+            if not self.vendors_file:
+                self.vendors_file = f"vendors_{suffix}.txt"
+            if not self.products_file:
+                self.products_file = f"products_{suffix}.txt"
+        else:
+            # Fallback to original defaults
+            self.orders_file = self.orders_file or "orders_se_train.txt"
+            self.orders_test_file = self.orders_test_file or "orders_se_test.txt"
+            self.vendors_file = self.vendors_file or "vendors_se.txt"
+            self.products_file = self.products_file or "products_se.txt"
 
 
 class EnrichedDataLoader:

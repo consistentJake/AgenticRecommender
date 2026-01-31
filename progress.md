@@ -158,3 +158,52 @@ doc/design/Repeated_Dataset_Evaluation_Plan260131.md
  1. write comment in the place explaining why we use vendor geohash to filter vendors before round2. because we want to preserve the real app secanrio that we are recommending vendors based on area
  2. in the details result outputs/202601310519/stage9_repeat_detailed.json, I want you to also add the historical items tuple (vendor id, cuisine, time), associated recorsd we pass into round2 for each similar user, also in tuple format. also record the time spend in waiting llm response.
  3. after we fix this, copy the config file using cp command, then just change the model to `google/gemini-2.0-flash-001` and update n_samples as 500. then using multi-thread, multi worker like 50. run the code
+
+
+
+   ┌──────────┬────────────────┬──────────────────┬──────────────────┬───────────┐                  
+  │  Metric  │ Gemini 3 Flash │ Gemini 2.5 Flash │ Gemini 2.0 Flash │ Kimi K2.5 │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Samples  │ 200            │ 200              │ 500              │ 199       │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Hit@1    │ 0.5250         │ 0.5000           │ 0.4940           │ 0.2613    │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Hit@3    │ 0.6600         │ 0.6400           │ 0.6060           │ 0.3769    │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Hit@5    │ 0.6750         │ 0.6400           │ 0.6440           │ 0.4523    │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ MRR      │ 0.5906         │ 0.5673           │ 0.5620           │ 0.3440    │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ GT found │ 68.0%          │ 66.0%            │ 72.4%            │ 60.8%     │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Avg rank │ 1.4            │ 1.5              │ 2.5              │ 4.24      │                  
+  ├──────────┼────────────────┼──────────────────┼──────────────────┼───────────┤                  
+  │ Avg time │ 5.5s           │ 8.8s             │ 3.1s             │ ~5s       │
+  └──────────┴────────────────┴──────────────────┴──────────────────┴───────────┘
+
+## Jan 31
+
+### Dataset-Prefixed Outputs
+
+Refactored output structure to support multiple datasets without collision:
+- All outputs now go to `outputs/{dataset_name}/` (e.g., `outputs/data_se/`, `outputs/data_sg/`)
+- Auto-detect data file names in `enriched_loader.py` (no more hardcoded `orders_sg_train.txt`)
+- Fixed hardcoded file names in `workflow_runner.py` stage 1 cache + log messages
+- Updated all configs (`workflow_config_qwen32_linux.yaml`, `workflow_config_gemini_repeat.yaml`, etc.)
+- Created new config: `workflow_config_qwen32_linux_sg.yaml` for data_sg dataset
+- Moved existing root-level output files to `outputs/data_se/`
+
+### data_sg Initial Test (5 samples, qwen3-32b, repeat eval)
+
+Dataset stats: 3.4M training rows, 591K test rows, 78 cuisines, 105K users, 7153 vendors
+
+| Metric   | data_sg (5 samples) |
+|----------|---------------------|
+| Hit@1    | 0.6000              |
+| Hit@3    | 0.6000              |
+| Hit@5    | 0.8000              |
+| NDCG@5   | 0.6861              |
+| MRR      | 0.6500              |
+| GT found | 80.0%               |
+| Avg rank | 1.8                 |
+| Errors   | 0/5                 |

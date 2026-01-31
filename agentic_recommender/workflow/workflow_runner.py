@@ -271,11 +271,13 @@ class PipelineStages:
             # Load data
             data_dir = stage_cfg.input.get('data_dir', '/Users/zhenkai/Downloads/data_sg')
 
-            # Check global cache
+            # Auto-detect data file names from the directory
+            from agentic_recommender.data.enriched_loader import DataConfig
+            data_config = DataConfig(data_dir=Path(data_dir))
             input_files = [
-                f"{data_dir}/orders_sg_train.txt",
-                f"{data_dir}/vendors_sg.txt",
-                f"{data_dir}/products_sg.txt",
+                f"{data_dir}/{data_config.orders_file}",
+                f"{data_dir}/{data_config.vendors_file}",
+                f"{data_dir}/{data_config.products_file}",
             ]
             cache = StageCache('load_data', enabled=not self.no_cache)
             cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
@@ -302,9 +304,9 @@ class PipelineStages:
             loader = load_singapore_data(data_dir)
 
             # Load individual files with logging
-            self.logger.file_read(f"{data_dir}/orders_sg_train.txt", "Loading orders")
-            self.logger.file_read(f"{data_dir}/vendors_sg.txt", "Loading vendors")
-            self.logger.file_read(f"{data_dir}/products_sg.txt", "Loading products")
+            self.logger.file_read(f"{data_dir}/{data_config.orders_file}", "Loading orders")
+            self.logger.file_read(f"{data_dir}/{data_config.vendors_file}", "Loading vendors")
+            self.logger.file_read(f"{data_dir}/{data_config.products_file}", "Loading products")
 
             # Get merged data
             merged_df = loader.load_merged()
