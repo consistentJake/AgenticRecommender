@@ -211,9 +211,10 @@ class WorkflowConfig:
 class PipelineStages:
     """Implementation of all pipeline stages."""
 
-    def __init__(self, config: WorkflowConfig, logger: WorkflowLogger):
+    def __init__(self, config: WorkflowConfig, logger: WorkflowLogger, no_cache: bool = False):
         self.config = config
         self.logger = logger
+        self.no_cache = no_cache
 
         # Ensure output directory exists
         output_dir = Path(config.get_output_base_dir())
@@ -276,7 +277,7 @@ class PipelineStages:
                 f"{data_dir}/vendors_sg.txt",
                 f"{data_dir}/products_sg.txt",
             ]
-            cache = StageCache('load_data')
+            cache = StageCache('load_data', enabled=not self.no_cache)
             cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
 
             if cache_valid:
@@ -396,7 +397,7 @@ class PipelineStages:
             # Check global cache
             input_path = stage_cfg.input.get('merged_data')
             input_files = [input_path] if input_path else []
-            cache = StageCache('build_users')
+            cache = StageCache('build_users', enabled=not self.no_cache)
             cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
 
             if cache_valid:
@@ -524,7 +525,7 @@ class PipelineStages:
             # Check global cache
             input_path = stage_cfg.input.get('merged_data')
             input_files = [input_path] if input_path else []
-            cache = StageCache('build_cuisines')
+            cache = StageCache('build_cuisines', enabled=not self.no_cache)
             cache_valid, cache_path = cache.check_cache(input_files, stage_cfg.settings)
 
             if cache_valid:
@@ -1662,7 +1663,10 @@ class PipelineStages:
             swing_config = CuisineSwingConfig(top_k=config.items_per_seed * 2)
             swing_model = CuisineSwingMethod(swing_config, prediction_target=prediction_target)
 
-            if not swing_model.load_from_cache(dataset_name, evaluation_method):
+            loaded_from_cache = False
+            if not self.no_cache:
+                loaded_from_cache = swing_model.load_from_cache(dataset_name, evaluation_method)
+            if not loaded_from_cache:
                 self.logger.info(f"Training new Swing model (target={prediction_target})...")
                 swing_model.fit(interactions)
                 swing_model.save_to_cache(dataset_name, evaluation_method)
@@ -1692,6 +1696,7 @@ class PipelineStages:
                 interactions=interactions,
                 method=evaluation_method,
                 prediction_target=prediction_target,
+                force_retrain=self.no_cache,
                 verbose=True
             )
 
@@ -1901,8 +1906,9 @@ class WorkflowRunner:
         'run_enhanced_rerank_evaluation',   # Stage 8: Two-round LLM + LightGCN (RECOMMENDED)
     ]
 
-    def __init__(self, config_path: str = "workflow_config.yaml"):
+    def __init__(self, config_path: str = "workflow_config.yaml", no_cache: bool = False):
         self.config = WorkflowConfig(config_path)
+        self.no_cache = no_cache
 
         # Generate run timestamp and create output subfolder
         self.run_timestamp = datetime.now().strftime("%Y%m%d%H%M")
@@ -1919,7 +1925,10 @@ class WorkflowRunner:
             log_file=self.config.get_log_file(),
             verbose=self.config.is_verbose()
         )
-        self.stages = PipelineStages(self.config, self.logger)
+        self.stages = PipelineStages(self.config, self.logger, no_cache=no_cache)
+
+        if no_cache:
+            self.logger.warning("--no-cache: All caches disabled. Stage outputs, Swing, and LightGCN will be regenerated.")
 
         # Map stage names to methods
         self.stage_methods = {
@@ -2106,6 +2115,12 @@ Examples:
         help='List all available stages and exit'
     )
 
+    parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Disable all caches and force regeneration of all stage outputs, Swing, and LightGCN models'
+    )
+
     args = parser.parse_args()
 
     # List stages if requested (use WorkflowConfig directly to avoid creating directories)
@@ -2122,7 +2137,7 @@ Examples:
         return
 
     # Initialize workflow
-    runner = WorkflowRunner(args.config)
+    runner = WorkflowRunner(args.config, no_cache=args.no_cache)
 
     # Run workflow
     results = runner.run(stages=args.stages)

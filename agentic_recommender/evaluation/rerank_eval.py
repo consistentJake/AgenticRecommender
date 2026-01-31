@@ -1451,13 +1451,19 @@ class EnhancedRerankEvaluator:
         target_day_of_week: int = None,
     ) -> str:
         """Build Round 1 reranking prompt."""
+        prediction_target = getattr(self.config, 'prediction_target', 'cuisine')
+
         # Format history
         history_lines = []
         for i, order in enumerate(order_history, 1):
             day_name = self.DAY_NAMES[order.get('day_of_week', 0)]
             hour = order.get('hour', 12)
-            cuisine = order.get('cuisine', 'unknown')
-            history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
+            if prediction_target == 'vendor_cuisine':
+                item = order.get('item', f"{order.get('vendor_id', 'unknown')}||{order.get('cuisine', 'unknown')}")
+                history_lines.append(f"{i}. {item}||({day_name}, {hour})")
+            else:
+                cuisine = order.get('cuisine', 'unknown')
+                history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
 
         history_str = "\n".join(history_lines)
 
@@ -1492,9 +1498,17 @@ You must rank ALL {len(candidates)} cuisines. Return your response as JSON:
         lightgcn_scores: List[Tuple[str, float]],
     ) -> str:
         """Build Round 2 reflection prompt."""
+        prediction_target = getattr(self.config, 'prediction_target', 'cuisine')
+
         # History summary (last 5)
         recent = order_history[-5:]
-        history_summary = ", ".join([o.get('cuisine', 'unknown') for o in recent])
+        if prediction_target == 'vendor_cuisine':
+            history_summary = ", ".join([
+                f"{o.get('item', o.get('vendor_id','?')+'||'+o.get('cuisine','?'))}||({self.DAY_NAMES[o.get('day_of_week',0)]}, {o.get('hour',12)})"
+                for o in recent
+            ])
+        else:
+            history_summary = ", ".join([o.get('cuisine', 'unknown') for o in recent])
 
         # Round 1 ranking (top 10)
         r1_str = ", ".join(round1_ranking[:10])
@@ -1939,6 +1953,7 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             max_tokens_round1=self.config.max_tokens_round1,
             max_tokens_round2=self.config.max_tokens_round2,
             enable_thinking=self.config.enable_thinking,
+            prediction_target=getattr(self.config, 'prediction_target', 'cuisine'),
         )
 
         # Create async provider

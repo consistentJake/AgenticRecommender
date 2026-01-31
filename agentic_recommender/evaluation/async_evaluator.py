@@ -41,6 +41,9 @@ class AsyncEvalConfig:
     max_tokens_round2: int = 4096
     enable_thinking: bool = False
 
+    # Prediction target
+    prediction_target: str = "cuisine"
+
 
 class AsyncRerankEvaluator:
     """
@@ -247,8 +250,14 @@ class AsyncRerankEvaluator:
         """Process single sample: candidate gen + round1 + lightgcn + round2."""
         start_time = time.time()
 
-        # Extract cuisine history from order history
-        cuisine_history = [o.get('cuisine', 'unknown') for o in sample['order_history']]
+        # Extract item history from order history based on prediction_target
+        if self.config.prediction_target == 'vendor_cuisine':
+            cuisine_history = [
+                o.get('item', f"{o.get('vendor_id', 'unknown')}||{o.get('cuisine', 'unknown')}")
+                for o in sample['order_history']
+            ]
+        else:
+            cuisine_history = [o.get('cuisine', 'unknown') for o in sample['order_history']]
 
         # Generate candidates (sync, fast)
         candidates, candidate_info = self.generator.generate_candidates(
@@ -294,6 +303,8 @@ class AsyncRerankEvaluator:
             'candidates': candidates,
             'candidate_info': candidate_info,
             # Round 1 results
+            'round1_prompt': round1_result.get('prompt', ''),
+            'round1_raw_response': round1_result.get('raw_response', ''),
             'round1_ranking': round1_result['ranking'],
             'round1_reasoning': round1_result.get('reasoning', ''),
             # LightGCN results
@@ -301,6 +312,8 @@ class AsyncRerankEvaluator:
             'lightgcn_ranking': lightgcn_ranking,
             'lightgcn_rank': lightgcn_rank,
             # Round 2 results
+            'round2_prompt': round2_result.get('prompt', ''),
+            'round2_raw_response': round2_result.get('raw_response', ''),
             'final_ranking': round2_result['ranking'],
             'final_reflection': round2_result.get('reflection', ''),
             # Metrics
@@ -328,7 +341,10 @@ class AsyncRerankEvaluator:
             enable_thinking=self.config.enable_thinking,
         )
 
-        return self._parse_round1_response(response, candidates)
+        result = self._parse_round1_response(response, candidates)
+        result['prompt'] = prompt
+        result['raw_response'] = response
+        return result
 
     async def _async_round2(
         self,
@@ -349,7 +365,10 @@ class AsyncRerankEvaluator:
             enable_thinking=self.config.enable_thinking,
         )
 
-        return self._parse_round2_response(response, candidates)
+        result = self._parse_round2_response(response, candidates)
+        result['prompt'] = prompt
+        result['raw_response'] = response
+        return result
 
     def _build_round1_prompt(
         self,
@@ -366,8 +385,12 @@ class AsyncRerankEvaluator:
         for i, order in enumerate(order_history, 1):
             day_name = self.DAY_NAMES[order.get('day_of_week', 0)]
             hour = order.get('hour', 12)
-            cuisine = order.get('cuisine', 'unknown')
-            history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
+            if self.config.prediction_target == 'vendor_cuisine':
+                item = order.get('item', f"{order.get('vendor_id', 'unknown')}||{order.get('cuisine', 'unknown')}")
+                history_lines.append(f"{i}. {item}||({day_name}, {hour})")
+            else:
+                cuisine = order.get('cuisine', 'unknown')
+                history_lines.append(f"{i}. {cuisine} ({day_name} {hour}:00)")
 
         history_str = "\n".join(history_lines)
 
@@ -404,7 +427,13 @@ You must rank ALL {len(candidates)} cuisines. Return your response as JSON:
         """Build Round 2 reflection prompt."""
         # History summary (last 5)
         recent = order_history[-5:]
-        history_summary = ", ".join([o.get('cuisine', 'unknown') for o in recent])
+        if self.config.prediction_target == 'vendor_cuisine':
+            history_summary = ", ".join([
+                f"{o.get('item', o.get('vendor_id','?')+'||'+o.get('cuisine','?'))}||({self.DAY_NAMES[o.get('day_of_week',0)]}, {o.get('hour',12)})"
+                for o in recent
+            ])
+        else:
+            history_summary = ", ".join([o.get('cuisine', 'unknown') for o in recent])
 
         # Round 1 ranking (top 10)
         r1_str = ", ".join(round1_ranking[:10])
@@ -610,6 +639,7 @@ async def run_async_evaluation(
         max_tokens_round1=kwargs.get('max_tokens_round1', 4096),
         max_tokens_round2=kwargs.get('max_tokens_round2', 4096),
         enable_thinking=kwargs.get('enable_thinking', False),
+        prediction_target=kwargs.get('prediction_target', 'cuisine'),
     )
 
     provider = AsyncLLMProvider(
