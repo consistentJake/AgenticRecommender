@@ -1624,6 +1624,7 @@ class PipelineStages:
                     prediction_target=prediction_target,
                     n_samples=config.n_samples,
                     deterministic=config.deterministic_sampling,
+                    min_history=config.min_history,
                 )
                 self.logger.success(f"Created {len(test_samples)} test samples from test file")
 

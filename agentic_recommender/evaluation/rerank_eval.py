@@ -621,6 +621,7 @@ def build_test_samples_from_test_file(
     seed: int = 42,
     n_samples: int = -1,
     deterministic: bool = True,
+    min_history: int = 5,
 ) -> List[Dict[str, Any]]:
     """
     Build test samples using full training history + test orders (Method 2).
@@ -628,7 +629,8 @@ def build_test_samples_from_test_file(
     Each order in test_df becomes one test case.
     Ground truth = set of items in that order (basket).
 
-    IMPORTANT: Only includes users that appear in BOTH train and test data.
+    IMPORTANT: Only includes users that appear in BOTH train and test data
+    and have at least min_history unique orders in training data.
     Cold-start users (only in test) are skipped.
 
     If deterministic=True, samples are sorted by order_id to ensure
@@ -641,6 +643,7 @@ def build_test_samples_from_test_file(
         seed: Random seed (used only if deterministic=False)
         n_samples: Number of samples to return (-1 = all samples)
         deterministic: If True, sort by order_id for reproducibility
+        min_history: Minimum number of unique orders in training data
 
     Returns:
         List of samples with:
@@ -718,6 +721,14 @@ def build_test_samples_from_test_file(
 
         user_histories[customer_id] = orders
 
+    # Filter users with insufficient training history
+    before_filter = len(user_histories)
+    user_histories = {uid: orders for uid, orders in user_histories.items() if len(orders) >= min_history}
+    filtered_out = before_filter - len(user_histories)
+    if filtered_out > 0:
+        print(f"[build_test_samples_from_test_file] Filtered {filtered_out} users with < {min_history} training orders")
+    print(f"[build_test_samples_from_test_file] {len(user_histories)} users with >= {min_history} training orders")
+
     # Build test samples from test orders
     samples = []
 
@@ -728,8 +739,8 @@ def build_test_samples_from_test_file(
         order_data = test_df[test_df['order_id'] == test_order_id]
         customer_id = order_data['customer_id'].iloc[0]
 
-        # Skip cold-start users
-        if customer_id not in valid_users:
+        # Skip cold-start users and users filtered by min_history
+        if customer_id not in user_histories:
             continue
 
         # Get all items in this test order (basket)
