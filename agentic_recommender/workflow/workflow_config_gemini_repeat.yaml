@@ -209,6 +209,7 @@ workflow:
         # Swing user-user similarity
         top_similar_users: 5          # Top similar users for CF
         max_records_per_similar_user: 5  # Records per similar user
+        max_total_similar_records: 20 # Cap total records across all similar users
 
         # Round 2: Vendor ranking
         temperature_round2: 0.2
@@ -239,7 +240,7 @@ llm:
     # api_key: "your-api-key"  # Or set GEMINI_API_KEY env var
 
   openrouter:
-    model_name: "moonshotai/kimi-k2.5"
+    model_name: "google/gemini-2.5-flash-preview-09-2025"
     api_key: "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"  # Or set OPENROUTER_API_KEY env var
 
 # Output directory settings

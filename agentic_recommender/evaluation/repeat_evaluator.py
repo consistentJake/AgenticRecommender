@@ -49,6 +49,7 @@ class RepeatEvalConfig:
     # Round 2 / Swing
     top_similar_users: int = 5
     max_records_per_similar_user: int = 5
+    max_total_similar_records: int = 20  # Cap total records across all similar users
     temperature_round2: float = 0.2
     max_tokens_round2: int = 4096
     # General
@@ -691,6 +692,9 @@ Return JSON:
         )
 
         result = []
+        total_records = 0
+        max_total = self.config.max_total_similar_records
+
         for sim_uid, sim_score in similar_users:
             records = self._user_records.get(sim_uid, [])
             # Filter by top cuisines
@@ -700,6 +704,13 @@ Return JSON:
             ]
             # Limit records per user
             filtered = filtered[-self.config.max_records_per_similar_user:]
+            # Enforce total cap across all similar users
+            remaining = max_total - total_records
+            if remaining <= 0:
+                break
+            if len(filtered) > remaining:
+                filtered = filtered[-remaining:]
+            total_records += len(filtered)
             result.append({
                 'user_id': sim_uid,
                 'similarity': sim_score,

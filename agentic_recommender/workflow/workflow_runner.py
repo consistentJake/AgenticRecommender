@@ -2011,6 +2011,7 @@ class PipelineStages:
                 max_candidate_vendors=settings.get('max_candidate_vendors', 20),
                 top_similar_users=settings.get('top_similar_users', 5),
                 max_records_per_similar_user=settings.get('max_records_per_similar_user', 5),
+                max_total_similar_records=settings.get('max_total_similar_records', 20),
                 temperature_round2=settings.get('temperature_round2', 0.2),
                 max_tokens_round2=settings.get('max_tokens_round2', 4096),
                 enable_thinking=settings.get('enable_thinking', True),

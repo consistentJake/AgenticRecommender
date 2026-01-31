@@ -209,6 +209,7 @@ workflow:
         # Swing user-user similarity
         top_similar_users: 5          # Top similar users for CF
         max_records_per_similar_user: 5  # Records per similar user
+        max_total_similar_records: 20 # Cap total records across all similar users
 
         # Round 2: Vendor ranking
         temperature_round2: 0.2
