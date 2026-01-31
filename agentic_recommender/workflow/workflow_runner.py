@@ -1835,6 +1835,295 @@ class PipelineStages:
             self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
             return False
 
+    def stage_run_repeat_evaluation(self) -> bool:
+        """Run Stage 9: Repeated dataset two-round evaluation."""
+        stage_cfg = self.config.get_stage('run_repeat_evaluation')
+        self.logger.stage_start('run_repeat_evaluation', stage_cfg.description)
+
+        try:
+            import asyncio
+            from agentic_recommender.data.repeat_filter import (
+                RepeatDatasetFilter,
+                build_repeat_test_samples,
+            )
+            from agentic_recommender.data.geohash_index import GeohashVendorIndex
+            from agentic_recommender.evaluation.repeat_evaluator import (
+                AsyncRepeatEvaluator,
+                RepeatEvalConfig,
+                compute_repeat_metrics,
+            )
+            from agentic_recommender.similarity.lightGCN import (
+                LightGCNEmbeddingManager,
+                LightGCNConfig,
+            )
+            from agentic_recommender.similarity.methods import SwingMethod, SwingConfig
+
+            settings = stage_cfg.settings
+            dataset_name = settings.get('dataset_name', 'data_se')
+
+            # ---- Load data ----
+            input_path = stage_cfg.input.get('merged_data')
+            self.logger.file_read(input_path, "Loading merged training data")
+            train_df = pd.read_parquet(input_path)
+            self.logger.info(f"Loaded training data: {len(train_df):,} rows")
+
+            test_data_path = stage_cfg.input.get('test_data')
+            self.logger.file_read(test_data_path, "Loading test data")
+            test_df = pd.read_parquet(test_data_path)
+            self.logger.info(f"Loaded test data: {len(test_df):,} rows")
+
+            # ---- Step 1: Filter datasets ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 1: FILTERING REPEAT DATASET")
+            self.logger.info("=" * 60)
+
+            min_history = settings.get('min_history_items', 5)
+            use_filter_cache = settings.get('use_filter_cache', True) and not self.no_cache
+
+            repeat_filter = RepeatDatasetFilter()
+            filtered_train, filtered_test, filter_stats = repeat_filter.filter(
+                train_df, test_df,
+                min_history_items=min_history,
+                use_cache=use_filter_cache,
+            )
+            self.logger.info(f"Filter stats: {json.dumps(filter_stats, indent=2)}")
+
+            # ---- Step 2: Build geohash index ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 2: BUILDING GEOHASH INDEX")
+            self.logger.info("=" * 60)
+
+            use_geohash_cache = settings.get('use_geohash_cache', True) and not self.no_cache
+            geohash_index = GeohashVendorIndex()
+            geohash_index.build(filtered_train, use_cache=use_geohash_cache)
+            self.logger.info(f"Geohash index stats: {geohash_index.get_stats()}")
+
+            # ---- Step 3: Train LightGCN on customer→cuisine ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 3: TRAINING LIGHTGCN (customer→cuisine)")
+            self.logger.info("=" * 60)
+
+            # Build cuisine-level interactions from filtered training data
+            cuisine_interactions = []
+            seen_pairs = set()
+            for _, row in filtered_train.iterrows():
+                cid = str(row['customer_id'])
+                cuisine = str(row.get('cuisine', 'unknown'))
+                pair = (cid, cuisine)
+                if pair not in seen_pairs:
+                    cuisine_interactions.append(pair)
+                    seen_pairs.add(pair)
+
+            self.logger.info(f"Cuisine interactions: {len(cuisine_interactions)}")
+
+            lightgcn_config = LightGCNConfig(
+                embedding_dim=settings.get('lightgcn_embedding_dim', 64),
+                epochs=settings.get('lightgcn_epochs', 50),
+            )
+            lightgcn_manager = LightGCNEmbeddingManager(lightgcn_config)
+            use_lightgcn_cache = settings.get('use_lightgcn_cache', True) and not self.no_cache
+            lightgcn_manager.load_or_train(
+                dataset_name=dataset_name,
+                interactions=cuisine_interactions,
+                method="repeat",
+                prediction_target="cuisine",
+                force_retrain=not use_lightgcn_cache,
+                verbose=True,
+            )
+            self.logger.info(f"LightGCN stats: {lightgcn_manager.get_stats()}")
+
+            # ---- Step 4: Train Swing user-user on vendor_id||cuisine ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 4: TRAINING SWING (user-user on vendor||cuisine)")
+            self.logger.info("=" * 60)
+
+            # Build item-level interactions: (customer_id, vendor_id||cuisine)
+            swing_interactions = []
+            for _, row in filtered_train.iterrows():
+                cid = str(row['customer_id'])
+                vid = str(row.get('vendor_id', ''))
+                cuisine = str(row.get('cuisine', 'unknown'))
+                item = f"{vid}||{cuisine}"
+                swing_interactions.append((cid, item))
+
+            self.logger.info(f"Swing interactions: {len(swing_interactions)}")
+
+            swing_config = SwingConfig(top_k=settings.get('top_similar_users', 5))
+            swing_model = SwingMethod(swing_config)
+
+            use_swing_cache = settings.get('use_swing_cache', True) and not self.no_cache
+            loaded_swing = False
+            if use_swing_cache:
+                loaded_swing = swing_model.load_from_cache(dataset_name, "repeat")
+            if not loaded_swing:
+                self.logger.info("Training new Swing user-user model...")
+                swing_model.fit(swing_interactions)
+                swing_model.save_to_cache(dataset_name, "repeat")
+
+            self.logger.info(f"Swing stats: {swing_model.get_stats()}")
+
+            # ---- Step 5: Build test samples ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 5: BUILDING TEST SAMPLES")
+            self.logger.info("=" * 60)
+
+            n_samples = settings.get('n_samples', 20)
+            deterministic = settings.get('deterministic_sampling', True)
+
+            test_samples = build_repeat_test_samples(
+                filtered_train, filtered_test,
+                n_samples=n_samples,
+                deterministic=deterministic,
+            )
+            self.logger.info(f"Built {len(test_samples)} test samples")
+
+            # Save test samples
+            samples_path = stage_cfg.output.get('samples_json')
+            if samples_path:
+                with open(samples_path, 'w') as f:
+                    json.dump(test_samples, f, indent=2, default=str)
+                self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
+
+            # ---- Step 6: Run evaluation ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 6: RUNNING TWO-ROUND EVALUATION")
+            self.logger.info("=" * 60)
+
+            llm_config = self.config.get_llm_config()
+            provider_type = llm_config.get('provider', 'mock')
+            enable_async = settings.get('enable_async', True)
+            max_workers = settings.get('max_workers', 25)
+
+            eval_config = RepeatEvalConfig(
+                min_history_items=min_history,
+                lightgcn_top_k_cuisines=settings.get('lightgcn_top_k_cuisines', 10),
+                lightgcn_epochs=settings.get('lightgcn_epochs', 50),
+                lightgcn_embedding_dim=settings.get('lightgcn_embedding_dim', 64),
+                round1_predict_top_k=settings.get('round1_predict_top_k', 3),
+                temperature_round1=settings.get('temperature_round1', 0.3),
+                max_tokens_round1=settings.get('max_tokens_round1', 4096),
+                max_candidate_vendors=settings.get('max_candidate_vendors', 20),
+                top_similar_users=settings.get('top_similar_users', 5),
+                max_records_per_similar_user=settings.get('max_records_per_similar_user', 5),
+                temperature_round2=settings.get('temperature_round2', 0.2),
+                max_tokens_round2=settings.get('max_tokens_round2', 4096),
+                enable_thinking=settings.get('enable_thinking', True),
+                dataset_name=dataset_name,
+                n_samples=n_samples,
+                deterministic_sampling=deterministic,
+                enable_async=enable_async,
+                max_workers=max_workers,
+                checkpoint_interval=settings.get('checkpoint_interval', 50),
+                retry_attempts=settings.get('retry_attempts', 3),
+            )
+
+            if enable_async and provider_type == 'openrouter':
+                from agentic_recommender.llm.async_provider import AsyncLLMProvider
+
+                api_key = (
+                    llm_config.get('openrouter', {}).get('api_key') or
+                    os.environ.get('OPENROUTER_API_KEY')
+                )
+                if not api_key:
+                    self.logger.error("OpenRouter API key not found!")
+                    self.logger.stage_end('run_repeat_evaluation', success=False)
+                    return False
+
+                self.logger.info(f"Async mode: {max_workers} workers")
+
+                async_provider = AsyncLLMProvider(
+                    api_key=api_key,
+                    model_name=llm_config.get('openrouter', {}).get('model_name'),
+                    max_concurrent=max_workers,
+                )
+
+                output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
+
+                evaluator = AsyncRepeatEvaluator(
+                    async_provider=async_provider,
+                    lightgcn_manager=lightgcn_manager,
+                    swing_model=swing_model,
+                    geohash_index=geohash_index,
+                    train_df=filtered_train,
+                    config=eval_config,
+                )
+
+                eval_output = asyncio.run(
+                    evaluator.evaluate_async(
+                        test_samples=test_samples,
+                        output_path=output_dir,
+                        verbose=True,
+                    )
+                )
+
+                detailed_results = eval_output.get('results', [])
+            else:
+                self.logger.error("Repeat evaluation requires async mode with OpenRouter provider")
+                self.logger.stage_end('run_repeat_evaluation', success=False)
+                return False
+
+            # ---- Step 7: Compute metrics ----
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("STEP 7: COMPUTING METRICS")
+            self.logger.info("=" * 60)
+
+            metrics = compute_repeat_metrics(detailed_results)
+            metrics['filter_stats'] = filter_stats
+
+            # Print results
+            self.logger.info("")
+            self.logger.info("=" * 72)
+            self.logger.info("REPEAT EVALUATION RESULTS")
+            self.logger.info("=" * 72)
+            for k in [1, 3, 5]:
+                hit = metrics.get(f'hit@{k}', 0)
+                ndcg = metrics.get(f'ndcg@{k}', 0)
+                self.logger.info(f"  Hit@{k}: {hit:.4f}  |  NDCG@{k}: {ndcg:.4f}")
+            self.logger.info(f"  MRR: {metrics.get('mrr', 0):.4f}")
+            self.logger.info(f"  GT found rate: {metrics.get('ground_truth_found_rate', 0):.2%}")
+            self.logger.info(f"  Avg rank (when found): {metrics.get('avg_rank_when_found', 0):.1f}")
+            self.logger.info(f"  Avg candidates: {metrics.get('avg_candidates', 0):.1f}")
+            self.logger.info(f"  Avg time/sample: {metrics.get('avg_time_ms', 0):.0f}ms")
+            self.logger.info(f"  Total/Valid samples: {metrics.get('total_samples', 0)}/{metrics.get('valid_samples', 0)}")
+            self.logger.info("=" * 72)
+
+            # ---- Save results ----
+            results_path = stage_cfg.output.get('results_json')
+            if results_path:
+                with open(results_path, 'w') as f:
+                    json.dump(metrics, f, indent=2, default=str)
+                self.logger.file_write(results_path, "Repeat evaluation metrics")
+
+            detailed_path = stage_cfg.output.get('detailed_json')
+            if detailed_path:
+                with open(detailed_path, 'w') as f:
+                    json.dump(detailed_results, f, indent=2, default=str)
+                self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed results")
+
+                self._save_preview(
+                    data=detailed_results,
+                    full_path=detailed_path,
+                    preview_rows=3,
+                    description="Preview of repeat evaluation detailed results",
+                )
+
+            self.logger.stage_end('run_repeat_evaluation', success=True)
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Stage failed: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            self.logger.stage_end('run_repeat_evaluation', success=False)
+            return False
+
     def _create_mock_enhanced_rerank_provider(self):
         """Create a mock provider for enhanced rerank testing."""
         import random
@@ -1905,6 +2194,7 @@ class WorkflowRunner:
         'run_topk_evaluation',              # Stage 6: Direct LLM prediction
         'run_rerank_evaluation',            # Stage 7: Retrieve-then-rerank
         'run_enhanced_rerank_evaluation',   # Stage 8: Two-round LLM + LightGCN (RECOMMENDED)
+        'run_repeat_evaluation',            # Stage 9: Repeated dataset two-round eval
     ]
 
     def __init__(self, config_path: str = "workflow_config.yaml", no_cache: bool = False):
@@ -1941,6 +2231,7 @@ class WorkflowRunner:
             'run_topk_evaluation': self.stages.stage_run_topk_evaluation,
             'run_rerank_evaluation': self.stages.stage_run_rerank_evaluation,
             'run_enhanced_rerank_evaluation': self.stages.stage_run_enhanced_rerank_evaluation,
+            'run_repeat_evaluation': self.stages.stage_run_repeat_evaluation,
         }
 
     def _setup_run_directory(self) -> str:

@@ -34,6 +34,8 @@ class SwingMethod(SimilarityMethod):
     sim(u1, u2) = Σ(i ∈ common_items) 1 / ((|I(u1)|+α1)^β × (|I(u2)|+α1)^β × (|U(i)|+α2))
     """
 
+    CACHE_DIR = Path.home() / ".cache" / "agentic_recommender" / "swing_user"
+
     def __init__(self, config: SwingConfig = None):
         super().__init__(config or SwingConfig())
         self.user_items: Dict[str, Set[str]] = {}
@@ -97,6 +99,80 @@ class SwingMethod(SimilarityMethod):
     def get_user_items(self, user_id: str) -> Set[str]:
         """Get items for a user."""
         return self.user_items.get(user_id, set()).copy()
+
+    def get_top_similar_users(
+        self, user_id: str, top_k: int = 5
+    ) -> List[Tuple[str, float]]:
+        """Get top-k most similar users via Swing.
+
+        Args:
+            user_id: Query user
+            top_k: Number of similar users to return
+
+        Returns:
+            List of (user_id, similarity_score) tuples, sorted descending
+        """
+        old_top_k = self.config.top_k
+        self.config.top_k = top_k
+        result = self.get_similar(user_id)
+        self.config.top_k = old_top_k
+        return result
+
+    def save_to_cache(self, dataset_name: str, method: str = "repeat") -> bool:
+        """Save fitted model to disk cache.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method for cache naming
+
+        Returns:
+            True if save succeeded
+        """
+        try:
+            self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_path = self._get_cache_path(dataset_name, method)
+            with open(cache_path, 'wb') as f:
+                pickle.dump({
+                    'user_items': self.user_items,
+                    'item_users': self.item_users,
+                    'config': self.config,
+                }, f)
+            print(f"[SwingMethod] Saved to cache: {cache_path}")
+            return True
+        except Exception as e:
+            print(f"[SwingMethod] Failed to save cache: {e}")
+            return False
+
+    def load_from_cache(self, dataset_name: str, method: str = "repeat") -> bool:
+        """Load fitted model from disk cache.
+
+        Args:
+            dataset_name: Name for cache file (e.g., "data_se")
+            method: Evaluation method for cache naming
+
+        Returns:
+            True if cache load succeeded
+        """
+        try:
+            cache_path = self._get_cache_path(dataset_name, method)
+            if not cache_path.exists():
+                return False
+            with open(cache_path, 'rb') as f:
+                data = pickle.load(f)
+            self.user_items = data['user_items']
+            self.item_users = data['item_users']
+            self._fitted = True
+            print(f"[SwingMethod] Loaded from cache: {cache_path}")
+            return True
+        except Exception as e:
+            print(f"[SwingMethod] Failed to load cache: {e}")
+            return False
+
+    def _get_cache_path(self, dataset_name: str, method: str = "repeat") -> Path:
+        """Get cache file path."""
+        if method:
+            return self.CACHE_DIR / f"{dataset_name}_{method}_swing_user.pkl"
+        return self.CACHE_DIR / f"{dataset_name}_swing_user.pkl"
 
     def get_stats(self) -> Dict:
         stats = super().get_stats()

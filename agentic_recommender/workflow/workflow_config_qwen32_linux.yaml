@@ -170,6 +170,62 @@ workflow:
         checkpoint_interval: 50      # Log progress every N samples
         retry_attempts: 3            # Retries per failed request
 
+    # Stage 9: Repeated Dataset Evaluation
+    # Two-round LLM: predict cuisines → rank vendors (repeat orders only)
+    run_repeat_evaluation:
+      enabled: true
+      description: "Two-round LLM evaluation on repeated orders dataset"
+      input:
+        merged_data: "outputs/stage1_merged_data.parquet"
+        test_data: "outputs/stage1_test_data.parquet"
+      output:
+        results_json: "outputs/stage9_repeat_results.json"
+        samples_json: "outputs/stage9_repeat_samples.json"
+        detailed_json: "outputs/stage9_repeat_detailed.json"
+      settings:
+        dataset_name: "data_se"
+
+        # Dataset filtering
+        min_history_items: 5          # Min unique orders per user
+
+        # Caching (per component)
+        use_filter_cache: true        # Cache filtered dataset
+        use_geohash_cache: true       # Cache geohash index
+        use_lightgcn_cache: true      # Cache LightGCN model
+        use_swing_cache: true         # Cache Swing model
+
+        # LightGCN (on customer→primary_cuisine)
+        lightgcn_epochs: 50
+        lightgcn_embedding_dim: 64
+        lightgcn_top_k_cuisines: 10   # Top cuisines to present in Round 1
+
+        # Round 1: Cuisine prediction
+        round1_predict_top_k: 3       # Predict top K cuisines
+        temperature_round1: 0.3
+
+        # Candidate selection
+        max_candidate_vendors: 20     # Max vendor candidates for Round 2
+
+        # Swing user-user similarity
+        top_similar_users: 5          # Top similar users for CF
+        max_records_per_similar_user: 5  # Records per similar user
+
+        # Round 2: Vendor ranking
+        temperature_round2: 0.2
+
+        # LLM settings
+        enable_thinking: true
+
+        # Test settings
+        n_samples: 20
+        deterministic_sampling: true
+
+        # Async settings
+        enable_async: true
+        max_workers: 25
+        checkpoint_interval: 50
+        retry_attempts: 3
+
 # LLM Provider Configuration
 llm:
   provider: "openrouter"  # Options: mock, gemini, openrouter

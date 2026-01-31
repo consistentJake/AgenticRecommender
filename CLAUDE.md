@@ -33,6 +33,7 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | 6 | `run_topk_evaluation` | no | Direct LLM ranking |
 | 7 | `run_rerank_evaluation` | no | Simple retrieve-rerank |
 | 8 | `run_enhanced_rerank_evaluation` | yes | **Main eval**: two-round LLM + LightGCN reflection |
+| 9 | `run_repeat_evaluation` | yes | Repeated orders: two-round LLM (cuisine→vendor) |
 
 ## Key Files
 
@@ -47,6 +48,9 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | Data loader | `agentic_recommender/data/enriched_loader.py` |
 | Prompt templates | `agentic_recommender/core/templates/rerank/` |
 | Stage cache | `agentic_recommender/workflow/stage_cache.py` |
+| Repeat filter | `agentic_recommender/data/repeat_filter.py` |
+| Geohash index | `agentic_recommender/data/geohash_index.py` |
+| Repeat evaluator | `agentic_recommender/evaluation/repeat_evaluator.py` |
 
 ## Output Structure
 
@@ -68,7 +72,10 @@ outputs/
     ├── stage8_enhanced_rerank_results.json    # Aggregate metrics (Hit@K, NDCG, MRR, basket)
     ├── stage8_enhanced_rerank_detailed.json   # Per-sample results
     ├── stage8_enhanced_rerank_detailed_preview.json
-    └── detailed_results.jsonl         # Streaming results (async)
+    ├── detailed_results.jsonl         # Streaming results (async)
+    ├── stage9_repeat_results.json     # Stage 9: Hit@K, NDCG, MRR for repeat orders
+    ├── stage9_repeat_samples.json     # Test samples used
+    └── stage9_repeat_detailed.json    # Per-sample results
 ```
 
 ## Testing: Validate by Stage
@@ -93,6 +100,11 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 **Stage 8 — run_enhanced_rerank_evaluation:** Check `stage8_enhanced_rerank_results.json` for Hit@K, NDCG, MRR metrics.
 ```bash
 python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages run_enhanced_rerank_evaluation
+```
+
+**Stage 9 — run_repeat_evaluation:** Check `stage9_repeat_results.json` for Hit@1/3/5, NDCG, MRR on repeat orders.
+```bash
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages run_repeat_evaluation
 ```
 
 ### Existing Test Code (reference)
