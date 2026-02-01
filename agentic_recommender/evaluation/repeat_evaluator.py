@@ -698,6 +698,18 @@ class AsyncRepeatEvaluator:
 
         history_str = "\n".join(history_lines)
 
+        # Most recent orders highlight (last 5)
+        n_recent = min(5, len(order_history))
+        recent_orders = order_history[-n_recent:]
+        recent_lines = []
+        for i, order in enumerate(recent_orders, 1):
+            day_name = DAY_NAMES[order.get('day_of_week', 0)]
+            hour = order.get('hour', 12)
+            vid = order.get('vendor_id', '?')
+            cuisine = order.get('cuisine', '?')
+            recent_lines.append(f"  {i}. {vid}||{cuisine} ({day_name} {hour}:00)")
+        recent_str = "\n".join(recent_lines)
+
         # Target time
         target_day = DAY_NAMES[sample.get('target_day_of_week', 0)]
         target_hour = sample.get('target_hour', 12)
@@ -712,16 +724,21 @@ class AsyncRepeatEvaluator:
 Each entry is: vendor_id||cuisine (day_of_week time)
 {history_str}
 
+## Most Recent Orders (last {n_recent} — these reflect the user's CURRENT preferences):
+{recent_str}
+
 ## Predict for: {target_day} at {target_hour}:00
 
 ## Collaborative Filtering Scores (cuisine similarity from similar users):
 {lgcn_str}
 
-Consider:
-- Temporal patterns: day-of-week and meal-time preferences
-- Cuisine frequency: cuisines ordered more often are more likely
-- CF scores: higher scores indicate cuisines popular among similar users
-- Recency: recent cuisine choices may reflect current preferences
+IMPORTANT: This is a REPEAT order prediction task. The user tends to reorder from places they've used before.
+
+Consider (in priority order):
+1. Recency: the user's most recent orders are the STRONGEST signal — cuisines ordered recently are much more likely than older ones
+2. Temporal patterns: match day-of-week and meal-time to similar past orders
+3. Cuisine frequency: cuisines ordered more often are more likely, but recency matters more than raw count
+4. CF scores: use as a tiebreaker when recency and frequency are similar
 
 Return exactly {top_k} cuisines as JSON:
 {{"cuisines": [{", ".join(f'"cuisine_{i+1}"' for i in range(top_k))}], "reasoning": "brief explanation"}}"""
@@ -738,15 +755,17 @@ Return exactly {top_k} cuisines as JSON:
 
         order_history = sample['order_history']
 
-        # Format history (last 10 for brevity)
+        # Format history (last 10 for brevity), mark most recent 3
         recent = order_history[-10:]
+        n_recent_mark = min(3, len(recent))
         history_lines = []
         for i, order in enumerate(recent, 1):
             day_name = DAY_NAMES[order.get('day_of_week', 0)]
             hour = order.get('hour', 12)
             vid = order.get('vendor_id', '?')
             cuisine = order.get('cuisine', '?')
-            history_lines.append(f"{i}. {vid}||{cuisine} ({day_name} {hour}:00)")
+            recency_mark = " [MOST RECENT]" if i > len(recent) - n_recent_mark else ""
+            history_lines.append(f"{i}. {vid}||{cuisine} ({day_name} {hour}:00){recency_mark}")
         history_str = "\n".join(history_lines)
 
         # Target time
@@ -776,7 +795,9 @@ Return exactly {top_k} cuisines as JSON:
 
         return f"""You are a food delivery recommendation system. Rank the candidate vendors from most to least likely for this user's next order.
 
-## User's Recent Order History (last {len(recent)} orders):
+IMPORTANT: This is a REPEAT order prediction task — the user is expected to reorder from a vendor they've used before. Vendors from their most recent orders are the strongest candidates.
+
+## User's Recent Order History (last {len(recent)} orders, oldest to newest):
 Each entry is: vendor_id||cuisine (day_of_week time)
 {history_str}
 
@@ -792,12 +813,13 @@ Each candidate is: vendor_id||cuisine
 ## Similar Users' Recent Orders (collaborative filtering):
 {similar_str}
 
-Consider:
-- Vendor loyalty: vendors the user has ordered from before are more likely
-- Round 1 cuisine predictions: vendors matching top cuisines should rank higher
-- Temporal patterns: day-of-week and meal-time preferences
-- Similar users: vendors popular among similar users may be good choices
-- Rank ALL {len(shuffled_candidates)} candidates
+Consider (in priority order):
+1. Recent vendor reuse: vendors the user ordered from MOST RECENTLY are much more likely to be reordered — prioritize the [MOST RECENT] orders heavily
+2. Vendor loyalty: vendors ordered from multiple times are strong candidates
+3. Round 1 cuisine predictions: among recently-used vendors, prefer those matching top cuisines
+4. Temporal patterns: match day-of-week and meal-time to similar past orders
+5. Similar users: use as a tiebreaker for vendors not in the user's history
+6. Rank ALL {len(shuffled_candidates)} candidates
 
 Return JSON:
 {{"final_ranking": ["vendor_id||cuisine", ...], "reflection": "brief reasoning"}}"""
