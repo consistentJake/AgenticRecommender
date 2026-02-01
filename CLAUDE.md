@@ -3,21 +3,21 @@
 ## Quick Start
 
 **Entry point:** `agentic_recommender/workflow/workflow_runner.py`
-**Config (data_se):** `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml`
-**Config (data_sg):** `agentic_recommender/workflow/workflow_config_qwen32_linux_sg.yaml`
+**Config (data_se):** `agentic_recommender/workflow/workflow_config_se.yaml`
+**Config (data_sg):** `agentic_recommender/workflow/workflow_config_sg.yaml`
 
 ```bash
 # From project root:
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml
 
 # Run specific stages:
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages load_data build_users
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages load_data build_users
 
 # List stages:
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --list
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --list
 
 # Background run (with nohup):
-./agentic_recommender/workflow/run_workflow.sh -c workflow_config_qwen32_linux.yaml
+./agentic_recommender/workflow/run_workflow.sh -c workflow_config_se.yaml
 ```
 
 **Note:** Config path is resolved relative to the script's directory — pass just the filename, not a full path.
@@ -41,8 +41,8 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | What | Where |
 |------|-------|
 | Workflow runner | `agentic_recommender/workflow/workflow_runner.py` |
-| Config (Qwen32, data_se) | `agentic_recommender/workflow/workflow_config_qwen32_linux.yaml` |
-| Config (Qwen32, data_sg) | `agentic_recommender/workflow/workflow_config_qwen32_linux_sg.yaml` |
+| Config (data_se) | `agentic_recommender/workflow/workflow_config_se.yaml` |
+| Config (data_sg) | `agentic_recommender/workflow/workflow_config_sg.yaml` |
 | Rerank evaluator | `agentic_recommender/evaluation/rerank_eval.py` |
 | LightGCN | `agentic_recommender/similarity/lightGCN.py` |
 | Swing similarity | `agentic_recommender/similarity/methods.py` |
@@ -82,27 +82,27 @@ After making changes, test stage-by-stage by checking outputs. Run individual st
 
 **Stage 1 — load_data:** Check `stage1_stats.json` for expected counts (617K rows, 109K customers, 39 cuisines).
 ```bash
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages load_data
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages load_data
 ```
 
 **Stage 2 — build_users:** Check `stage2_users_summary.json` (18K+ users with min 5 orders).
 ```bash
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages build_users
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages build_users
 ```
 
 **Stage 3 — build_cuisines:** Check `stage3_cuisine_profiles.json` has 39 cuisine entries.
 ```bash
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages build_cuisines
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages build_cuisines
 ```
 
 **Stage 8 — run_enhanced_rerank_evaluation:** Check `stage8_enhanced_rerank_results.json` for Hit@K, NDCG, MRR metrics.
 ```bash
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages run_enhanced_rerank_evaluation
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages run_enhanced_rerank_evaluation
 ```
 
 **Stage 9 — run_repeat_evaluation:** Check `stage9_repeat_results.json` for Hit@1/3/5, NDCG, MRR on repeat orders.
 ```bash
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages run_repeat_evaluation
+python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages run_repeat_evaluation
 ```
 
 ### Existing Test Code (reference)

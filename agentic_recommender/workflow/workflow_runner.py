@@ -1005,6 +1005,14 @@ class PipelineStages:
                     model_name=model_name
                 )
                 self.logger.success(f"Initialized OpenRouter with model: {model_name}")
+            elif provider_type == 'openai_compatible':
+                oc = self._resolve_openai_compatible_config(llm_config)
+                if not oc['api_key']:
+                    self.logger.error("OpenAI-compatible API key not found!")
+                    self.logger.stage_end('run_topk_evaluation', success=False)
+                    return False
+                provider = OpenRouterProvider(api_key=oc['api_key'], model_name=oc['model_name'], base_url=oc['base_url'])
+                self.logger.success(f"Initialized OpenAI-compatible provider: {oc['model_name']}")
             else:
                 self.logger.info(f"Using {provider_type} provider")
                 provider = create_llm_provider(provider_type=provider_type)
@@ -1135,6 +1143,17 @@ class PipelineStages:
             self.logger.error(traceback.format_exc())
             self.logger.stage_end('run_topk_evaluation', success=False)
             return False
+
+    def _resolve_openai_compatible_config(self, llm_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve openai_compatible config section into base_url, api_key, model_name."""
+        oc = llm_config.get('openai_compatible', {})
+        env_var = oc.get('api_key_env_var', 'OPENAI_COMPATIBLE_API_KEY')
+        api_key = oc.get('api_key') or os.environ.get(env_var)
+        return {
+            'base_url': oc.get('base_url'),
+            'api_key': api_key,
+            'model_name': oc.get('model_name'),
+        }
 
     def _create_mock_topk_provider(self, cuisines: List[str]):
         """Create a mock provider that returns realistic cuisine predictions."""
@@ -1273,6 +1292,14 @@ class PipelineStages:
                     model_name=llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
                 )
                 self.logger.success(f"Initialized OpenRouter")
+            elif provider_type == 'openai_compatible':
+                oc = self._resolve_openai_compatible_config(llm_config)
+                if not oc['api_key']:
+                    self.logger.error("OpenAI-compatible API key not found!")
+                    self.logger.stage_end('run_rerank_evaluation', success=False)
+                    return False
+                provider = OpenRouterProvider(api_key=oc['api_key'], model_name=oc['model_name'], base_url=oc['base_url'])
+                self.logger.success(f"Initialized OpenAI-compatible provider: {oc['model_name']}")
             else:
                 from agentic_recommender.models.llm_provider import create_llm_provider
                 provider = create_llm_provider(provider_type=provider_type)
@@ -1733,6 +1760,15 @@ class PipelineStages:
                     model_name=llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
                 )
                 self.logger.success(f"Initialized OpenRouter")
+            elif provider_type == 'openai_compatible':
+                oc = self._resolve_openai_compatible_config(llm_config)
+                api_key = oc['api_key']
+                if not api_key:
+                    self.logger.error("OpenAI-compatible API key not found!")
+                    self.logger.stage_end('run_enhanced_rerank_evaluation', success=False)
+                    return False
+                provider = OpenRouterProvider(api_key=api_key, model_name=oc['model_name'], base_url=oc['base_url'])
+                self.logger.success(f"Initialized OpenAI-compatible provider: {oc['model_name']}")
             else:
                 from agentic_recommender.models.llm_provider import create_llm_provider
                 provider = create_llm_provider(provider_type=provider_type)
@@ -1757,7 +1793,7 @@ class PipelineStages:
             checkpoint_interval = settings.get('checkpoint_interval', 50)
             retry_attempts = settings.get('retry_attempts', 3)
 
-            if enable_async and provider_type == 'openrouter':
+            if enable_async and provider_type in ('openrouter', 'openai_compatible'):
                 import asyncio
                 self.logger.info("")
                 self.logger.info("*" * 60)
@@ -1773,6 +1809,11 @@ class PipelineStages:
                 # Get output directory for JSONL streaming
                 output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
 
+                # Resolve base_url for openai_compatible
+                async_base_url = None
+                if provider_type == 'openai_compatible':
+                    async_base_url = self._resolve_openai_compatible_config(llm_config).get('base_url')
+
                 metrics, detailed_results = asyncio.run(
                     evaluator.evaluate_async(
                         test_samples=test_samples,
@@ -1781,12 +1822,13 @@ class PipelineStages:
                         max_workers=max_workers,
                         checkpoint_interval=checkpoint_interval,
                         retry_attempts=retry_attempts,
-                        verbose=True
+                        verbose=True,
+                        base_url=async_base_url,
                     )
                 )
             else:
                 if enable_async:
-                    self.logger.warning("Async mode only supported with OpenRouter provider")
+                    self.logger.warning("Async mode only supported with OpenRouter/OpenAI-compatible provider")
                 metrics, detailed_results = evaluator.evaluate(
                     test_samples=test_samples,
                     verbose=True
@@ -1976,6 +2018,12 @@ class PipelineStages:
 
             n_samples = settings.get('n_samples', 20)
             deterministic = settings.get('deterministic_sampling', True)
+            sample_start = settings.get('sample_start', None)  # 1-based inclusive
+            sample_end = settings.get('sample_end', None)       # 1-based inclusive
+
+            # Ensure n_samples covers the requested range
+            if sample_end is not None and 0 < n_samples < sample_end:
+                n_samples = sample_end
 
             use_samples_cache = settings.get('use_filter_cache', True) and not self.no_cache
 
@@ -1987,6 +2035,17 @@ class PipelineStages:
                 use_cache=use_samples_cache,
             )
             self.logger.info(f"Built {len(test_samples)} test samples")
+
+            # Apply sample range (1-based inclusive)
+            if sample_start is not None or sample_end is not None:
+                total_before = len(test_samples)
+                start_idx = (sample_start - 1) if sample_start else 0
+                end_idx = sample_end if sample_end else total_before
+                test_samples = test_samples[start_idx:end_idx]
+                self.logger.info(
+                    f"Applied sample range [{sample_start or 1}..{sample_end or total_before}] "
+                    f"-> {len(test_samples)} samples (from {total_before} available)"
+                )
 
             # Save test samples
             samples_path = stage_cfg.output.get('samples_json')
@@ -2031,15 +2090,24 @@ class PipelineStages:
                 request_timeout=settings.get('request_timeout', 30.0),
             )
 
-            if enable_async and provider_type == 'openrouter':
+            if enable_async and provider_type in ('openrouter', 'openai_compatible'):
                 from agentic_recommender.llm.async_provider import AsyncLLMProvider
 
-                api_key = (
-                    llm_config.get('openrouter', {}).get('api_key') or
-                    os.environ.get('OPENROUTER_API_KEY')
-                )
+                if provider_type == 'openai_compatible':
+                    oc = self._resolve_openai_compatible_config(llm_config)
+                    api_key = oc['api_key']
+                    model_name = oc['model_name']
+                    base_url = oc['base_url']
+                else:
+                    api_key = (
+                        llm_config.get('openrouter', {}).get('api_key') or
+                        os.environ.get('OPENROUTER_API_KEY')
+                    )
+                    model_name = llm_config.get('openrouter', {}).get('model_name')
+                    base_url = None
+
                 if not api_key:
-                    self.logger.error("OpenRouter API key not found!")
+                    self.logger.error(f"{provider_type} API key not found!")
                     self.logger.stage_end('run_repeat_evaluation', success=False)
                     return False
 
@@ -2050,10 +2118,11 @@ class PipelineStages:
 
                 async_provider = AsyncLLMProvider(
                     api_key=api_key,
-                    model_name=llm_config.get('openrouter', {}).get('model_name'),
+                    model_name=model_name,
                     max_concurrent=max_workers,
                     timeout=request_timeout,
                     retry_attempts=retry_attempts,
+                    base_url=base_url,
                 )
 
                 output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
@@ -2089,7 +2158,7 @@ class PipelineStages:
 
                 detailed_results = eval_output.get('results', [])
             else:
-                self.logger.error("Repeat evaluation requires async mode with OpenRouter provider")
+                self.logger.error("Repeat evaluation requires async mode with OpenRouter/OpenAI-compatible provider")
                 self.logger.stage_end('run_repeat_evaluation', success=False)
                 return False
 

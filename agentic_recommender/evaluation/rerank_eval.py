@@ -1990,6 +1990,7 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         checkpoint_interval: int = 50,
         retry_attempts: int = 3,
         verbose: bool = True,
+        base_url: str = None,
     ) -> Tuple[EnhancedRerankMetrics, List[Dict[str, Any]]]:
         """
         Async evaluation with parallel LLM requests.
@@ -1999,11 +2000,12 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
         Args:
             test_samples: List of test samples
             output_path: Directory to save results
-            api_key: OpenRouter API key (or uses env var)
+            api_key: API key (or uses OPENROUTER_API_KEY env var)
             max_workers: Number of concurrent LLM requests
             checkpoint_interval: Log progress every N samples
             retry_attempts: Number of retries per failed request
             verbose: Print progress
+            base_url: API endpoint URL. Defaults to OpenRouter.
 
         Returns:
             Tuple of (metrics, detailed_results)
@@ -2042,6 +2044,7 @@ Return JSON: {{"final_ranking": ["most_likely", ..., "least_likely"], "reflectio
             model_name=model_name,
             max_concurrent=max_workers,
             retry_attempts=retry_attempts,
+            base_url=base_url,
         )
 
         # Create async evaluator

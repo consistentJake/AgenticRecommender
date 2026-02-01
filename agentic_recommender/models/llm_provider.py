@@ -464,34 +464,49 @@ class OpenRouterProvider(LLMProvider):
         self,
         api_key: str = None,
         model_name: str = None,
+        base_url: str = None,
     ):
         """
         Initialize OpenRouter provider.
 
+        Also works as a generic OpenAI-compatible provider when base_url is set.
+
         Args:
-            api_key: OpenRouter API key (or uses OPENROUTER_API_KEY env var)
+            api_key: API key (or uses OPENROUTER_API_KEY env var)
             model_name: Model to use (default: google/gemini-2.0-flash-001)
+            base_url: API endpoint URL. Defaults to OpenRouter.
         """
         import os
 
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.model_name = model_name or self.DEFAULT_MODEL
+        self.base_url = base_url  # None means OpenRouter
 
         if not self.api_key:
-            raise ValueError("OpenRouter API key required (pass api_key or set OPENROUTER_API_KEY)")
+            raise ValueError("API key required (pass api_key or set OPENROUTER_API_KEY)")
 
-        try:
-            import requests
-            self._requests = requests
-        except ImportError as exc:
-            raise ImportError("requests not installed. Run: pip install requests") from exc
+        self._openai_client = None
+        if self.base_url:
+            # Use OpenAI SDK for non-OpenRouter endpoints
+            from openai import OpenAI
+            self._openai_client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+            )
+        else:
+            # Use raw requests for OpenRouter
+            try:
+                import requests
+                self._requests = requests
+            except ImportError as exc:
+                raise ImportError("requests not installed. Run: pip install requests") from exc
 
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/AgenticRecommender",
-            "X-Title": "Agentic Recommender System",
-        }
+            self.headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/AgenticRecommender",
+                "X-Title": "Agentic Recommender System",
+            }
 
         # Metrics
         self.total_calls = 0
@@ -540,38 +555,47 @@ class OpenRouterProvider(LLMProvider):
             user_content += "\n\nRespond only with valid JSON."
         messages.append({"role": "user", "content": user_content})
 
-        payload = {
-            "model": self.model_name,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
         try:
-            response = self._requests.post(
-                self.BASE_URL,
-                headers=self.headers,
-                json=payload,
-                timeout=60
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            text = ""
-            if data.get("choices"):
-                text = data["choices"][0]["message"]["content"]
+            if self._openai_client:
+                # OpenAI SDK path (DashScope and other OpenAI-compatible APIs)
+                completion = self._openai_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                text = completion.choices[0].message.content if completion.choices else ""
+                tokens = completion.usage.total_tokens if completion.usage else 0
+            else:
+                # Raw requests path (OpenRouter)
+                payload = {
+                    "model": self.model_name,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                response = self._requests.post(
+                    self.BASE_URL,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=60
+                )
+                response.raise_for_status()
+                data = response.json()
+                text = ""
+                if data.get("choices"):
+                    text = data["choices"][0]["message"]["content"]
+                usage = data.get("usage", {})
+                tokens = usage.get("total_tokens", 0)
 
             # Track metrics
             duration = time.time() - start_time
             self.total_calls += 1
             self.total_time += duration
 
-            usage = data.get("usage", {})
-            tokens = usage.get("total_tokens", 0)
             if tokens:
                 self.total_tokens += tokens
             else:
-                # Estimate tokens
                 self.total_tokens += len(prompt.split()) + len(text.split())
 
             return text.strip()
@@ -589,8 +613,9 @@ class OpenRouterProvider(LLMProvider):
 
     def get_model_info(self) -> Dict[str, Any]:
         """Get model and usage information."""
+        provider_label = "OpenRouter" if self.base_url is None else f"OpenAI({self.base_url})"
         return {
-            "provider": "OpenRouter",
+            "provider": provider_label,
             "model_name": self.model_name,
             "total_calls": self.total_calls,
             "total_tokens": self.total_tokens,

@@ -430,6 +430,24 @@ class AsyncRepeatEvaluator:
                 print(f"  P95:               {timing['p95_seconds']:.2f}s")
             print("-" * 60)
 
+            if 'failure_diagnostics' in model_info:
+                diag = model_info['failure_diagnostics']
+                print("")
+                print("-" * 60)
+                print("  FAILURE DIAGNOSTICS")
+                print("-" * 60)
+                print(f"  Total retry failures: {diag['total_failures']}")
+                print(f"  By error type:     {diag['by_error_type']}")
+                if diag['by_http_status']:
+                    print(f"  By HTTP status:    {diag['by_http_status']}")
+                ps = diag['prompt_size_stats']
+                print(f"  Prompt size (chars): min={ps['min_chars']}  max={ps['max_chars']}  "
+                      f"avg={ps['avg_chars']}  median={ps['median_chars']}")
+                at = diag['attempt_elapsed_stats']
+                print(f"  Time at failure:   min={at['min_s']}s  max={at['max_s']}s  "
+                      f"avg={at['avg_s']}s  timeouts={at['timeouts_count']}")
+                print("-" * 60)
+
         return self._read_all_results()
 
     async def _worker(self, queue, worker_id, total, verbose):

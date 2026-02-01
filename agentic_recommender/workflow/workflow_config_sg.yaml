@@ -1,0 +1,181 @@
+# Workflow Configuration — data_sg (Singapore)
+# Usage:
+#   python -m agentic_recommender.workflow.workflow_runner --config workflow_config_sg.yaml
+#   python -m agentic_recommender.workflow.workflow_runner --config workflow_config_sg.yaml --stages run_repeat_evaluation
+
+workflow:
+  name: "Food Delivery Recommendation Pipeline (data_sg)"
+  description: "Process data -> Build representations -> Run evaluations"
+
+  verbose: true
+  log_file: "outputs/data_sg/workflow.log"
+
+  stages:
+    # Stage 1: Load raw data
+    load_data:
+      enabled: true
+      description: "Load and merge food delivery data"
+      input:
+        data_dir: "/home/zhenkai/Downloads/data_sg/data_sg/"
+      output:
+        merged_data: "outputs/data_sg/stage1_merged_data.parquet"
+        merged_preview: "outputs/data_sg/stage1_merged_preview.json"
+        stats: "outputs/data_sg/stage1_stats.json"
+        test_data: "outputs/data_sg/stage1_test_data.parquet"
+      settings:
+        preview_rows: 1000
+        load_test_data: true
+
+    # Stage 2: Build enriched user representations
+    build_users:
+      enabled: true
+      description: "Create EnrichedUser representations for all users"
+      input:
+        merged_data: "outputs/data_sg/stage1_merged_data.parquet"
+      output:
+        users_json: "outputs/data_sg/stage2_enriched_users.json"
+        users_summary: "outputs/data_sg/stage2_users_summary.json"
+      settings:
+        min_orders: 5
+        max_users: null  # null = ALL users (needed for auxiliary matrix)
+
+    # Stage 3: Build cuisine profiles
+    build_cuisines:
+      enabled: true
+      description: "Build cuisine profiles for temporal patterns"
+      input:
+        merged_data: "outputs/data_sg/stage1_merged_data.parquet"
+      output:
+        cuisines_json: "outputs/data_sg/stage3_cuisine_profiles.json"
+
+    # Stages 4-7: Legacy / disabled
+    generate_prompts:
+      enabled: false
+    run_predictions:
+      enabled: false
+    run_topk_evaluation:
+      enabled: false
+    run_rerank_evaluation:
+      enabled: false
+
+    # Stage 8: Enhanced Two-Round Rerank Evaluation
+    # Two-round LLM with cuisine-cuisine swing + LightGCN reflection
+    run_enhanced_rerank_evaluation:
+      enabled: true
+      description: "Two-round LLM reranking with LightGCN reflection"
+      input:
+        merged_data: "outputs/data_sg/stage1_merged_data.parquet"
+        test_data: "outputs/data_sg/stage1_test_data.parquet"
+      output:
+        results_json: "outputs/data_sg/stage8_enhanced_rerank_results.json"
+        samples_json: "outputs/data_sg/stage8_enhanced_rerank_samples.json"
+        detailed_json: "outputs/data_sg/stage8_enhanced_rerank_detailed.json"
+      settings:
+        evaluation_method: "method2"
+        dataset_name: "data_sg"
+
+        # Prediction
+        prediction_target: "vendor_cuisine"
+        enable_basket_metrics: true
+        filter_seen_items: true
+
+        # Candidate generation
+        n_candidates: 20
+        items_per_seed: 5
+
+        # LightGCN
+        lightgcn_epochs: 50
+        lightgcn_embedding_dim: 64
+
+        # LLM
+        temperature_round1: 0.3
+        temperature_round2: 0.2
+        enable_thinking: true
+
+        # Sampling
+        n_samples: 5
+        min_history: 5
+        deterministic_sampling: true
+
+        # Async
+        enable_async: true
+        max_workers: 25
+        checkpoint_interval: 50
+        retry_attempts: 5
+
+    # Stage 9: Repeated Dataset Evaluation
+    # Two-round LLM: predict cuisines -> rank vendors (repeat orders only)
+    run_repeat_evaluation:
+      enabled: true
+      description: "Two-round LLM evaluation on repeated orders dataset"
+      input:
+        merged_data: "outputs/data_sg/stage1_merged_data.parquet"
+        test_data: "outputs/data_sg/stage1_test_data.parquet"
+      output:
+        results_json: "outputs/data_sg/stage9_repeat_results.json"
+        samples_json: "outputs/data_sg/stage9_repeat_samples.json"
+        detailed_json: "outputs/data_sg/stage9_repeat_detailed.json"
+      settings:
+        dataset_name: "data_sg"
+
+        # Filtering
+        min_history_items: 5
+
+        # Caching
+        use_filter_cache: true
+        use_geohash_cache: true
+        use_lightgcn_cache: true
+        use_swing_cache: true
+
+        # LightGCN
+        lightgcn_epochs: 50
+        lightgcn_embedding_dim: 64
+        lightgcn_top_k_cuisines: 10
+
+        # Round 1: Cuisine prediction
+        round1_predict_top_k: 3
+        temperature_round1: 0.3
+
+        # Candidate selection
+        max_candidate_vendors: 20
+
+        # Swing user-user similarity
+        top_similar_users: 5
+        max_records_per_similar_user: 5
+        max_total_similar_records: 20
+
+        # Round 2: Vendor ranking
+        temperature_round2: 0.2
+
+        # LLM
+        enable_thinking: true
+
+        # Sampling — use sample_start/sample_end (1-based inclusive) to run a subset
+        # e.g. sample_start: 201, sample_end: 500 runs samples 201-500
+        n_samples: 200
+        # sample_start: null
+        # sample_end: null
+        deterministic_sampling: true
+
+        # Async
+        enable_async: true
+        max_workers: 25
+        checkpoint_interval: 50
+        retry_attempts: 5
+        request_timeout: 30
+
+# LLM Provider Configuration
+llm:
+  provider: "openrouter"
+  temperature: 0.3
+  max_tokens: 4096
+
+  openrouter:
+    model_name: "google/gemini-2.5-pro"
+    api_key: "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"
+
+# Output
+output:
+  base_dir: "outputs/data_sg"
+  create_dirs: true
+  timestamp_suffix: false
