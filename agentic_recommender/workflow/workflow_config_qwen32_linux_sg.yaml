@@ -168,7 +168,7 @@ workflow:
         enable_async: true           # Use async evaluation for parallel LLM requests
         max_workers: 25              # Concurrent LLM requests (when async enabled)
         checkpoint_interval: 50      # Log progress every N samples
-        retry_attempts: 3            # Retries per failed request
+        retry_attempts: 10            # Retries per failed request
 
     # Stage 9: Repeated Dataset Evaluation
     # Two-round LLM: predict cuisines → rank vendors (repeat orders only)
@@ -225,7 +225,7 @@ workflow:
         enable_async: true
         max_workers: 25
         checkpoint_interval: 50
-        retry_attempts: 3
+        retry_attempts: 10
         request_timeout: 30       # Per-request timeout in seconds
 
 # LLM Provider Configuration

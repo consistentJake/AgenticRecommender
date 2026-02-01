@@ -42,8 +42,8 @@ class AsyncLLMProvider:
         model_name: str = None,
         max_concurrent: int = 10,
         timeout: float = 30.0,
-        retry_attempts: int = 3,
-        retry_delay: float = 1.0,
+        retry_attempts: int = 10,
+        retry_delay: float = 2.0,
     ):
         """
         Initialize async LLM provider.
@@ -176,7 +176,7 @@ class AsyncLLMProvider:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_error = e
                 if attempt < self.retry_attempts - 1:
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = min(self.retry_delay * (2 ** attempt), 60)
                     logger.warning(
                         f"Request failed (attempt {attempt + 1}/{self.retry_attempts}), "
                         f"retrying in {delay}s: {e}"
