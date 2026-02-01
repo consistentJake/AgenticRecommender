@@ -133,7 +133,7 @@ workflow:
         lightgcn_top_k_cuisines: 10
 
         # Round 1: Cuisine prediction
-        round1_predict_top_k: 3
+        round1_predict_top_k: 5
         temperature_round1: 0.3
 
         # Candidate selection
@@ -152,7 +152,7 @@ workflow:
 
         # Sampling — use sample_start/sample_end (1-based inclusive) to run a subset
         # e.g. sample_start: 201, sample_end: 500 runs samples 201-500
-        n_samples: 200
+        n_samples: 300
         # sample_start: null
         # sample_end: null
         deterministic_sampling: true

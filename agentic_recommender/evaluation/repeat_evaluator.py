@@ -724,7 +724,7 @@ Consider:
 - Recency: recent cuisine choices may reflect current preferences
 
 Return exactly {top_k} cuisines as JSON:
-{{"cuisines": ["most_likely_cuisine", "second_most_likely", "third_most_likely"], "reasoning": "brief explanation"}}"""
+{{"cuisines": [{", ".join(f'"cuisine_{i+1}"' for i in range(top_k))}], "reasoning": "brief explanation"}}"""
 
     def _build_round2_prompt(
         self,
