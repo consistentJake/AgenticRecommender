@@ -71,6 +71,7 @@ class RepeatEvalConfig:
     max_tokens_round2: int = 4096
     # General
     enable_thinking: bool = True
+    enable_thinking_round2: bool = True  # Override thinking for round 2 (None = follow enable_thinking)
     prediction_target: str = "vendor_cuisine"
     dataset_name: str = "data_se"
     n_samples: int = 20
@@ -82,6 +83,10 @@ class RepeatEvalConfig:
     retry_attempts: int = 3
     # Request timeout (per LLM attempt, in seconds)
     request_timeout: float = 30.0
+    # Frequency ensemble: ensure top-2 most frequent cuisines appear in R1 output
+    enable_frequency_ensemble: bool = True
+    # Recency filter: -1 = no filter; N = filter samples where GT vendor last appeared N+ orders ago
+    max_recency_distance: int = -1
 
 
 class AsyncRepeatEvaluator:
@@ -533,6 +538,17 @@ class AsyncRepeatEvaluator:
             round1_response, all_cuisines, lightgcn_top_cuisines
         )
 
+        # Frequency ensemble: ensure top-2 most frequent cuisines are included
+        if self.config.enable_frequency_ensemble:
+            from collections import Counter
+            cuisine_counts = Counter(o.get('cuisine', 'unknown') for o in sample['order_history'])
+            top2_freq = [c for c, _ in cuisine_counts.most_common(2)]
+            for freq_cuisine in top2_freq:
+                if freq_cuisine.lower() not in [c.lower() for c in round1_cuisines]:
+                    # Replace the last LLM cuisine with the missing frequent cuisine
+                    round1_cuisines[-1] = freq_cuisine
+                    break  # Only force one substitution
+
         # Candidate selection: filter vendors by geohash + predicted cuisines.
         # We use vendor_geohash to scope candidates to the same delivery area,
         # mirroring a real app scenario where we only recommend vendors that
@@ -574,7 +590,7 @@ class AsyncRepeatEvaluator:
                 round2_prompt,
                 temperature=self.config.temperature_round2,
                 max_tokens=self.config.max_tokens_round2,
-                enable_thinking=self.config.enable_thinking,
+                enable_thinking=self.config.enable_thinking_round2,
             )
         except Exception as e:
             round2_response = f"ERROR: {e}"
@@ -682,6 +698,7 @@ class AsyncRepeatEvaluator:
         lightgcn_scores: List[Tuple[str, float]],
     ) -> str:
         """Build Round 1 prompt: predict top cuisines."""
+        from collections import Counter
         import random as _random
 
         order_history = sample['order_history']
@@ -710,6 +727,15 @@ class AsyncRepeatEvaluator:
             recent_lines.append(f"  {i}. {vid}||{cuisine} ({day_name} {hour}:00)")
         recent_str = "\n".join(recent_lines)
 
+        # Cuisine frequency rankings
+        cuisine_counts = Counter(o.get('cuisine', 'unknown') for o in order_history)
+        sorted_cuisines = cuisine_counts.most_common()
+        freq_lines = [
+            f"  {rank}. {cuisine} — {count}/{len(order_history)} orders ({count/len(order_history)*100:.0f}%)"
+            for rank, (cuisine, count) in enumerate(sorted_cuisines, 1)
+        ]
+        freq_str = "\n".join(freq_lines)
+
         # Target time
         target_day = DAY_NAMES[sample.get('target_day_of_week', 0)]
         target_hour = sample.get('target_hour', 12)
@@ -727,6 +753,9 @@ Each entry is: vendor_id||cuisine (day_of_week time)
 ## Most Recent Orders (last {n_recent} — these reflect the user's CURRENT preferences):
 {recent_str}
 
+## Cuisine Frequency Rankings (from entire history):
+{freq_str}
+
 ## Predict for: {target_day} at {target_hour}:00
 
 ## Collaborative Filtering Scores (cuisine similarity from similar users):
@@ -735,10 +764,10 @@ Each entry is: vendor_id||cuisine (day_of_week time)
 IMPORTANT: This is a REPEAT order prediction task. The user tends to reorder from places they've used before.
 
 Consider (in priority order):
-1. Recency: the user's most recent orders are the STRONGEST signal — cuisines ordered recently are much more likely than older ones
-2. Temporal patterns: match day-of-week and meal-time to similar past orders
-3. Cuisine frequency: cuisines ordered more often are more likely, but recency matters more than raw count
-4. CF scores: use as a tiebreaker when recency and frequency are similar
+1. Cuisine frequency: cuisines ordered more often are very likely to be reordered — check the frequency rankings above
+2. Recency: recent orders indicate CURRENT active preferences
+3. Temporal patterns: match day-of-week and meal-time to similar past orders
+4. CF scores: use as a tiebreaker when frequency and recency are similar
 
 Return exactly {top_k} cuisines as JSON:
 {{"cuisines": [{", ".join(f'"cuisine_{i+1}"' for i in range(top_k))}], "reasoning": "brief explanation"}}"""

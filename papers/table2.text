@@ -1,0 +1,23 @@
+\begin{table}[t]
+    \centering
+    \caption{Final-stage performance of LLM variants on DHRD-SG and DHRD-SE}
+    \label{tab:llm_rerank_performance}
+    \begin{tabular}{llcc}
+        \hline
+        Dataset & Model & Final Hit@3 & Final NDCG@3 \\
+        \hline
+        \multirow{6}{*}{DHRD-SG} & Gemini-3-Flash (thinking) & 0.675 & 0.552 \\
+             & Gemini-3-Flash (no thinking) & 0.651 & 0.541 \\
+             & GPT-4.1-mini & 0.632 & 0.520 \\
+             & Qwen3-80B & 0.273 & 0.226 \\
+            & DPVP & 0.678 & 0.560 \\
+            & CF-Base CARS FM & 0.600 & 0.492 \\
+        \multirow{6}{*}{DHRD-SE} & Gemini-3-Flash (thinking) & 0.733 & 0.656 \\
+             & Gemini-3-Flash (no thinking) & 0.710 & 0.641 \\
+             & GPT-4.1-mini & 0.667 & 0.576 \\
+             & Qwen3-80B & 0.294 & 0.226 \\
+            & DPVP & 0.660 & 0.550 \\
+            & CF-Base CARS FM & 0.690 & 0.562 \\
+        \hline
+    \end{tabular}
+\end{table}

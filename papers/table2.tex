@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Ablation study on DHRD-SG repeat-order evaluation. LightGCN \& round1 predict cuisine, round2 predict vendor}
+\label{tab:ablation}
+\begin{tabular}{lccc}
+\toprule
+Metric & LightGCN (cuisine)& Round 1 (cuisine) & Round 2 (vendor) \\
+\midrule
+Hit@1  & 0.236 & 0.540 & 0.481 \\
+Hit@3  & 0.650 & 0.851 & 0.679 \\
+Hit@5  & 0.843 & 0.905 & 0.685 \\
+NDCG@1 & 0.234 & 0.538 & 0.479 \\
+NDCG@3 & 0.477 & 0.726 & 0.601 \\
+NDCG@5 & 0.549 & 0.750 & 0.597 \\
+\bottomrule
+\end{tabular}
+\end{table}

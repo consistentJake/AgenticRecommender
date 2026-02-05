@@ -2026,6 +2026,7 @@ class PipelineStages:
                 n_samples = sample_end
 
             use_samples_cache = settings.get('use_filter_cache', True) and not self.no_cache
+            max_recency_distance = settings.get('max_recency_distance', -1)
 
             test_samples = build_repeat_test_samples(
                 filtered_train, filtered_test,
@@ -2033,6 +2034,7 @@ class PipelineStages:
                 deterministic=deterministic,
                 dataset_name=dataset_name,
                 use_cache=use_samples_cache,
+                max_recency_distance=max_recency_distance,
             )
             self.logger.info(f"Built {len(test_samples)} test samples")
 
@@ -2080,6 +2082,7 @@ class PipelineStages:
                 temperature_round2=settings.get('temperature_round2', 0.2),
                 max_tokens_round2=settings.get('max_tokens_round2', 4096),
                 enable_thinking=settings.get('enable_thinking', True),
+                enable_thinking_round2=settings.get('enable_thinking_round2', settings.get('enable_thinking', True)),
                 dataset_name=dataset_name,
                 n_samples=n_samples,
                 deterministic_sampling=deterministic,
@@ -2088,6 +2091,8 @@ class PipelineStages:
                 checkpoint_interval=settings.get('checkpoint_interval', 50),
                 retry_attempts=settings.get('retry_attempts', 3),
                 request_timeout=settings.get('request_timeout', 30.0),
+                enable_frequency_ensemble=settings.get('enable_frequency_ensemble', True),
+                max_recency_distance=max_recency_distance,
             )
 
             if enable_async and provider_type in ('openrouter', 'openai_compatible'):
@@ -2376,11 +2381,15 @@ class WorkflowRunner:
 
             # Rewrite input paths that reference outputs from this workflow
             # (paths starting with base_dir are workflow outputs)
+            # If the rewritten path doesn't exist, fall back to the original
+            # (supports running individual stages against cached earlier-stage outputs)
             input_config = stage_config.get('input', {})
             for key, path in input_config.items():
                 if path and isinstance(path, str) and path.startswith(base_dir):
                     new_path = self._rewrite_path(path, base_dir)
-                    input_config[key] = new_path
+                    if os.path.exists(new_path):
+                        input_config[key] = new_path
+                    # else: keep original path (it may exist from a prior run)
 
     def _rewrite_path(self, original_path: str, base_dir: str) -> str:
         """Rewrite a single path to use the timestamped subfolder."""

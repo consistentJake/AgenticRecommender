@@ -22,7 +22,7 @@ This document provides detailed implementation steps for each issue identified i
 #### Step 1: Rotate the Exposed Key
 
 1. Log into OpenRouter dashboard: https://openrouter.ai/keys
-2. Revoke the exposed key: `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`
+2. Revoke the exposed key: `******`
 3. Generate a new API key
 4. Store securely (password manager, not in code)
 

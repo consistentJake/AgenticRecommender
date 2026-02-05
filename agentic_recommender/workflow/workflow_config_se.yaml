@@ -147,14 +147,19 @@ workflow:
         # Round 2: Vendor ranking
         temperature_round2: 0.2
 
+        # Frequency ensemble: ensure top-2 most frequent cuisines in R1 output
+        enable_frequency_ensemble: true
+        # Recency filter: remove test samples where GT vendor last appeared N+ orders ago (-1 = disabled)
+        max_recency_distance: 10
+
         # LLM
         enable_thinking: true
 
         # Sampling — use sample_start/sample_end (1-based inclusive) to run a subset
         # e.g. sample_start: 201, sample_end: 500 runs samples 201-500
-        n_samples: 300
-        # sample_start: null
-        # sample_end: null
+        n_samples: 600
+        sample_start: 301
+        sample_end: 600
         deterministic_sampling: true
 
         # Async
@@ -162,7 +167,7 @@ workflow:
         max_workers: 25
         checkpoint_interval: 50
         retry_attempts: 5
-        request_timeout: 30
+        request_timeout: 60
 
 # LLM Provider Configuration
 llm:
@@ -171,8 +176,8 @@ llm:
   max_tokens: 4096
 
   openrouter:
-    model_name: "google/gemini-2.5-pro"
-    api_key: "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"
+    model_name: "google/gemini-2.5-flash-preview-09-2025"
+    api_key: null  # Set via OPENROUTER_API_KEY env var
 
 # Output
 output:

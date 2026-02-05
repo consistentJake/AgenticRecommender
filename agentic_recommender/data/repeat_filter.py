@@ -168,7 +168,12 @@ def _compute_samples_cache_key(
     deterministic: bool,
     seed: int,
 ) -> str:
-    """Compute cache key from data shape, content sample, and params."""
+    """Compute cache key from data shape, content sample, and params.
+
+    Note: max_recency_distance is intentionally excluded — the cache stores the
+    full unfiltered sample list (with gt_recency_distance computed). Recency
+    filtering is a cheap post-step applied after cache load.
+    """
     key_parts = [
         str(filtered_train_df.shape),
         str(filtered_test_df.shape),
@@ -222,6 +227,7 @@ def build_repeat_test_samples(
     seed: int = 42,
     dataset_name: str = "",
     use_cache: bool = True,
+    max_recency_distance: int = -1,
 ) -> List[Dict[str, Any]]:
     """
     Build test samples from filtered repeat dataset.
@@ -237,19 +243,40 @@ def build_repeat_test_samples(
         seed: Random seed (used only if deterministic=False)
         dataset_name: Dataset name for cache file prefix
         use_cache: Whether to use disk cache
+        max_recency_distance: Filter samples where GT vendor last appeared N+ orders ago (-1 = no filter)
 
     Returns:
         List of test sample dicts
     """
     random.seed(seed)
 
-    # Try loading from cache (caches the full list before n_samples slicing)
+    # Try loading from cache (caches the full unfiltered list with gt_recency_distance)
     if use_cache and dataset_name:
         cache_key = _compute_samples_cache_key(
-            filtered_train_df, filtered_test_df, deterministic, seed
+            filtered_train_df, filtered_test_df, deterministic, seed,
         )
         cached = _load_samples_cache(dataset_name, cache_key)
         if cached is not None:
+            # Backfill gt_recency_distance if missing (old cache without this field)
+            needs_backfill = any('gt_recency_distance' not in s for s in cached)
+            if needs_backfill:
+                for sample in cached:
+                    if 'gt_recency_distance' not in sample:
+                        history = sample['order_history']
+                        gt_vendor_id = sample['ground_truth_vendor_id']
+                        last_pos = -1
+                        for i, order in enumerate(history):
+                            if order['vendor_id'] == gt_vendor_id:
+                                last_pos = i
+                        sample['gt_recency_distance'] = (len(history) - 1 - last_pos) if last_pos >= 0 else len(history)
+                # Re-save cache with backfilled field
+                _save_samples_cache(dataset_name, cache_key, cached)
+            # Apply recency filter on cached samples
+            if max_recency_distance > 0:
+                before = len(cached)
+                cached = [s for s in cached if s['gt_recency_distance'] <= max_recency_distance]
+                print(f"[build_repeat_test_samples] Recency filter (max_distance={max_recency_distance}): "
+                      f"{before} -> {len(cached)} samples ({before - len(cached)} removed)")
             total_available = len(cached)
             if 0 < n_samples < total_available:
                 sliced = cached[:n_samples]
@@ -323,18 +350,37 @@ def build_repeat_test_samples(
 
         samples.append(sample)
 
+    # Compute gt_recency_distance for each sample:
+    # how many orders ago was the GT vendor last seen in the training history?
+    for sample in samples:
+        history = sample['order_history']
+        gt_vendor_id = sample['ground_truth_vendor_id']
+        last_pos = -1
+        for i, order in enumerate(history):
+            if order['vendor_id'] == gt_vendor_id:
+                last_pos = i
+        recency_distance = (len(history) - 1 - last_pos) if last_pos >= 0 else len(history)
+        sample['gt_recency_distance'] = recency_distance
+
     # Sort or shuffle
     if deterministic:
         samples.sort(key=lambda x: str(x['order_id']))
     else:
         random.shuffle(samples)
 
-    # Save full list to cache (before slicing)
-    total_available = len(samples)
+    # Save full unfiltered list to cache (with gt_recency_distance, before recency filtering)
     if use_cache and dataset_name:
         _save_samples_cache(dataset_name, cache_key, samples)
 
+    # Apply recency filter (after caching so cache stores the full list)
+    if max_recency_distance > 0:
+        before = len(samples)
+        samples = [s for s in samples if s['gt_recency_distance'] <= max_recency_distance]
+        print(f"[build_repeat_test_samples] Recency filter (max_distance={max_recency_distance}): "
+              f"{before} -> {len(samples)} samples ({before - len(samples)} removed)")
+
     # Limit samples
+    total_available = len(samples)
     if 0 < n_samples < total_available:
         samples = samples[:n_samples]
 

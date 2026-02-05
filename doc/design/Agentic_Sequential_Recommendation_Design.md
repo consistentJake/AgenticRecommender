@@ -848,7 +848,7 @@ def test_metrics():
 import google.generativeai as genai
 
 class GeminiProvider:
-    def __init__(self, api_key="AIzaSyC-Ku57fAg294TDJ0iIgpkp7X8fs191W-M"):
+    def __init__(self, api_key="******"):
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
         

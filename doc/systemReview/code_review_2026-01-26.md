@@ -48,13 +48,13 @@ The AgenticRecommender system implements a multi-stage recommendation pipeline c
 # workflow_config_linux.yaml:178
 openrouter:
   model_name: "google/gemini-2.0-flash-001"
-  api_key: "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"
+  api_key: "******"
 ```
 
 ```python
 # topk.py:637-638
 if __name__ == "__main__":
-    API_KEY = "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"
+    API_KEY = "******"
     run_topk_evaluation(api_key=API_KEY, n_samples=20)
 ```
 

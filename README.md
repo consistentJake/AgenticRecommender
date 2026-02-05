@@ -1,6 +1,6 @@
 # Agentic Sequential Recommendation System
 
-A cuisine-level recommendation system for food delivery with **two-round LLM reranking**, **LightGCN collaborative filtering**, and **basket prediction support**.
+A cuisine-level recommendation system for **[food delivery datset(delivery hero)](https://github.com/deliveryhero/dh-reco-dataset)** with **two-round LLM reranking**, **LightGCN collaborative filtering**, and **basket prediction support**.
 
 ## Current System Architecture
 
@@ -16,17 +16,29 @@ Training Data → LightGCN + Swing (cached per method)
 ## Quick Start
 
 ```bash
-# Activate environment
+# 1. Set up environment
 source venv/bin/activate
 
-# Run complete pipeline (Method 1: Leave-Last-Out)
+# 2. Set LLM API key (required)
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+
+# 3. Run complete pipeline
 python -m agentic_recommender.workflow.workflow_runner \
-    --config agentic_recommender/workflow/workflow_config_linux.yaml \
+    --config workflow_config_se.yaml \
     --stages load_data run_enhanced_rerank_evaluation
 
 # Check outputs
-ls -la outputs/stage8_*
+ls -la outputs/data_se/stage8_*
 ```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | API key from [OpenRouter](https://openrouter.ai/) for LLM inference |
+| `OPENAI_COMPATIBLE_API_KEY` | No | Alternative key when using OpenAI-compatible providers |
+
+The pipeline reads the API key from the config YAML first, then falls back to the environment variable. For security, prefer setting the env var rather than putting keys in config files.
 
 ---
 
@@ -59,7 +71,7 @@ ls -la outputs/stage8_*
 
 ## Configuration
 
-Edit `agentic_recommender/workflow/workflow_config_linux.yaml`:
+Edit `agentic_recommender/workflow/workflow_config_se.yaml` (or `workflow_config_sg.yaml`):
 
 ```yaml
 stages:
@@ -170,7 +182,8 @@ agentic_recommender/
 │   └── methods.py              # Swing similarity with caching
 └── workflow/
     ├── workflow_runner.py      # Main entry point
-    └── workflow_config_linux.yaml
+    ├── workflow_config_se.yaml # Sweden dataset config
+    └── workflow_config_sg.yaml # Singapore dataset config
 ```
 
 ---
@@ -276,11 +289,3 @@ ls -la ~/.cache/agentic_recommender/swing/
 - `docs/testing_plan_evaluation_methods.md` - Testing procedures
 - `agentic_recommender/evaluation/basket_evaluation.md` - Basket metric formulas
 
-
-
-python -m agentic_recommender.workflow.workflow_runner --config                                       workflow_config_linux.yaml --stages load_data run_enhanced_rerank_evaluation
-
-
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_linux.yaml --stages load_data run_enhanced_rerank_evaluation
-
-python -m agentic_recommender.workflow.workflow_runner --config workflow_config_qwen32_nothink_linux.yaml --stages load_data run_enhanced_rerank_evaluation

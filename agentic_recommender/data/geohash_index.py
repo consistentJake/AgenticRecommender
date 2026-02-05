@@ -108,15 +108,35 @@ class GeohashVendorIndex:
         candidates = []
         seen = set()
 
-        # Iterate through requested cuisines in order (preserves priority)
+        # Round-robin across cuisines to ensure diversity.
+        # Build per-cuisine vendor iterators.
+        cuisine_vendors = []
         for cuisine in cuisines:
             vendors = geohash_data.get(cuisine, [])
-            for vid in vendors:
-                if vid not in seen:
-                    candidates.append(vid)
-                    seen.add(vid)
-                    if len(candidates) >= max_candidates:
-                        return candidates
+            if vendors:
+                cuisine_vendors.append(iter(vendors))
+
+        if not cuisine_vendors:
+            return []
+
+        # Round-robin: take one vendor from each cuisine in turn
+        exhausted = set()
+        while len(candidates) < max_candidates and len(exhausted) < len(cuisine_vendors):
+            for idx, viter in enumerate(cuisine_vendors):
+                if idx in exhausted:
+                    continue
+                while True:
+                    try:
+                        vid = next(viter)
+                    except StopIteration:
+                        exhausted.add(idx)
+                        break
+                    if vid not in seen:
+                        candidates.append(vid)
+                        seen.add(vid)
+                        break
+                if len(candidates) >= max_candidates:
+                    return candidates
 
         return candidates
 

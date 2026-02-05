@@ -633,6 +633,8 @@ def run_topk_evaluation(
 
 
 if __name__ == "__main__":
-    # Use API key from APIs.md
-    API_KEY = "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"
+    import os
+    API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+    if not API_KEY:
+        raise ValueError("Set OPENROUTER_API_KEY environment variable")
     run_topk_evaluation(api_key=API_KEY, n_samples=20)

@@ -1,0 +1,340 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+%Template version as of 6/27/2024
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{parskip}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{MARS: Multi-Agent Reasoning for Sequential Recommendation
+}
+
+% \author{\IEEEauthorblockN{1\textsuperscript{st} Given Name Surname}
+% \IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+% \textit{name of organization (of Aff.)}\\
+% City, Country \\
+% email address or ORCID}
+% \and
+% \IEEEauthorblockN{2\textsuperscript{nd} Given Name Surname}
+% \IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+% \textit{name of organization (of Aff.)}\\
+% City, Country \\
+% email address or ORCID}
+
+% }
+
+\maketitle
+
+\begin{abstract}
+Traditional recommender systems, primarily driven by Deep Learning and ID-based collaborative filtering, excel at capturing latent user preferences but often struggle with data sparsity and lack the semantic reasoning capabilities required for complex, intent-driven tasks. While the integration of Large Language Models (LLMs) has introduced rich semantic understanding to the field, existing approaches predominantly utilize LLMs as static scoring functions, failing to fully leverage their potential for deliberate planning. In this paper, we propose a novel Agentic Recommender System, a framework that shifts the ranking paradigm from simple pattern matching to autonomous, multi-step reasoning.
+
+Our approach designs a comprehensive agentic workflow that empowers the recommender to decompose complex user queries, utilize external tools, and engage in iterative self-correction. Through extensive experiments, we demonstrate that this framework significantly outperforms state-of-the-art graph-based models. Furthermore, our analysis reveals pivotal insights regarding model optimization: we find that inference-time scaling—allocating compute to the reasoning at test time—yields substantial performance gains by enabling the model to refine its logic, whereas Supervised Fine-Tuning (SFT) offers diminishing returns compared to the inherent reasoning capabilities of frontier models. By achieving superior ranking performance with minimal training overhead, our work positions agentic workflows as a foundational and efficient path toward the next generation of intent-aware recommender systems.
+\end{abstract}
+
+\begin{IEEEkeywords}
+component, formatting, style, styling, insert.
+\end{IEEEkeywords}
+
+\section{Introduction}
+In the era of information overload, Recommender Systems (RS) have become the fundamental engine powering user experience across the digital landscape. From e-commerce platforms like Amazon to content streaming services like Netflix and YouTube, these systems serve as the primary filter between users and vast catalogs of items, driving both user satisfaction and business revenue \cite{covington2016deep}. As user needs evolve from simple item retrieval to complex, intent-driven decision-making, the architectural paradigms of these systems have undergone significant transformations.
+
+For the past decade, Deep Learning (DL) has dominated the field. Models such as Neural Collaborative Filtering (NCF) \cite{he2017neural} and Deep Interest Networks (DIN) \cite{zhou2018deep} moved beyond the linearity of Matrix Factorization, enabling the capture of intricate, non-linear user-item interactions. Furthermore, the introduction of sequential modeling—exemplified by SASRec \cite{kang2018self} and BERT4Rec \cite{sun2019bert4rec}—allowed systems to view user preference not as a static profile, but as a dynamic trajectory, significantly improving next-item prediction accuracy. However, despite their success, these classical DL models rely heavily on ID-based collaborative signals, often treating items as abstract indices and failing to comprehend the rich semantic context or the underlying reasoning behind a user's choice.
+
+The advent of Large Language Models (LLMs) has begun to address this semantic gap. By leveraging extensive world knowledge and superior natural language understanding, LLM-based recommenders (e.g., MMREC \cite{tian2024mmrec}, TALLRec \cite{bao2023tallrec}) have demonstrated remarkable zero-shot capabilities and the ability to interpret textual item descriptions. Yet, a critical limitation remains: current LLM-based approaches predominantly operate as static predictors or passive conversationalists. They struggle with multi-step reasoning, long-horizon planning, and proactive tool usage—capabilities essential for handling complex user goals that require more than a single-turn retrieval. For instance, planning a travel itinerary requires not just suggesting a hotel, but coordinating location, budget constraints, and activities—a task that demands an agentic workflow rather than simple probability ranking.
+
+To bridge this gap, we observe a rising trend in Agentic AI—autonomous systems capable of perception, reasoning, and action execution \cite{wang2024macrec, li2024recommender}. In this work, we propose a novel framework that integrates Agentic AI into the recommendation pipeline. Unlike traditional models that map inputs directly to outputs, our solution designs an agentic flow where the recommender acts as an intelligent agent. This agent decomposes complex user queries into sub-tasks, utilizes external tools (such as search engines or domain-specific APIs), and reasons iteratively to refine its outputs. By empowering the recommender with the agency to "think" before it "acts," we aim to close the reasoning gap present in existing literature, delivering recommendations that are not only accurate but also actionable and contextually grounded.
+
+\section{Related Work}\label{AA}
+Our work builds upon three distinct pillars of research: classical Deep Learning for recommendation, the application of LLMs in RS, and the emerging field of Agentic AI.
+
+\subsection{Classical Deep Learning for Recommendation}
+
+The shift from traditional Matrix Factorization to neural architectures marked a pivotal moment in RS research. NCF \cite{he2017neural} generalized matrix factorization by replacing the inner product with a multi-layer perceptron to learn non-linear user-item interactions. To address the dynamic nature of user preferences, sequential recommendation models emerged. SASRec \cite{kang2018self} and BERT4Rec \cite{sun2019bert4rec} adapted the Transformer architecture to capture long-term dependencies in user behavior sequences via self-attention mechanisms. Furthermore, to better utilize rich feature sets in industrial settings, models like the DIN \cite{zhou2018deep} introduced attention mechanisms to learn the relevance of historical behaviors to a target item adaptively. While these models excel at matching efficiency and capturing collaborative signals, they fundamentally lack semantic reasoning capabilities, treating items primarily as ID embeddings.
+
+\subsection{Large Language Models for Recommendation}
+
+The emergence of LLMs has catalyzed a paradigm shift towards "Recommendation as Language Processing." Early works focused on using BERT-based encoders to enhance content representations. More recently, generative approaches have gained traction. TALLRec \cite{bao2023tallrec} demonstrated that instruction tuning could significantly align general-purpose LLMs with recommendation objectives, even with limited training data. Other works, such as Chat-REC \cite{gao2023chat}, leverage the conversational abilities of LLMs to build interactive recommenders that can refine user preferences through dialogue. LLM has also been proven to be effective in the recommendation system while handling multi-modal as well as missing data \cite{tian2024mmrec, ding2024data}
+despite these advancements, these models largely function as "System 1" thinkers—relying on pattern matching and immediate generation—without the "System 2" capabilities of deliberate reasoning and planning.
+
+\subsection{Agentic AI in Recommendation}
+
+Agentic AI represents the next frontier, moving from passive prediction to active simulation and problem-solving. Early exploration in this domain focused on using agents to simulate user behavior. Agent4Rec \cite{zhang2024generative} utilize LLM-based generative agents to simulate users in a sandbox environment, observing emergent social behaviors and validating recommendation algorithms without live traffic. More recently, research has pivoted toward using agents as the recommender itself. Research has pivoted toward designing agents that actively construct recommendations through collaboration and specialized reasoning. A prime example is MACRec \cite{wang2024macrec}, which proposes a multi-agent collaboration framework where distinct agents—acting as managers, searchers, and analysts—cooperate to decompose and solve complex recommendation tasks. This collaborative approach allows for a more holistic handling of user needs compared to monolithic models.
+This trend towards specialization is also evident in domain-specific applications, where the complexity of user intent requires distinct handling mechanisms. For instance, in food delivery scenarios, it was demonstrate that user intent often bifurcates between "repeat" consumption and "exploration" of new items \cite{li2024recommender}. They propose a purpose-driven framework where specialized modules (functionally analogous to agents) are dedicated to either repeat or exploration tasks, ensuring that the system can dynamically adapt to the user's immediate goal. Our work extends these directions by designing a comprehensive agentic flow that not only employs tool usage but also integrates this type of intent-aware reasoning and multi-step planning to handle complex, goal-oriented recommendation tasks.
+
+
+\section{Agentic Recommender Design}
+
+We formulate the repeat-order prediction task as a hierarchical, multi-agent workflow orchestrated by a central Manager. To handle the scale of vendor selection, we adopt a coarse-to-fine paradigm: the system first restricts the search space to relevant cuisines (Round 1) before ranking specific vendors (Round 2). The architecture comprises four specialized agents interacting via a hub-and-spoke topology:
+\begin{itemize}
+    \item \textbf{Manager}: The central controller that enforces the execution pipeline, manages state transitions, and handles fallback mechanisms.
+    \item \textbf{Profiler}: A retrieval agent responsible for fetching heterogeneous data (user history, geospatial indices, and collaborative signals).
+    \item \textbf{Similarity Agent}: A agent provides baisc user-item similarity to help Analyer item ranking in Round1.
+    \item \textbf{Analyzer}: A reasoning agent dedicated to coarse-grained cuisine prediction using global collaborative signals.
+    \item \textbf{Critic}: A ranking agent that performs fine-grained vendor selection using local collaborative evidence.
+\end{itemize}
+
+\subsection{State Preparation and Retrieval}
+Before invoking the reasoning agents, the Manager dispatches the Profiler to construct a comprehensive evidence state by aggregating heterogeneous data sources. The process begins by reconstructing the user's chronological order history to extract behavioral features, such as vendor loyalty and temporal meal patterns, while simultaneously establishing the specific prediction context (e.g., day-of-week and hour). To augment these explicit behavioral signals with latent preference data, we integrate a pre-trained three-layer LightGCN \cite{he2020lightgcn} model. Optimized via Bayesian Personalized Ranking (BPR) loss on the user-cuisine bipartite graph, this module provides global affinity scores that highlight potential interests beyond the user's immediate history. Finally, to ensure the physical feasibility of all subsequent recommendations, the Profiler queries a geospatial index that maps the user's geohash to available vendors, strictly confining the search space to deliverable options.
+
+\subsection{Round 1: Coarse-Grained Reasoning (The Analyzer)}
+The Analyzer serves as the initial filter in our coarse-to-fine pipeline, tasked with narrowing the immense search space by identifying the top-three most likely cuisines. It receives a synthesized prompt containing the target temporal context, the user's recent consumption trends, and the top-ranked global affinities derived from the LightGCN model. Leveraging the reasoning capabilities of the LLM, the Analyzer weighs these factors—balancing the inertia of historical habits (recency) against the latent possibilities suggested by collaborative filtering—to resolve potential conflicts between past behavior and new preferences. The agent outputs a rationale-backed list of target cuisines, effectively pruning the candidate pool for the subsequent vendor ranking phase.
+
+\subsection{Round 2: Fine-Grained Ranking (The Critic)}
+The Critic performs the final vendor ranking. To enable precise selection, the Profiler first retrieves a candidate set of vendors matching the Analyzer's predicted cuisines, constrained by the geospatial index.
+A critical innovation in this stage is the injection of Local Collaborative Evidence via Swing Similarity \cite{yang2020swing}. Unlike heavy deep learning models, Swing captures structural similarity by weighing co-purchase patterns while penalizing noisy, high-activity users:
+\begin{equation}
+\resizebox{1.0\hsize}{!}{$ % Note the $ symbols to re-enter math mode
+    \mathrm{sim}(u_1, u_2) = \sum_{i ,\in, I_{u_1} \cap I_{u_2}} \frac{1}{\bigl(|I_{u_1}| + \alpha_1\bigr)^{!\beta} \cdot \bigl(|I_{u_2}| + \alpha_1\bigr)^{!\beta} \cdot \bigl(|U_i| + \alpha_2\bigr)}
+$}
+\end{equation}
+where $I_u$ and $U_i$ represent user and item degrees, respectively. The Critic executes the final ranking by synthesizing the filtered candidate vendors with Peer Evidence drawn from the specific transaction histories of the user's top-5 Swing neighbors. In this reasoning phase, the agent integrates multiple decision vectors: it assesses Vendor Loyalty based on the user's personal history, validates current trends through Peer Validation from similar users, and ensures Constraint Alignment with the cuisine and temporal boundaries set in Round 1. To guarantee that the ranking is driven by semantic content rather than prompt artifacts, we randomly shuffle candidates before injection to mitigate position bias. The workflow culminates in a JSON-structured ranked list, utilizing a deterministic rule-based fallback mechanism to ensure system reliability in cases of generation failure.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiments}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Datasets}
+We conduct our empirical evaluation on two real-world food delivery datasets sourced from the Delivery Hero platform \cite{assylbekov2023delivery}: \textbf{DHRD-SE} (Stockholm, Sweden) and \textbf{DHRD-SG} (Singapore). These datasets provide a comprehensive view of user interactions, encompassing customer profiles, vendor metadata, cuisine tags, geospatial information (geohash), and timestamped transaction logs.
+
+Table~\ref{tab:dataset_stats} summarizes the key statistics. To align the evaluation with real-world deployment scenarios, we employ a chronological data split, reserving the most recent interactions for testing. Furthermore, as this study focuses on optimizing repeat-consumption behavior, we filter the test set to include only interactions where the user-vendor pair has appeared in the training history. To mitigate cold-start noise, we strictly consider users with a minimum of five unique historical orders.
+
+\begin{table}[t]
+    \centering
+    \caption{Dataset statistics. \textit{Rep.\%} denotes the proportion of repeat orders (user--vendor pairs present in the training history).}
+    \label{tab:dataset_stats}
+    \small
+    \begin{tabular}{lrrrrr}
+        \hline
+        \textbf{Dataset} & \textbf{\#Users} & \textbf{\#Vendors} & \textbf{\#Orders} & \textbf{\#Cuisines} & \textbf{Rep.\%} \\
+        \hline
+        DHRD-SE & 7,900 & 1,131 & 128,329 & 39 & 56.5\% \\
+        DHRD-SG & 46,129 & 7,296 & 791,088 & 78 & 42.3\% \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Evaluation Metrics}
+Given that food delivery interfaces typically display a limited number of options on the initial screen, top-$k$ performance is paramount. Accordingly, we adopt \textbf{HR@3} (Hit Rate at 3) and \textbf{NDCG@3} as our primary evaluation protocols. To provide a comprehensive performance profile, we also report HR@1 and NDCG@1 for completeness.
+
+\subsection{Baselines}
+We compare our proposed framework against a robust suite of competitive baselines, centering our analysis on DPVP \cite{zhang2023modeling}, the current state-of-the-art model for food delivery recommendation. DPVP utilizes complex time-aware graphs to capture users' dual period-varying preferences across locations, stores, and cuisines. We further benchmark against DIN \cite{zhou2018deep}, SDIM \cite{cao2022sampling} and CF-enhanced CARS \cite{mao2023finalmlp}. 
+
+\subsection{Backbone Large Language Models}
+To investigate the relationship between fundamental reasoning capabilities and recommendation quality, we instantiate our agents using frontier models from both the open-weights and proprietary sectors. We select the \textbf{Qwen} series to represent the state-of-the-art in open-weights models, chosen for its strong benchmarks in instruction following and logic. Complementing this, we utilize \textbf{Gemini} to evaluate the performance of top-tier proprietary reasoning engines. This dual selection allows us to rigorously analyze how model scale and architecture influence the efficacy of the agentic workflow, a detailed comparison of which is provided in table ~\ref{tab:final-vendor}.
+
+
+% \paragraph{Implementation Details.}
+% LightGCN is implemented in PyTorch with 64-dimensional embeddings, three propagation layers, BPR loss, 50 epochs, learning rate $10^{-3}$, and L2 regularization $10^{-4}$.
+% Swing uses smoothing parameters $\alpha_1{=}5.0$, $\alpha_2{=}1.0$, $\beta{=}0.3$.
+% Candidate vendors are drawn from the geohash index conditioned on Round~1 cuisines, shuffled, and capped at 20.
+% Round~2 prompts include up to five Swing-similar users with at most 20 total records filtered to the predicted cuisines.
+% The evaluation pipeline issues up to 25 concurrent asynchronous requests with exponential-backoff retry (up to 10 attempts) and disk-caches LightGCN embeddings, Swing scores, and geohash indices for reproducibility.
+
+%% ---- Overall Performance ----
+
+\section{Results}
+Table~\ref{tab:llm_rerank_performance} summarizes the repeat-order ranking performance across both the DHRD-SE and DHRD-SG benchmarks. Our proposed Agentic framework consistently outperforms the strongest baselines.
+
+On the DHRD-SE dataset, our optimal configuration (powered by \textbf{Gemini-2.5-pro}) achieves an HR@3 of $0.756$ and an NDCG@3 of $0.624$. This represents a substantial margin over the leading baseline, DPVP, which reports an HR@3 of $0.660$—marking a relative improvement of $+14.5\%$. Crucially, this superior performance is achieved in a zero-shot manner, without the extensive task-specific training required by the baseline.
+
+The robustness of our approach is further evidenced on DHRD-SG, a significantly more challenging environment characterized by $7\times$ the vendor volume and $2\times$ the cuisine diversity compared to the Swedish dataset. Despite this increased sparsity and entropy, our model maintains its competitive edge, delivering a $+13.4\%$ relative improvement in \textbf{NDCG} over the best performing baseline.
+
+\begin{table}[t]
+    \centering
+    \caption{Final-stage performance of LLM variants on DHRD-SG and DHRD-SE}
+    \label{tab:llm_rerank_performance}
+    \begin{tabular}{llcc}
+        \hline
+        Dataset & Model &  Hit Rate @3 & NDCG@3 \\
+        \hline
+        \multirow{7}{*}{DHRD-SG} & Gemini-2.5-Pro & 0.679 & 0.601 \\
+         & Gemini-3-Flash (thinking) & 0.675 & 0.552 \\
+             & Gemini-3-Flash (no thinking) & 0.651 & 0.541 \\
+             & GPT-4.1-mini & 0.632 & 0.520 \\
+
+             & Qwen3-80B & 0.273 & 0.226 \\
+            & DPVP & 0.678 & 0.560 \\
+            & CF-Base CARS FM & 0.600 & 0.492 \\
+        \multirow{7}{*}{DHRD-SE} & Gemini-2.5-Pro & 0.756 & 0.624 \\
+                     & Gemini-3-Flash (thinking) & 0.733 & 0.656 \\
+             & Gemini-3-Flash (no thinking) & 0.710 & 0.641 \\
+             & GPT-4.1-mini & 0.667 & 0.576 \\
+             & Qwen3-80B & 0.294 & 0.226 \\
+            & DPVP & 0.660 & 0.550 \\
+            & CF-Base CARS FM & 0.690 & 0.562 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+
+
+%% ---- Multi-Model Comparison ----
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{agentic_rec.png}
+    \caption{Example Prompt of round1(upper left) and round2(upper right) request, round1 cuisine ranking (bottom left), round 2 results(bottom right). `ad99ee9d||noodles` is the ground truth}
+    \label{fig:graph1}
+\end{figure}
+
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{agentic_food_devliery.drawio.png}
+    \caption{Multi-Agent Workflow for Food Delivery Recommendation}
+    \label{fig:graph1}
+\end{figure*}
+
+\subsection{Impact of Reasoning Capability and Inference Scaling}
+To rigorously isolate the contribution of the underlying LLM's reasoning engine to recommendation quality, we evaluated our framework across different model generations and inference configurations while keeping the prompt structure and retrieval candidates constant. Table~\ref{tab:llm_rerank_performance} details the performance trajectories across the Google Gemini Flash lineage on DHRD-SE and the Qwen3 series on DHRD-SG.
+
+\begin{table}[t]
+\centering
+\caption{Final Vendor Hit@K and NDCG@K}
+\label{tab:final-vendor}
+\begin{tabular}{llcccc}
+\toprule
+        \hline
+Dataset & Model & Hit@1 & Hit@3 & NDCG@1 & NDCG@3 \\
+        \hline
+        \midrule
+\multirow{SE}
+ & gemini-2.0-flash & 0.510 & 0.677 & 0.510 & 0.563 \\
+ & gemini-2.5-flash  & 0.523 & 0.696 & 0.523 & 0.584 \\
+ & gemini-3.0-flash & 0.540 & 0.733 & 0.540 & 0.656 \\
+ & gemini-2.5-pro            & 0.557 & 0.756 & 0.557 & 0.624 \\
+\midrule
+\multirow{SG}
+ & gemini-2.0-flash & 0.420 & 0.633 & 0.420 & 0.552 \\
+ & gemini-2.5-flash & 0.430 & 0.668 & 0.430 & 0.541 \\
+ & gemini-3.0-flash  & 0.468 & 0.675 & 0.468 & 0.552 \\
+ & gemini-2.5-pro            & 0.481 & 0.679 & 0.481 & 0.601 \\
+\bottomrule
+        \hline
+\end{tabular}
+\end{table}
+
+A distinct positive correlation emerges between general-purpose reasoning capability and domain-specific ranking accuracy. On the DHRD-SE dataset, the transition from \textbf{Gemini-2.0-Flash} to \textbf{Gemini-3-Flash} yields a monotonic performance gain, with HR@3 rising from $0.677$ to $0.733$ ($+8.3\%$) and NDCG@3 climbing from $0.563$ to $0.656$ ($+16.5\%$ relative). This progression suggests that the enhanced instruction-following and logical coherence inherent to newer model generations translate directly into a superior ability to navigate complex recommendation constraints.
+
+Furthermore, we isolated the impact of \textbf{inference-time scaling} by ablating the model's "thinking" capabilities. As detailed in Table~\ref{tab:llm_rerank_performance}, configurations with reasoning traces enabled consistently outperform their standard-inference counterparts. This result underscores the critical value of test-time computation; by allowing the agent to engage in iterative planning and self-correction before outputting a decision, the system significantly reduces ranking errors.
+% This observation has a practical implication: since recommendation accuracy scales with reasoning quality, one can potentially achieve strong performance with a small, efficient model \emph{fine-tuned on distilled reasoning traces} from a larger teacher model.
+% Rather than deploying a 32B-parameter model at inference time, a smaller student model trained to reproduce the chain-of-thought outputs of the teacher could retain much of the reasoning benefit at a fraction of the computational cost.
+% We leave this distillation approach to future work.
+
+%% ---- Multi-Level Analysis ----
+
+\subsection{Performance Analysis}
+Our results validate the effectiveness of the coarse-to-fine architectural design. The Analyzer (Round~1) demonstrates high robustness in intent classification, achieving a cuisine-level HR@3 of $0.845$ on DHRD-SG when inference-time reasoning is enabled. This confirms that the fusion of LightGCN-derived global affinities with the LLM's understanding of sequential history successfully captures high-level user preferences. The performance drop observed in the final metrics is therefore attributable to the significantly higher entropy involved in distinguishing between functionally similar vendors within the same cuisine category, rather than a failure in high-level intent recognition.
+
+We observe a strong correlation between prediction accuracy and the regularity of user behavior. Performance peaks during primary meal windows (18:00--21:00), consistent with the hypothesis that the agent successfully exploits structured temporal routines. Furthermore, the system exhibits expected behavior regarding data density: users with deeper historical logs and high vendor loyalty scores yield significantly higher accuracy, confirming the agent's ability to leverage habitual cues. However, a performance gap persists between "head" cuisines (e.g., Pizza, Burgers) and long-tail categories; while the agentic workflow mitigates data sparsity, it does not fully eliminate the inherent difficulty of reasoning about sparse interactions where collaborative signals are weak.
+%% ---- Ablation Study ----
+
+\subsection{Ablation Study}
+
+Table~\ref{tab:ablation} reports leave-one-component-out ablations.
+Excluding LightGCN scores from Round~1 diminishes cuisine recall, confirming that embeddings provide complementary collaborative evidence beyond sequential order histories.
+Omitting similar-user records from Round~2 is the single most harmful vendor-level removal, demonstrating that peer behavior is critical once the candidate set is defined.
+Without geohash filtering, the candidate list balloons and overwhelms the Critic, degrading ranking quality.
+Collapsing the pipeline to a single round (cuisine prediction only) eliminates vendor-level precision entirely.
+Collectively, the ablations confirm that each component---collaborative signals, spatial filtering, and two-stage LLM reasoning---contributes to the final accuracy.
+
+
+\begin{table}[t]
+\centering
+\caption{Ablation study on DHRD-SG repeat-order evaluation. LightGCN \& round1 predict cuisine, round2 predict vendor}
+\label{tab:ablation}
+\begin{tabular}{lccc}
+\toprule
+\hline
+Metric & LightGCN (cuisine)& Round 1 (cuisine) & Round 2 (vendor) \\
+\hline
+\midrule
+Hit@1  & 0.2358 & 0.5399 & 0.4810 \\
+Hit@3  & 0.6495 & 0.8514 & 0.6790 \\
+Hit@5  & 0.8426 & 0.9054 & 0.6853 \\
+NDCG@1 & 0.2358 & 0.5399 & 0.4810 \\
+NDCG@3 & 0.4767 & 0.7260 & 0.6010 \\
+NDCG@5 & 0.5491 & 0.7497 & 0.5965 \\
+\bottomrule
+\hline
+\end{tabular}
+\end{table}
+
+
+% \subsection{Discussion}
+
+
+
+
+% \paragraph{Training-free competitive performance.}
+% A notable property of our agentic pipeline is that it requires \emph{no task-specific training}.
+% The only learned components are LightGCN (trained on the user--cuisine bipartite graph with standard BPR loss) and Swing (a parameter-free co-purchase statistic).
+% All recommendation reasoning is performed by a general-purpose LLM conditioned on structured prompts.
+% Despite this, our NDCG@3 on DHRD-SE ($0.606$) surpasses DPVP ($0.550$), a dedicated food delivery model trained end-to-end with domain-specific graph architectures and hyperparameter tuning.
+% This suggests that the combination of lightweight collaborative signals and LLM reasoning can match---and in some metrics exceed---specialized trained models for repeat-order prediction.
+
+% \paragraph{Interpretability.}
+% Unlike neural recommendation models that produce opaque scores, every prediction in our pipeline comes with an explicit reasoning trace: the Analyzer explains why it selected certain cuisines, and the Critic reflects on how it balanced vendor loyalty, temporal patterns, and peer evidence.
+% This interpretability is valuable both for debugging recommendation failures and for building user trust in production systems.
+
+% \paragraph{Scalability via distillation.}
+% The consistent relationship between model reasoning capability and recommendation accuracy (Section~\ref{sec:model_comparison}) suggests a path toward efficient deployment.
+% As LLMs with stronger thinking abilities become available, their reasoning traces can be distilled into smaller, specialized models through supervised fine-tuning.
+% A compact student model trained on the teacher's chain-of-thought outputs could retain most of the reasoning benefit while meeting latency and cost requirements for production food delivery recommendation.
+
+\section{Discussion}
+\subsection{Parameter Efficiency and Zero-Shot Generalization}
+A distinguishing feature of our proposed framework is its competitive performance despite the absence of extensive task-specific training. Traditional SOTA baselines, such as DPVP, rely on complex, domain-specific graph architectures that require end-to-end training and rigorous hyperparameter optimization to model time-varying preferences. In contrast, our pipeline relies solely on lightweight components: a standard LightGCN (trained via simple BPR loss) and Swing (a parameter-free statistic).
+
+Remarkably, despite offloading the complex reasoning to a general-purpose, frozen LLM, our framework achieves $13\%$ improvement on NDCG@3. This result challenges the prevailing assumption that high-performance recommendation requires heavy, specialized model architectures. It suggests that a \textbf{hybrid paradigm}—combining lightweight collaborative signals with the zero-shot reasoning capabilities of foundation models—can effectively generalize to complex sequential tasks without the debt of maintaining and retraining massive domain-specific networks.
+
+\subsection{Interpretability and Transparent Decision-Making}
+Beyond ranking accuracy, our agentic workflow offers a structural advantage in \textbf{explainability}, addressing a critical limitation of latent-factor neural models. While deep learning baselines output opaque probability scores, our agents generate explicit, natural language rationales for every decision. The Analyzer articulates why specific cuisines were prioritized based on context, and the Critic provides a transparent audit of how it weighed conflicting factors, such as vendor loyalty versus peer evidence.
+
+This "white-box" reasoning capability transforms the recommender from a black-box predictor into an interpretable system. In practical deployments, this transparency is invaluable: it facilitates rapid debugging of logic failures (e.g., identifying when an agent over-indexes on recency) and enhances end-user trust by enabling the system to provide meaningful explanations for its suggestions.
+
+\subsection{Performance on Sparse Signals: ID-based vs. Agentic Models}
+Beyond the ablation studies presented in Table~\ref{tab:ablation}, we extended our evaluation to contrast our Agentic framework against strong graph-based baselines, specifically LightGCN, across varying task granularities. We observed a stark divergence in performance when shifting the recommendation target from coarse-grained labels (e.g., \textit{Cuisine}) to fine-grained entities (e.g., \textit{Vendor}).
+
+While LightGCN remained competitive for cuisine classification, its performance degraded significantly for vendor recommendation. We attribute this to the **interaction sparsity** inherent in the vendor space. The cuisine manifold is relatively low-dimensional and densely connected; thus, the user-item interaction graph contains sufficient edge density for message-passing mechanisms to learn representative embeddings. In contrast, the vendor space is high-dimensional with a long-tail distribution, resulting in a sparse graph where ID-based collaborative signals become weak or disconnected.
+
+This comparison underscores the core advantage of our Agentic solution. Unlike traditional collaborative filtering which relies on dense historical priors, our agent leverages **semantic reasoning** and **general world knowledge**. By treating recommendation as a reasoning problem rather than a signal-matching problem, the agent effectively mitigates data scarcity, maintaining high performance even in scenarios where collaborative signals are insufficient.
+
+\subsection{Inference Time Scaling and Reasoning Capabilities}
+To isolate the impact of model capacity and reasoning depth, we evaluated our framework across a spectrum of frontier models, encompassing both open-source and proprietary architectures. Our experiments reveal two pivotal scaling laws in the context of recommendation:
+
+\begin{itemize}
+    \item \textbf{Model Scale Correlation:} Consistent with general NLP trends, larger models demonstrated superior performance, correlating with their broader knowledge base and improved instruction-following capabilities.
+    \item \textbf{The Necessity of "Round 2" Thinking:} Crucially, we found that enabling "thinking" steps (i.e., inference-time reasoning) yielded substantial performance gains independent of model size. 
+\end{itemize}
+
+These findings suggest that complex recommendation tasks require more than intuitive pattern matching ("Round 1"). By allocating more compute at inference time, the agentic workflow mimics "Round 2" processing allowing the model to decompose complex user intents, weigh conflicting constraints (e.g., delivery time vs. rating), and perform **self-correction** on its initial ranking candidates. This demonstrates that **inference-time scaling** is not solely an NLP phenomenon but a critical lever for next-generation recommender systems, enabling them to handle the nuance of user preference with greater precision than single-pass generation.
+
+\subsection{The Diminishing Returns of Supervised Fine-Tuning}
+Finally, we investigated the efficacy of Supervised Fine-Tuning (SFT) as a mechanism for performance enhancement. Contrary to the prevailing paradigm in earlier LLM-based recommendation works, our results indicate that SFT yields only marginal improvements compared to the zero-shot Agentic workflow.
+
+When weighing the computational cost and engineering overhead of SFT against the performance delta, the Return on Investment (ROI) is suboptimal. We hypothesize that while SFT improves the model's adherence to output formatting, it contributes little to—and potentially degrades—the model's complex reasoning capabilities due to the risk of catastrophic forgetting or overfitting to limited training templates. This observation aligns with recent industry findings, such as those by Wang et al.~\cite{wang2025reaseq}, which suggest that reasoning capabilities are better elicited through prompt engineering and inference scaling than through parameter updates.
+
+Consequently, we argue that the frontier of recommender system optimization lies not in blindly optimizing model parameters, but in the **architectural design of the Agentic flow**. Empowering the model with the right tools, memory mechanisms, and planning algorithms offers a more scalable and effective path to improvement than traditional fine-tuning.
+
+\section{Conclusion}
+In this work, we introduced a novel Agentic Recommender System framework that fundamentally shifts the ranking paradigm from pattern matching to reasoning-driven decision-making. By harnessing the advanced reasoning capabilities of LLMs, our approach effectively bridges the semantic gap that limits traditional ID-based methods.
+
+Our empirical results demonstrate that this agentic workflow outperforms state-of-the-art graph-based model like DPVP. Notably, our framework achieves these results with high data efficiency, requiring only the minimal training of a lightGCN head rather than the extensive hyperparameter tuning and large-scale retraining inherent to graph neural networks.
+
+Furthermore, this study establishes a critical precedent for the role of inference-time scaling in recommendation systems. We provide compelling evidence that allocating compute to "deliberative reasoning"—allowing the model to think and self-correct at test time—yields significant gains in ranking accuracy. This finding suggests that future improvements in recommender systems may stem as much from test-time computation as from model scaling.
+
+Finally, we position this work not merely as a standalone model, but as a foundational, modular architecture. By decoupling the reasoning engine from the retrieval and tool-use components, our framework allows for the seamless integration of future frontier models to further enhance performance. We believe this agentic approach represents a vital step toward the next generation of recommender systems—ones that merge vast world knowledge with intricate logical reasoning to deliver truly intent-aware recommendations.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

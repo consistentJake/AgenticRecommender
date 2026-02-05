@@ -1,0 +1,16 @@
+  \begin{table}[t]
+\centering
+\caption{Final Vendor Hit@K and NDCG@K}
+\label{tab:final-vendor}
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Model & Hit@1 & Hit@3 & NDCG@1 & NDCG@3 \\
+\midrule
+\multirow{SE}
+ & gemini-2.5-pro            & 0.557 & 0.756 & 0.527 & 0.624 \\
+\midrule
+\multirow{SG}
+ & gemini-2.5-pro            & 0.481 & 0.679 & 0.479 & 0.601 \\
+\bottomrule
+\end{tabular}
+\end{table}
