@@ -1062,6 +1062,222 @@ Return JSON:
         }
 
 
+class AgentBasedAsyncEvaluator:
+    """Async evaluator using agent-based pipeline.
+
+    Same worker pool / checkpointing / JSONL as AsyncRepeatEvaluator,
+    but delegates per-sample processing to RecommendationManager.
+    """
+
+    def __init__(self, manager, async_provider: AsyncLLMProvider, config: 'RepeatEvalConfig'):
+        self.manager = manager
+        self.provider = async_provider
+        self.config = config
+
+        # State (same as AsyncRepeatEvaluator)
+        self.results_file: Optional[Path] = None
+        self._detailed_json_path: Optional[Path] = None
+        self._all_results: List[Dict] = []
+        self._completed_ids: Set[str] = set()
+        self._write_lock = asyncio.Lock()
+        self._progress_count = 0
+        self._start_time = 0.0
+
+    async def evaluate_async(
+        self,
+        test_samples: List[Dict[str, Any]],
+        output_path: Path,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """Evaluate samples with parallel LLM requests.
+
+        Same interface as AsyncRepeatEvaluator.evaluate_async().
+        """
+        output_path = Path(output_path)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        self.results_file = output_path / "detailed_results.jsonl"
+        self._detailed_json_path = output_path / "stage9_repeat_detailed.json"
+        self._start_time = time.time()
+
+        # Resume support
+        self._completed_ids = self._load_completed_ids()
+        self._all_results = self._load_all_results_from_jsonl()
+        pending = [s for s in test_samples if str(s['customer_id']) + "_" + str(s['order_id']) not in self._completed_ids]
+
+        if verbose:
+            print("")
+            print("=" * 60)
+            print("  ASYNC AGENT-BASED REPEAT EVALUATOR")
+            print("=" * 60)
+            print(f"  Total samples:     {len(test_samples)}")
+            print(f"  Already completed: {len(self._completed_ids)}")
+            print(f"  Pending:           {len(pending)}")
+            print(f"  Concurrent workers: {self.config.max_workers}")
+            print(f"  Results file:      {self.results_file}")
+            print("=" * 60)
+            print("")
+
+        if not pending:
+            print("[AgentBasedAsyncEvaluator] All samples already completed.")
+            return self._read_all_results()
+
+        # Process pending samples
+        async with self.provider:
+            queue = asyncio.Queue()
+            for i, sample in enumerate(pending):
+                await queue.put((i, sample))
+
+            workers = [
+                asyncio.create_task(self._worker(queue, worker_id, len(pending), verbose))
+                for worker_id in range(min(self.config.max_workers, len(pending)))
+            ]
+
+            if verbose and async_tqdm:
+                with async_tqdm(total=len(pending), desc="Evaluating") as pbar:
+                    prev_count = 0
+                    while self._progress_count < len(pending):
+                        await asyncio.sleep(0.5)
+                        new_count = self._progress_count
+                        if new_count > prev_count:
+                            pbar.update(new_count - prev_count)
+                            prev_count = new_count
+            else:
+                await queue.join()
+
+            for w in workers:
+                w.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)
+
+        elapsed = time.time() - self._start_time
+        if verbose:
+            print("")
+            print("=" * 60)
+            print("  ASYNC AGENT-BASED EVALUATION COMPLETE")
+            print("=" * 60)
+            print(f"  Total time:    {elapsed:.1f}s")
+            print(f"  Samples done:  {len(pending)}")
+            if len(pending) > 0:
+                print(f"  Throughput:    {len(pending) / elapsed:.2f} samples/sec")
+                print(f"  Avg per sample: {elapsed / len(pending) * 1000:.1f}ms")
+            print("=" * 60)
+
+            model_info = self.provider.get_model_info()
+            print("")
+            print("-" * 60)
+            print("  LLM REQUEST TIMING STATISTICS")
+            print("-" * 60)
+            print(f"  Total LLM calls:   {model_info.get('total_calls', 0)}")
+            print(f"  Failed calls:      {model_info.get('failed_calls', 0)}")
+            if 'timing' in model_info:
+                timing = model_info['timing']
+                print(f"  Avg request time:  {timing['avg_seconds']:.2f}s")
+                print(f"  P50 (median):      {timing['p50_seconds']:.2f}s")
+                print(f"  P95:               {timing['p95_seconds']:.2f}s")
+            print("-" * 60)
+
+            if 'failure_diagnostics' in model_info:
+                diag = model_info['failure_diagnostics']
+                print("")
+                print("-" * 60)
+                print("  FAILURE DIAGNOSTICS")
+                print("-" * 60)
+                print(f"  Total retry failures: {diag['total_failures']}")
+                print(f"  By error type:     {diag['by_error_type']}")
+                if diag['by_http_status']:
+                    print(f"  By HTTP status:    {diag['by_http_status']}")
+                ps = diag['prompt_size_stats']
+                print(f"  Prompt size (chars): min={ps['min_chars']}  max={ps['max_chars']}  "
+                      f"avg={ps['avg_chars']}  median={ps['median_chars']}")
+                at = diag['attempt_elapsed_stats']
+                print(f"  Time at failure:   min={at['min_s']}s  max={at['max_s']}s  "
+                      f"avg={at['avg_s']}s  timeouts={at['timeouts_count']}")
+                print("-" * 60)
+
+        return self._read_all_results()
+
+    async def _worker(self, queue, worker_id, total, verbose):
+        """Worker that processes samples from queue."""
+        while True:
+            try:
+                idx, sample = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                break
+
+            try:
+                result = await self._process_sample(idx, sample, verbose)
+                await self._write_result(result)
+                self._progress_count += 1
+
+                if verbose and self._progress_count % self.config.checkpoint_interval == 0:
+                    elapsed = time.time() - self._start_time
+                    rate = self._progress_count / elapsed
+                    remaining = total - self._progress_count
+                    eta = remaining / rate if rate > 0 else 0
+                    print(
+                        f"[Worker Pool] Progress: {self._progress_count}/{total} "
+                        f"({self._progress_count/total*100:.1f}%) | "
+                        f"Rate: {rate:.2f} samples/sec | "
+                        f"ETA: {eta:.0f}s"
+                    )
+            except Exception as e:
+                logger.error(f"Worker {worker_id} failed on {sample.get('customer_id')}: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+            finally:
+                queue.task_done()
+
+    async def _process_sample(self, idx: int, sample: Dict[str, Any], verbose: bool) -> Dict[str, Any]:
+        """Delegate to RecommendationManager."""
+        return await self.manager.process_sample(idx, sample, self.provider, self.config)
+
+    def _load_completed_ids(self) -> Set[str]:
+        """Load already completed sample IDs from JSONL file."""
+        completed = set()
+        if self.results_file and self.results_file.exists():
+            try:
+                with open(self.results_file, 'r') as f:
+                    for line in f:
+                        if line.strip():
+                            result = json.loads(line)
+                            cid = str(result.get('customer_id', ''))
+                            oid = str(result.get('order_id', ''))
+                            completed.add(f"{cid}_{oid}")
+            except Exception as e:
+                logger.warning(f"Error loading completed IDs: {e}")
+        return completed
+
+    async def _write_result(self, result: Dict[str, Any]):
+        """Append result to JSONL file and update detailed JSON."""
+        async with self._write_lock:
+            with open(self.results_file, 'a') as f:
+                f.write(json.dumps(result, default=str) + '\n')
+            self._all_results.append(result)
+            if self._detailed_json_path:
+                with open(self._detailed_json_path, 'w') as f:
+                    json.dump(self._all_results, f, indent=2, default=str)
+
+    def _load_all_results_from_jsonl(self) -> List[Dict]:
+        """Load all existing results from JSONL into memory."""
+        results = []
+        if self.results_file and self.results_file.exists():
+            with open(self.results_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        results.append(json.loads(line))
+        return results
+
+    def _read_all_results(self) -> Dict[str, Any]:
+        """Read all results from in-memory list."""
+        return {
+            'results': self._all_results,
+            'completed_samples': len(self._all_results),
+            'results_file': str(self.results_file),
+        }
+
+
 def _compute_ranking_metrics(
     ranks: List[int],
     valid: int,

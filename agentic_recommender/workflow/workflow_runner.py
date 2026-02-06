@@ -599,551 +599,6 @@ class PipelineStages:
             self.logger.stage_end('build_cuisines', success=False)
             return False
 
-    # -------------------------------------------------------------------------
-    # Stage 4: Generate Prompts
-    # -------------------------------------------------------------------------
-    def stage_generate_prompts(self) -> bool:
-        """Generate formatted prompts for LLM prediction."""
-        stage_cfg = self.config.get_stage('generate_prompts')
-        self.logger.stage_start('generate_prompts', stage_cfg.description)
-
-        try:
-            from agentic_recommender.core.prompts import PromptManager, PromptType
-
-            # Load users
-            users_path = stage_cfg.input.get('users_json')
-            self.logger.file_read(users_path, "Loading user representations")
-            with open(users_path, 'r') as f:
-                users = json.load(f)
-            self.logger.info(f"Loaded {len(users)} users")
-
-            # Load merged data for candidate products
-            merged_path = stage_cfg.input.get('merged_data')
-            self.logger.file_read(merged_path, "Loading merged data for candidates")
-            merged_df = pd.read_parquet(merged_path)
-
-            # Get settings
-            max_prompts = stage_cfg.settings.get('max_prompts', 100)
-            prompt_type_str = stage_cfg.settings.get('prompt_type', 'reflector_first_round')
-
-            # Map string to PromptType enum
-            prompt_type_map = {
-                'reflector_first_round': PromptType.REFLECTOR_FIRST_ROUND,
-                'analyst_user': PromptType.ANALYST_USER,
-                'manager_think': PromptType.MANAGER_THINK,
-            }
-            prompt_type = prompt_type_map.get(prompt_type_str, PromptType.REFLECTOR_FIRST_ROUND)
-
-            # Initialize prompt manager
-            prompt_mgr = PromptManager()
-
-            # Generate prompts
-            prompts = []
-            readable_prompts = []
-
-            self.logger.info(f"Generating up to {max_prompts} prompts using template: {prompt_type_str}")
-
-            # Get unique vendors for candidates
-            all_vendors = merged_df[['vendor_id', 'cuisine']].drop_duplicates()
-
-            for i, user in enumerate(users[:max_prompts]):
-                if (i + 1) % 50 == 0 or i == 0:
-                    self.logger.info(f"  Generating prompt {i+1}/{min(len(users), max_prompts)}")
-
-                # Get user's order history
-                customer_id = user['customer_id']
-                user_orders = merged_df[merged_df['customer_id'] == customer_id]
-
-                if len(user_orders) == 0:
-                    continue
-
-                # Format order history
-                order_history_lines = []
-                for order_id in user_orders['order_id'].unique()[:5]:
-                    order = user_orders[user_orders['order_id'] == order_id].iloc[0]
-                    order_history_lines.append(
-                        f"- {order.get('day_name', 'N/A')} at {order.get('hour', 'N/A')}:00: "
-                        f"{order.get('cuisine', 'unknown')} (${order.get('unit_price', 0):.2f})"
-                    )
-                order_history = "\n".join(order_history_lines)
-
-                # Select a candidate product (from a different vendor)
-                user_vendors = set(user_orders['vendor_id'].unique())
-                candidate_vendors = all_vendors[~all_vendors['vendor_id'].isin(user_vendors)]
-
-                if len(candidate_vendors) > 0:
-                    candidate = candidate_vendors.sample(1).iloc[0]
-                else:
-                    candidate = all_vendors.sample(1).iloc[0]
-
-                candidate_product = f"Vendor: {candidate['vendor_id']}\nCuisine: {candidate['cuisine']}"
-
-                # Generate prompt
-                try:
-                    prompt_text = prompt_mgr.render(
-                        prompt_type,
-                        order_history=order_history,
-                        candidate_product=candidate_product
-                    )
-
-                    prompt_record = {
-                        'id': i,
-                        'customer_id': customer_id,
-                        'candidate_vendor': str(candidate['vendor_id']),
-                        'candidate_cuisine': candidate['cuisine'],
-                        'prompt': prompt_text,
-                        'order_history': order_history,
-                        'template': prompt_type_str
-                    }
-                    prompts.append(prompt_record)
-
-                    # Readable format
-                    readable_prompts.append(f"\n{'='*80}\nPROMPT {i+1} (Customer: {customer_id})\n{'='*80}\n{prompt_text}\n")
-
-                except Exception as e:
-                    self.logger.warning(f"Failed to generate prompt for user {customer_id}: {e}")
-
-            self.logger.success(f"Generated {len(prompts)} prompts")
-
-            # Save prompts JSON
-            output_path = stage_cfg.output.get('prompts_json')
-            if output_path:
-                with open(output_path, 'w') as f:
-                    json.dump(prompts, f, indent=2)
-                self.logger.file_write(output_path, f"{len(prompts)} prompts")
-
-                # Save preview
-                self._save_preview(
-                    data=prompts,
-                    full_path=output_path,
-                    preview_rows=5,
-                    description="Preview of generated prompts",
-                )
-
-            # Save readable prompts
-            readable_path = stage_cfg.output.get('prompts_readable')
-            if readable_path:
-                with open(readable_path, 'w') as f:
-                    f.write(f"Generated Prompts - {datetime.now().isoformat()}\n")
-                    f.write(f"Total: {len(prompts)} prompts\n")
-                    f.write(f"Template: {prompt_type_str}\n")
-                    f.writelines(readable_prompts)
-                self.logger.file_write(readable_path, "Human-readable prompts")
-
-            self.logger.stage_end('generate_prompts', success=True)
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Stage failed: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            self.logger.stage_end('generate_prompts', success=False)
-            return False
-
-    # -------------------------------------------------------------------------
-    # Stage 5: Run Predictions
-    # -------------------------------------------------------------------------
-    def stage_run_predictions(self) -> bool:
-        """Run LLM predictions on generated prompts."""
-        stage_cfg = self.config.get_stage('run_predictions')
-        self.logger.stage_start('run_predictions', stage_cfg.description)
-
-        try:
-            from agentic_recommender.models.llm_provider import (
-                create_llm_provider, MockLLMProvider
-            )
-
-            # Load prompts
-            input_path = stage_cfg.input.get('prompts_json')
-            self.logger.file_read(input_path, "Loading prompts")
-            with open(input_path, 'r') as f:
-                prompts = json.load(f)
-            self.logger.info(f"Loaded {len(prompts)} prompts")
-
-            # Get settings
-            limit = stage_cfg.settings.get('limit', 5)
-            save_intermediate = stage_cfg.settings.get('save_intermediate', True)
-
-            # Limit prompts
-            prompts_to_process = prompts[:limit]
-            self.logger.info(f"Processing first {len(prompts_to_process)} prompts (limit={limit})")
-
-            # Initialize LLM provider
-            llm_config = self.config.get_llm_config()
-            provider_type = llm_config.get('provider', 'mock')
-
-            self.logger.info(f"Initializing LLM provider: {provider_type}")
-
-            if provider_type == 'mock':
-                # Use mock provider for testing
-                provider = MockLLMProvider(responses={
-                    "prediction": '{"prediction": true, "confidence": 0.75, "reasoning": "Mock prediction based on user patterns"}'
-                })
-            else:
-                provider = create_llm_provider(
-                    provider_type=provider_type,
-                    temperature=llm_config.get('temperature', 0.7),
-                    max_tokens=llm_config.get('max_tokens', 512)
-                )
-
-            self.logger.success(f"LLM Provider initialized: {provider.get_model_info()['provider']}")
-
-            # Run predictions
-            predictions = []
-            output_path = stage_cfg.output.get('predictions_json')
-
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("STARTING LLM PREDICTIONS")
-            self.logger.info("=" * 60)
-
-            for i, prompt_record in enumerate(prompts_to_process):
-                self.logger.info(f"\n[{i+1}/{len(prompts_to_process)}] Processing prompt for customer: {prompt_record['customer_id']}")
-                self.logger.info(f"  Candidate cuisine: {prompt_record['candidate_cuisine']}")
-
-                start_time = time.time()
-
-                # Get prediction from LLM
-                response = provider.generate(
-                    prompt_record['prompt'],
-                    temperature=llm_config.get('temperature', 0.7),
-                    max_tokens=llm_config.get('max_tokens', 512)
-                )
-
-                duration = time.time() - start_time
-
-                # Parse response
-                try:
-                    # Try to extract JSON from response
-                    import re
-                    json_match = re.search(r'\{[^}]+\}', response)
-                    if json_match:
-                        parsed = json.loads(json_match.group())
-                    else:
-                        parsed = {'raw_response': response}
-                except json.JSONDecodeError:
-                    parsed = {'raw_response': response}
-
-                prediction_record = {
-                    'id': prompt_record['id'],
-                    'customer_id': prompt_record['customer_id'],
-                    'candidate_vendor': prompt_record['candidate_vendor'],
-                    'candidate_cuisine': prompt_record['candidate_cuisine'],
-                    'response': response,
-                    'parsed': parsed,
-                    'duration_seconds': duration,
-                    'timestamp': datetime.now().isoformat()
-                }
-                predictions.append(prediction_record)
-
-                # Log result
-                pred_value = parsed.get('prediction', 'N/A')
-                confidence = parsed.get('confidence', 'N/A')
-                self.logger.info(f"  Prediction: {pred_value}, Confidence: {confidence}")
-                self.logger.info(f"  Duration: {duration:.2f}s")
-
-                # Save intermediate results
-                if save_intermediate and output_path:
-                    with open(output_path, 'w') as f:
-                        json.dump(predictions, f, indent=2)
-
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("PREDICTIONS COMPLETE")
-            self.logger.info("=" * 60)
-
-            # Final save
-            if output_path:
-                with open(output_path, 'w') as f:
-                    json.dump(predictions, f, indent=2)
-                self.logger.file_write(output_path, f"{len(predictions)} predictions")
-
-                # Save preview
-                self._save_preview(
-                    data=predictions,
-                    full_path=output_path,
-                    preview_rows=10,
-                    description="Preview of LLM predictions",
-                )
-
-            # Generate summary
-            summary_path = stage_cfg.output.get('predictions_summary')
-            if summary_path:
-                # Count predictions
-                true_count = sum(1 for p in predictions
-                               if p.get('parsed', {}).get('prediction') == True)
-                false_count = sum(1 for p in predictions
-                                if p.get('parsed', {}).get('prediction') == False)
-
-                avg_duration = sum(p['duration_seconds'] for p in predictions) / len(predictions)
-
-                summary = {
-                    'total_predictions': len(predictions),
-                    'true_predictions': true_count,
-                    'false_predictions': false_count,
-                    'average_duration_seconds': avg_duration,
-                    'provider': provider.get_model_info(),
-                    'timestamp': datetime.now().isoformat()
-                }
-
-                with open(summary_path, 'w') as f:
-                    json.dump(summary, f, indent=2)
-                self.logger.file_write(summary_path, "Prediction summary")
-
-                self.logger.info("")
-                self.logger.info("Summary:")
-                self.logger.info(f"  Total predictions: {len(predictions)}")
-                self.logger.info(f"  True predictions: {true_count}")
-                self.logger.info(f"  False predictions: {false_count}")
-                self.logger.info(f"  Average duration: {avg_duration:.2f}s")
-
-            self.logger.stage_end('run_predictions', success=True)
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Stage failed: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            self.logger.stage_end('run_predictions', success=False)
-            return False
-
-    # -------------------------------------------------------------------------
-    # Stage 6: Run TopK Evaluation with Real LLM
-    # -------------------------------------------------------------------------
-    def stage_run_topk_evaluation(self) -> bool:
-        """Run TopK evaluation with real LLM predictions."""
-        stage_cfg = self.config.get_stage('run_topk_evaluation')
-        self.logger.stage_start('run_topk_evaluation', stage_cfg.description)
-
-        try:
-            from agentic_recommender.evaluation.topk import (
-                TopKTestDataBuilder,
-                SequentialRecommendationEvaluator,
-                TopKMetrics,
-            )
-            from agentic_recommender.models.llm_provider import (
-                create_llm_provider,
-                OpenRouterProvider,
-                MockLLMProvider,
-            )
-
-            # Load merged data
-            input_path = stage_cfg.input.get('merged_data')
-            self.logger.file_read(input_path, "Loading merged data for evaluation")
-            merged_df = pd.read_parquet(input_path)
-            self.logger.info(f"Loaded {len(merged_df):,} rows")
-
-            # Get settings
-            n_samples = stage_cfg.settings.get('n_samples', 50)
-            min_history = stage_cfg.settings.get('min_history', 5)
-            k_values = stage_cfg.settings.get('k_values', [1, 3, 5, 10])
-            seed = stage_cfg.settings.get('seed', 42)
-            save_predictions = stage_cfg.settings.get('save_predictions', True)
-
-            # Build test samples
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("BUILDING TEST SAMPLES")
-            self.logger.info("=" * 60)
-            self.logger.info(f"Creating {n_samples} test samples (min_history={min_history})...")
-
-            builder = TopKTestDataBuilder(
-                orders_df=merged_df,
-                min_history=min_history
-            )
-            test_samples = builder.build_test_samples(n_samples=n_samples, seed=seed)
-            self.logger.success(f"Created {len(test_samples)} test samples")
-
-            # Get cuisine list
-            cuisines = builder.get_unique_cuisines()
-            self.logger.info(f"Unique cuisines: {len(cuisines)}")
-
-            # Save test samples
-            samples_path = stage_cfg.output.get('samples_json')
-            if samples_path:
-                with open(samples_path, 'w') as f:
-                    json.dump(test_samples, f, indent=2)
-                self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
-
-                # Save preview
-                self._save_preview(
-                    data=test_samples,
-                    full_path=samples_path,
-                    preview_rows=5,
-                    description="Preview of TopK test samples",
-                )
-
-            # Initialize LLM provider
-            llm_config = self.config.get_llm_config()
-            provider_type = llm_config.get('provider', 'mock')
-
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("INITIALIZING LLM PROVIDER")
-            self.logger.info("=" * 60)
-            self.logger.info(f"Provider type: {provider_type}")
-
-            if provider_type == 'mock':
-                # Create mock provider with cuisine-aware responses
-                self.logger.info("Using MOCK provider for testing")
-                provider = self._create_mock_topk_provider(cuisines)
-            elif provider_type == 'openrouter':
-                self.logger.info("Using OpenRouter provider (REAL LLM)")
-                api_key = (
-                    llm_config.get('openrouter', {}).get('api_key') or
-                    os.environ.get('OPENROUTER_API_KEY')
-                )
-                model_name = llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
-
-                if not api_key:
-                    self.logger.error("OpenRouter API key not found! Set OPENROUTER_API_KEY env var or add to config")
-                    self.logger.stage_end('run_topk_evaluation', success=False)
-                    return False
-
-                provider = OpenRouterProvider(
-                    api_key=api_key,
-                    model_name=model_name
-                )
-                self.logger.success(f"Initialized OpenRouter with model: {model_name}")
-            elif provider_type == 'openai_compatible':
-                oc = self._resolve_openai_compatible_config(llm_config)
-                if not oc['api_key']:
-                    self.logger.error("OpenAI-compatible API key not found!")
-                    self.logger.stage_end('run_topk_evaluation', success=False)
-                    return False
-                provider = OpenRouterProvider(api_key=oc['api_key'], model_name=oc['model_name'], base_url=oc['base_url'])
-                self.logger.success(f"Initialized OpenAI-compatible provider: {oc['model_name']}")
-            else:
-                self.logger.info(f"Using {provider_type} provider")
-                provider = create_llm_provider(provider_type=provider_type)
-
-            provider_info = provider.get_model_info()
-            self.logger.info(f"Provider info: {provider_info}")
-
-            # Run evaluation
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("RUNNING TOPK EVALUATION")
-            self.logger.info("=" * 60)
-            self.logger.info(f"Evaluating {len(test_samples)} samples with K={k_values}...")
-
-            evaluator = SequentialRecommendationEvaluator(
-                llm_provider=provider,
-                cuisine_list=cuisines,
-                k_values=k_values,
-            )
-
-            # Custom evaluation with detailed logging
-            detailed_results = []
-            results_list = []
-            total_time = 0.0
-
-            for i, sample in enumerate(test_samples):
-                self.logger.info(f"\n[{i+1}/{len(test_samples)}] Customer: {sample['customer_id']}")
-                self.logger.info(f"  History length: {len(sample['order_history'])} orders")
-                self.logger.info(f"  Ground truth: {sample['ground_truth_cuisine']}")
-
-                start_time = time.time()
-
-                # Get predictions
-                predictions = evaluator._get_predictions(
-                    customer_id=sample['customer_id'],
-                    order_history=sample['order_history'],
-                    k=max(k_values)
-                )
-
-                elapsed = (time.time() - start_time) * 1000
-                total_time += elapsed
-
-                # Find rank
-                rank = evaluator._find_rank(predictions, sample['ground_truth_cuisine'])
-
-                self.logger.info(f"  Predictions: {[p[0] for p in predictions[:5]]}")
-                self.logger.info(f"  Rank: {rank if rank > 0 else 'NOT FOUND'}")
-                self.logger.info(f"  Time: {elapsed:.2f}ms")
-
-                result = {
-                    'sample_idx': i,
-                    'customer_id': sample['customer_id'],
-                    'ground_truth': sample['ground_truth_cuisine'],
-                    'predictions': [(p[0], float(p[1])) for p in predictions],
-                    'rank': rank,
-                    'hit_at_1': 1 if 0 < rank <= 1 else 0,
-                    'hit_at_3': 1 if 0 < rank <= 3 else 0,
-                    'hit_at_5': 1 if 0 < rank <= 5 else 0,
-                    'hit_at_10': 1 if 0 < rank <= 10 else 0,
-                    'time_ms': elapsed,
-                }
-                results_list.append(result)
-
-                if save_predictions:
-                    detailed_results.append({
-                        **result,
-                        'order_history': sample['order_history'][-5:],  # Last 5 orders
-                    })
-
-            # Compute metrics
-            n_valid = len([r for r in results_list if len(r['predictions']) > 0])
-
-            metrics = {
-                'hit_at_1': sum(r['hit_at_1'] for r in results_list) / n_valid if n_valid > 0 else 0,
-                'hit_at_3': sum(r['hit_at_3'] for r in results_list) / n_valid if n_valid > 0 else 0,
-                'hit_at_5': sum(r['hit_at_5'] for r in results_list) / n_valid if n_valid > 0 else 0,
-                'hit_at_10': sum(r['hit_at_10'] for r in results_list) / n_valid if n_valid > 0 else 0,
-                'mrr': sum(1.0 / r['rank'] if r['rank'] > 0 else 0 for r in results_list) / n_valid if n_valid > 0 else 0,
-                'total_samples': len(test_samples),
-                'valid_samples': n_valid,
-                'avg_time_ms': total_time / len(test_samples) if test_samples else 0,
-                'provider': provider_info,
-                'k_values': k_values,
-                'timestamp': datetime.now().isoformat(),
-            }
-
-            # Print results
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("TOPK EVALUATION RESULTS")
-            self.logger.info("=" * 60)
-            self.logger.info(f"  Hit@1:  {metrics['hit_at_1']:.2%}")
-            self.logger.info(f"  Hit@3:  {metrics['hit_at_3']:.2%}")
-            self.logger.info(f"  Hit@5:  {metrics['hit_at_5']:.2%}")
-            self.logger.info(f"  Hit@10: {metrics['hit_at_10']:.2%}")
-            self.logger.info(f"  MRR:    {metrics['mrr']:.4f}")
-            self.logger.info(f"  Samples: {n_valid}/{len(test_samples)}")
-            self.logger.info(f"  Avg time: {metrics['avg_time_ms']:.2f}ms")
-
-            # Save results
-            results_path = stage_cfg.output.get('results_json')
-            if results_path:
-                with open(results_path, 'w') as f:
-                    json.dump(metrics, f, indent=2)
-                self.logger.file_write(results_path, "TopK evaluation metrics")
-
-            # Save detailed predictions
-            detailed_path = stage_cfg.output.get('detailed_predictions')
-            if detailed_path and save_predictions:
-                with open(detailed_path, 'w') as f:
-                    json.dump(detailed_results, f, indent=2)
-                self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed predictions")
-
-                # Save preview
-                self._save_preview(
-                    data=detailed_results,
-                    full_path=detailed_path,
-                    preview_rows=5,
-                    description="Preview of detailed TopK predictions",
-                )
-
-            self.logger.stage_end('run_topk_evaluation', success=True)
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Stage failed: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            self.logger.stage_end('run_topk_evaluation', success=False)
-            return False
-
     def _resolve_openai_compatible_config(self, llm_config: Dict[str, Any]) -> Dict[str, Any]:
         """Resolve openai_compatible config section into base_url, api_key, model_name."""
         oc = llm_config.get('openai_compatible', {})
@@ -1155,401 +610,6 @@ class PipelineStages:
             'model_name': oc.get('model_name'),
         }
 
-    def _create_mock_topk_provider(self, cuisines: List[str]):
-        """Create a mock provider that returns realistic cuisine predictions."""
-        import random
-
-        class MockTopKProvider:
-            """Mock provider for TopK evaluation testing."""
-
-            def __init__(self, cuisine_list):
-                self.cuisines = cuisine_list
-                self.call_count = 0
-
-            def generate(self, prompt: str, **kwargs) -> str:
-                """Generate mock cuisine predictions."""
-                self.call_count += 1
-
-                # Return top 10 random cuisines as predictions
-                selected = random.sample(self.cuisines, min(10, len(self.cuisines)))
-                predictions = [
-                    {"cuisine": c, "confidence": round(0.95 - i * 0.08, 2)}
-                    for i, c in enumerate(selected)
-                ]
-
-                return json.dumps({"predictions": predictions})
-
-            def get_model_info(self):
-                return {
-                    "provider": "MockTopK",
-                    "model_name": "mock-topk-llm",
-                    "total_calls": self.call_count
-                }
-
-        return MockTopKProvider(cuisines)
-
-    # -------------------------------------------------------------------------
-    # Stage 7: Retrieve-Rerank Evaluation
-    # -------------------------------------------------------------------------
-    def stage_run_rerank_evaluation(self) -> bool:
-        """Run retrieve-then-rerank evaluation with candidate generation."""
-        stage_cfg = self.config.get_stage('run_rerank_evaluation')
-        self.logger.stage_start('run_rerank_evaluation', stage_cfg.description)
-
-        try:
-            from agentic_recommender.evaluation.rerank_eval import (
-                CuisineCandidateGenerator,
-                RerankEvaluator,
-                RerankConfig,
-                build_test_samples,
-            )
-            from agentic_recommender.models.llm_provider import OpenRouterProvider
-
-            # Load merged data
-            input_path = stage_cfg.input.get('merged_data')
-            self.logger.file_read(input_path, "Loading merged data for rerank evaluation")
-            merged_df = pd.read_parquet(input_path)
-            self.logger.info(f"Loaded {len(merged_df):,} rows")
-
-            # Get settings
-            settings = stage_cfg.settings
-            config = RerankConfig(
-                n_candidates=settings.get('n_candidates', 20),
-                n_from_history=settings.get('n_from_history', 10),
-                n_similar_users=settings.get('n_similar_users', 10),
-                similarity_method=settings.get('similarity_method', 'swing'),
-                k_picks=settings.get('k_picks', 5),
-                n_samples=settings.get('n_samples', 10),
-                min_history=settings.get('min_history', 5),
-            )
-
-            # Build test samples
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("BUILDING TEST SAMPLES")
-            self.logger.info("=" * 60)
-
-            test_samples = build_test_samples(
-                merged_df,
-                n_samples=config.n_samples,
-                min_history=config.min_history,
-            )
-            self.logger.success(f"Created {len(test_samples)} test samples")
-
-            # Save test samples
-            samples_path = stage_cfg.output.get('samples_json')
-            if samples_path:
-                with open(samples_path, 'w') as f:
-                    json.dump(test_samples, f, indent=2)
-                self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
-
-                # Save preview
-                self._save_preview(
-                    data=test_samples,
-                    full_path=samples_path,
-                    preview_rows=5,
-                    description="Preview of Rerank test samples",
-                )
-
-            # Build candidate generator
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("BUILDING CANDIDATE GENERATOR")
-            self.logger.info("=" * 60)
-            self.logger.info(f"Similarity method: {config.similarity_method}")
-            self.logger.info(f"Candidates per user: {config.n_candidates}")
-
-            generator = CuisineCandidateGenerator(config)
-            generator.fit(merged_df)
-
-            gen_stats = generator.get_stats()
-            self.logger.info(f"Generator stats: {gen_stats['num_users']} users, {gen_stats['num_cuisines']} cuisines")
-
-            # Initialize LLM provider
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("INITIALIZING LLM PROVIDER")
-            self.logger.info("=" * 60)
-
-            llm_config = self.config.get_llm_config()
-            provider_type = llm_config.get('provider', 'mock')
-            self.logger.info(f"Provider type: {provider_type}")
-
-            if provider_type == 'mock':
-                provider = self._create_mock_rerank_provider()
-            elif provider_type == 'openrouter':
-                api_key = (
-                    llm_config.get('openrouter', {}).get('api_key') or
-                    os.environ.get('OPENROUTER_API_KEY')
-                )
-                if not api_key:
-                    self.logger.error("OpenRouter API key not found!")
-                    self.logger.stage_end('run_rerank_evaluation', success=False)
-                    return False
-
-                provider = OpenRouterProvider(
-                    api_key=api_key,
-                    model_name=llm_config.get('openrouter', {}).get('model_name', 'google/gemini-2.0-flash-001')
-                )
-                self.logger.success(f"Initialized OpenRouter")
-            elif provider_type == 'openai_compatible':
-                oc = self._resolve_openai_compatible_config(llm_config)
-                if not oc['api_key']:
-                    self.logger.error("OpenAI-compatible API key not found!")
-                    self.logger.stage_end('run_rerank_evaluation', success=False)
-                    return False
-                provider = OpenRouterProvider(api_key=oc['api_key'], model_name=oc['model_name'], base_url=oc['base_url'])
-                self.logger.success(f"Initialized OpenAI-compatible provider: {oc['model_name']}")
-            else:
-                from agentic_recommender.models.llm_provider import create_llm_provider
-                provider = create_llm_provider(provider_type=provider_type)
-
-            # Run evaluation
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("RUNNING RERANK EVALUATION")
-            self.logger.info("=" * 60)
-            self.logger.info(f"Samples: {len(test_samples)}, K picks: {config.k_picks}")
-
-            evaluator = RerankEvaluator(
-                llm_provider=provider,
-                candidate_generator=generator,
-                config=config,
-            )
-
-            # Custom verbose evaluation
-            metrics, detailed_results = self._run_rerank_with_logging(
-                evaluator, test_samples, config
-            )
-
-            # Print results
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("RERANK EVALUATION RESULTS")
-            self.logger.info("=" * 60)
-            self.logger.info(f"  Recall@{config.k_picks}:  {metrics.recall_at_k:.2%}")
-            self.logger.info(f"  Precision@{config.k_picks}: {metrics.precision_at_k:.2%}")
-            self.logger.info(f"  First Hit Avg: {metrics.first_hit_avg:.2f}")
-            self.logger.info(f"  GT in Candidates: {metrics.ground_truth_in_candidates:.2%}")
-            self.logger.info(f"  Avg Candidate Rank: {metrics.avg_candidate_rank:.1f}")
-            self.logger.info(f"  Samples: {metrics.valid_samples}/{metrics.total_samples}")
-            self.logger.info(f"  Avg Time: {metrics.avg_time_ms:.2f}ms")
-
-            # Save results
-            results_path = stage_cfg.output.get('results_json')
-            if results_path:
-                with open(results_path, 'w') as f:
-                    json.dump(metrics.to_dict(), f, indent=2)
-                self.logger.file_write(results_path, "Rerank evaluation metrics")
-
-            # Save detailed results
-            detailed_path = stage_cfg.output.get('detailed_json')
-            if detailed_path:
-                with open(detailed_path, 'w') as f:
-                    json.dump(detailed_results, f, indent=2)
-                self.logger.file_write(detailed_path, f"{len(detailed_results)} detailed results")
-
-                # Save preview
-                self._save_preview(
-                    data=detailed_results,
-                    full_path=detailed_path,
-                    preview_rows=5,
-                    description="Preview of detailed Rerank results",
-                )
-
-            self.logger.stage_end('run_rerank_evaluation', success=True)
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Stage failed: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            self.logger.stage_end('run_rerank_evaluation', success=False)
-            return False
-
-    def _run_rerank_with_logging(
-        self,
-        evaluator,
-        test_samples: List[Dict],
-        config,
-    ) -> Tuple[Any, List[Dict]]:
-        """Run rerank evaluation with detailed logging."""
-        import random
-        from collections import Counter
-
-        results = []
-        total_time = 0.0
-
-        for i, sample in enumerate(test_samples):
-            self.logger.info(f"\n[{i+1}/{len(test_samples)}] Customer: {sample['customer_id']}")
-            self.logger.info(f"  History: {len(sample['order_history'])} orders")
-            self.logger.info(f"  Ground truth: {sample['ground_truth_cuisine']}")
-
-            start_time = time.time()
-
-            # Generate candidates
-            candidates, candidate_info = evaluator.generator.generate_candidates(
-                customer_id=sample['customer_id'],
-                ground_truth=sample['ground_truth_cuisine'],
-            )
-
-            # Detailed candidate breakdown for debugging
-            self.logger.info(f"  ")
-            self.logger.info(f"  === CANDIDATE SELECTION ({len(candidates)} total) ===")
-
-            # Show user's order history summary
-            history_cuisines = [o.get('cuisine', 'unknown') for o in sample['order_history']]
-            cuisine_counts = Counter(history_cuisines)
-            self.logger.info(f"  User's cuisine history: {dict(cuisine_counts.most_common(5))}")
-
-            # Show candidates from history
-            from_history = candidate_info['from_history']
-            self.logger.info(f"  ")
-            self.logger.info(f"  [FROM USER HISTORY] ({len(from_history)} cuisines):")
-            for idx, cuisine in enumerate(from_history, 1):
-                count = cuisine_counts.get(cuisine, 0)
-                self.logger.info(f"    {idx}. {cuisine} (ordered {count}x)")
-
-            # Show candidates from similar users
-            from_similar = candidate_info['from_similar_users']
-            self.logger.info(f"  ")
-            self.logger.info(f"  [FROM SIMILAR USERS] ({len(from_similar)} cuisines):")
-            for idx, cuisine in enumerate(from_similar, 1):
-                self.logger.info(f"    {idx}. {cuisine}")
-
-            # Show random fill if any
-            from_history_set = set(from_history)
-            from_similar_set = set(from_similar)
-            from_random = [c for c in candidates if c not in from_history_set and c not in from_similar_set and c != sample['ground_truth_cuisine']]
-            if from_random:
-                self.logger.info(f"  ")
-                self.logger.info(f"  [RANDOM FILL] ({len(from_random)} cuisines):")
-                for idx, cuisine in enumerate(from_random, 1):
-                    self.logger.info(f"    {idx}. {cuisine}")
-
-            # Show ground truth status
-            self.logger.info(f"  ")
-            self.logger.info(f"  [GROUND TRUTH] {sample['ground_truth_cuisine']}")
-            if candidate_info['ground_truth_added']:
-                self.logger.info(f"    -> NOT in candidates naturally, ADDED at rank {candidate_info['ground_truth_rank']}")
-            else:
-                self.logger.info(f"    -> Found in candidates at rank {candidate_info['ground_truth_rank']}")
-
-            # Show all 20 candidates in order
-            self.logger.info(f"  ")
-            self.logger.info(f"  [FINAL CANDIDATE LIST]:")
-            for idx, cuisine in enumerate(candidates, 1):
-                source = ""
-                if cuisine in from_history_set:
-                    source = "(history)"
-                elif cuisine in from_similar_set:
-                    source = "(similar users)"
-                elif cuisine == sample['ground_truth_cuisine'] and candidate_info['ground_truth_added']:
-                    source = "(GT added)"
-                else:
-                    source = "(random)"
-                gt_marker = " <-- GROUND TRUTH" if cuisine == sample['ground_truth_cuisine'] else ""
-                self.logger.info(f"    {idx:2}. {cuisine} {source}{gt_marker}")
-
-            self.logger.info(f"  ")
-
-            # Get K picks from LLM
-            picks = []
-            llm_interactions = []
-            for k in range(config.k_picks):
-                llm_result = evaluator._get_llm_pick(
-                    order_history=sample['order_history'],
-                    candidates=candidates,
-                    target_hour=sample.get('target_hour'),
-                    target_day_of_week=sample.get('target_day_of_week'),
-                )
-                pick = llm_result['parsed_pick']
-                picks.append(pick)
-                llm_interactions.append(llm_result)
-                match = "✓" if pick == sample['ground_truth_cuisine'] else "✗"
-                self.logger.info(f"  Pick {k+1}: {pick} {match}")
-
-            elapsed = (time.time() - start_time) * 1000
-            total_time += elapsed
-
-            # Calculate metrics
-            ground_truth = sample['ground_truth_cuisine']
-            hits = [1 if p == ground_truth else 0 for p in picks]
-            first_hit = next((i+1 for i, h in enumerate(hits) if h == 1), 0)
-
-            result = {
-                'sample_idx': i,
-                'customer_id': sample['customer_id'],
-                'ground_truth': ground_truth,
-                'target_hour': sample.get('target_hour'),
-                'target_day_of_week': sample.get('target_day_of_week'),
-                'candidates': candidates,
-                'candidate_info': candidate_info,
-                'picks': picks,
-                'llm_interactions': llm_interactions,
-                'hits': hits,
-                'first_hit': first_hit,
-                'recall': 1 if any(hits) else 0,
-                'precision': sum(hits) / len(hits),
-                'time_ms': elapsed,
-            }
-            results.append(result)
-
-            self.logger.info(f"  Recall: {result['recall']}, Precision: {result['precision']:.2f}")
-
-        # Compute aggregate metrics
-        from agentic_recommender.evaluation.rerank_eval import RerankMetrics
-
-        n = len(results)
-        if n == 0:
-            return RerankMetrics(total_samples=len(test_samples)), results
-
-        metrics = RerankMetrics(
-            recall_at_k=sum(r['recall'] for r in results) / n,
-            precision_at_k=sum(r['precision'] for r in results) / n,
-            first_hit_avg=sum(r['first_hit'] for r in results if r['first_hit'] > 0) / max(1, sum(1 for r in results if r['first_hit'] > 0)),
-            ground_truth_in_candidates=sum(1 for r in results if not r['candidate_info']['ground_truth_added']) / n,
-            avg_candidate_rank=sum(r['candidate_info']['ground_truth_rank'] for r in results) / n,
-            total_samples=len(test_samples),
-            valid_samples=n,
-            avg_time_ms=total_time / n,
-        )
-
-        return metrics, results
-
-    def _create_mock_rerank_provider(self):
-        """Create a mock provider for rerank testing."""
-        import random
-
-        class MockRerankProvider:
-            """Mock provider that picks from candidates."""
-
-            def __init__(self):
-                self.call_count = 0
-
-            def generate(self, prompt: str, **kwargs) -> str:
-                """Pick a random cuisine from the prompt's candidates."""
-                self.call_count += 1
-
-                # Extract candidates from prompt
-                if "Available Options:" in prompt:
-                    options_line = prompt.split("Available Options:")[1].split("\n")[1]
-                    candidates = [c.strip() for c in options_line.split(",")]
-                    if candidates:
-                        return random.choice(candidates)
-
-                return "chinese"  # fallback
-
-            def get_model_info(self):
-                return {
-                    "provider": "MockRerank",
-                    "model_name": "mock-rerank-llm",
-                    "total_calls": self.call_count
-                }
-
-        return MockRerankProvider()
-
-    # -------------------------------------------------------------------------
     # Stage 8: Enhanced Rerank Evaluation (Two-Round LLM + LightGCN)
     # -------------------------------------------------------------------------
     def stage_run_enhanced_rerank_evaluation(self) -> bool:
@@ -1880,7 +940,7 @@ class PipelineStages:
             return False
 
     def stage_run_repeat_evaluation(self) -> bool:
-        """Run Stage 9: Repeated dataset two-round evaluation."""
+        """Run Stage 9: Repeated dataset two-round evaluation using agents."""
         stage_cfg = self.config.get_stage('run_repeat_evaluation')
         self.logger.stage_start('run_repeat_evaluation', stage_cfg.description)
 
@@ -1890,17 +950,21 @@ class PipelineStages:
                 RepeatDatasetFilter,
                 build_repeat_test_samples,
             )
-            from agentic_recommender.data.geohash_index import GeohashVendorIndex
             from agentic_recommender.evaluation.repeat_evaluator import (
-                AsyncRepeatEvaluator,
+                AgentBasedAsyncEvaluator,
                 RepeatEvalConfig,
                 compute_repeat_metrics,
             )
-            from agentic_recommender.similarity.lightGCN import (
-                LightGCNEmbeddingManager,
-                LightGCNConfig,
+            from agentic_recommender.similarity.lightGCN import LightGCNConfig
+            from agentic_recommender.similarity.methods import SwingConfig
+            from agentic_recommender.agents import (
+                SimilarityAgent,
+                UserProfilerAgent,
+                VendorProfilerAgent,
+                CuisinePredictorAgent,
+                VendorRankerAgent,
+                RecommendationManager,
             )
-            from agentic_recommender.similarity.methods import SwingMethod, SwingConfig
 
             settings = stage_cfg.settings
             dataset_name = settings.get('dataset_name', 'data_se')
@@ -1933,87 +997,40 @@ class PipelineStages:
             )
             self.logger.info(f"Filter stats: {json.dumps(filter_stats, indent=2)}")
 
-            # ---- Step 2: Build geohash index ----
+            # ---- Step 2: Initialize data-processing agents ----
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("STEP 2: BUILDING GEOHASH INDEX")
+            self.logger.info("STEP 2: INITIALIZING AGENTS")
             self.logger.info("=" * 60)
 
-            use_geohash_cache = settings.get('use_geohash_cache', True) and not self.no_cache
-            geohash_index = GeohashVendorIndex()
-            geohash_index.build(filtered_train, use_cache=use_geohash_cache)
-            self.logger.info(f"Geohash index stats: {geohash_index.get_stats()}")
+            # VendorProfilerAgent (geohash index)
+            vendor_profiler = VendorProfilerAgent("vendor_profiler")
+            vendor_profiler.initialize(filtered_train, no_cache=self.no_cache)
+            self.logger.info(f"VendorProfiler stats: {vendor_profiler.get_stats()}")
 
-            # ---- Step 3: Train LightGCN on customer→cuisine ----
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("STEP 3: TRAINING LIGHTGCN (customer→cuisine)")
-            self.logger.info("=" * 60)
-
-            # Build cuisine-level interactions from filtered training data
-            cuisine_interactions = []
-            seen_pairs = set()
-            for _, row in filtered_train.iterrows():
-                cid = str(row['customer_id'])
-                cuisine = str(row.get('cuisine', 'unknown'))
-                pair = (cid, cuisine)
-                if pair not in seen_pairs:
-                    cuisine_interactions.append(pair)
-                    seen_pairs.add(pair)
-
-            self.logger.info(f"Cuisine interactions: {len(cuisine_interactions)}")
-
+            # SimilarityAgent (LightGCN)
             lightgcn_config = LightGCNConfig(
                 embedding_dim=settings.get('lightgcn_embedding_dim', 64),
                 epochs=settings.get('lightgcn_epochs', 50),
             )
-            lightgcn_manager = LightGCNEmbeddingManager(lightgcn_config)
-            use_lightgcn_cache = settings.get('use_lightgcn_cache', True) and not self.no_cache
-            lightgcn_manager.load_or_train(
-                dataset_name=dataset_name,
-                interactions=cuisine_interactions,
-                method="repeat",
-                prediction_target="cuisine",
-                force_retrain=not use_lightgcn_cache,
-                verbose=True,
+            similarity = SimilarityAgent("similarity")
+            similarity.initialize(
+                filtered_train, lightgcn_config, dataset_name, no_cache=self.no_cache
             )
-            self.logger.info(f"LightGCN stats: {lightgcn_manager.get_stats()}")
+            self.logger.info(f"Similarity stats: {similarity.get_stats()}")
 
-            # ---- Step 4: Train Swing user-user on vendor_id||cuisine ----
-            self.logger.info("")
-            self.logger.info("=" * 60)
-            self.logger.info("STEP 4: TRAINING SWING (user-user on vendor||cuisine)")
-            self.logger.info("=" * 60)
-
-            # Build item-level interactions: (customer_id, vendor_id||cuisine)
-            swing_interactions = []
-            for _, row in filtered_train.iterrows():
-                cid = str(row['customer_id'])
-                vid = str(row.get('vendor_id', ''))
-                cuisine = str(row.get('cuisine', 'unknown'))
-                item = f"{vid}||{cuisine}"
-                swing_interactions.append((cid, item))
-
-            self.logger.info(f"Swing interactions: {len(swing_interactions)}")
-
+            # UserProfilerAgent (Swing + user records)
             swing_config = SwingConfig(top_k=settings.get('top_similar_users', 5))
-            swing_model = SwingMethod(swing_config)
+            user_profiler = UserProfilerAgent("user_profiler")
+            user_profiler.initialize(
+                filtered_train, swing_config, dataset_name, no_cache=self.no_cache
+            )
+            self.logger.info(f"UserProfiler stats: {user_profiler.get_stats()}")
 
-            use_swing_cache = settings.get('use_swing_cache', True) and not self.no_cache
-            loaded_swing = False
-            if use_swing_cache:
-                loaded_swing = swing_model.load_from_cache(dataset_name, "repeat")
-            if not loaded_swing:
-                self.logger.info("Training new Swing user-user model...")
-                swing_model.fit(swing_interactions)
-                swing_model.save_to_cache(dataset_name, "repeat")
-
-            self.logger.info(f"Swing stats: {swing_model.get_stats()}")
-
-            # ---- Step 5: Build test samples ----
+            # ---- Step 3: Build test samples ----
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("STEP 5: BUILDING TEST SAMPLES")
+            self.logger.info("STEP 3: BUILDING TEST SAMPLES")
             self.logger.info("=" * 60)
 
             n_samples = settings.get('n_samples', 20)
@@ -2056,10 +1073,10 @@ class PipelineStages:
                     json.dump(test_samples, f, indent=2, default=str)
                 self.logger.file_write(samples_path, f"{len(test_samples)} test samples")
 
-            # ---- Step 6: Run evaluation ----
+            # ---- Step 4: Run agent-based evaluation ----
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("STEP 6: RUNNING TWO-ROUND EVALUATION")
+            self.logger.info("STEP 4: RUNNING AGENT-BASED TWO-ROUND EVALUATION")
             self.logger.info("=" * 60)
 
             llm_config = self.config.get_llm_config()
@@ -2093,6 +1110,23 @@ class PipelineStages:
                 request_timeout=settings.get('request_timeout', 30.0),
                 enable_frequency_ensemble=settings.get('enable_frequency_ensemble', True),
                 max_recency_distance=max_recency_distance,
+            )
+
+            # Initialize LLM agents
+            cuisine_predictor = CuisinePredictorAgent("cuisine_predictor")
+            cuisine_predictor.initialize(eval_config)
+
+            vendor_ranker = VendorRankerAgent("vendor_ranker")
+            vendor_ranker.initialize(eval_config)
+
+            # Pre-compute per-user lookups (LightGCN + Swing)
+            self.logger.info("Pre-computing per-user lookups (LightGCN + Swing)...")
+            user_profiler.precompute_lookups(test_samples, similarity, eval_config)
+
+            # Build orchestrator
+            manager = RecommendationManager(
+                user_profiler, vendor_profiler, similarity,
+                cuisine_predictor, vendor_ranker,
             )
 
             if enable_async and provider_type in ('openrouter', 'openai_compatible'):
@@ -2132,26 +1166,11 @@ class PipelineStages:
 
                 output_dir = os.path.dirname(stage_cfg.output.get('detailed_json', 'outputs'))
 
-                use_eval_cache = (
-                    settings.get('use_filter_cache', True)
-                    and settings.get('use_lightgcn_cache', True)
-                    and settings.get('use_swing_cache', True)
-                    and not self.no_cache
-                )
-
-                evaluator = AsyncRepeatEvaluator(
+                evaluator = AgentBasedAsyncEvaluator(
+                    manager=manager,
                     async_provider=async_provider,
-                    lightgcn_manager=lightgcn_manager,
-                    swing_model=swing_model,
-                    geohash_index=geohash_index,
-                    train_df=filtered_train,
                     config=eval_config,
-                    use_cache=use_eval_cache,
                 )
-
-                # Pre-compute LightGCN + Swing lookups for all test users
-                self.logger.info("Pre-computing per-user lookups (LightGCN + Swing)...")
-                evaluator.precompute_user_lookups(test_samples)
 
                 eval_output = asyncio.run(
                     evaluator.evaluate_async(
@@ -2167,10 +1186,10 @@ class PipelineStages:
                 self.logger.stage_end('run_repeat_evaluation', success=False)
                 return False
 
-            # ---- Step 7: Compute metrics ----
+            # ---- Step 5: Compute metrics ----
             self.logger.info("")
             self.logger.info("=" * 60)
-            self.logger.info("STEP 7: COMPUTING METRICS")
+            self.logger.info("STEP 5: COMPUTING METRICS")
             self.logger.info("=" * 60)
 
             metrics = compute_repeat_metrics(detailed_results)
@@ -2307,12 +1326,8 @@ class WorkflowRunner:
         'load_data',
         'build_users',
         'build_cuisines',
-        'generate_prompts',
-        'run_predictions',
-        'run_topk_evaluation',              # Stage 6: Direct LLM prediction
-        'run_rerank_evaluation',            # Stage 7: Retrieve-then-rerank
         'run_enhanced_rerank_evaluation',   # Stage 8: Two-round LLM + LightGCN (RECOMMENDED)
-        'run_repeat_evaluation',            # Stage 9: Repeated dataset two-round eval
+        'run_repeat_evaluation',            # Stage 9: Agent-based two-round eval
     ]
 
     def __init__(self, config_path: str = "workflow_config.yaml", no_cache: bool = False):
@@ -2344,10 +1359,6 @@ class WorkflowRunner:
             'load_data': self.stages.stage_load_data,
             'build_users': self.stages.stage_build_users,
             'build_cuisines': self.stages.stage_build_cuisines,
-            'generate_prompts': self.stages.stage_generate_prompts,
-            'run_predictions': self.stages.stage_run_predictions,
-            'run_topk_evaluation': self.stages.stage_run_topk_evaluation,
-            'run_rerank_evaluation': self.stages.stage_run_rerank_evaluation,
             'run_enhanced_rerank_evaluation': self.stages.stage_run_enhanced_rerank_evaluation,
             'run_repeat_evaluation': self.stages.stage_run_repeat_evaluation,
         }

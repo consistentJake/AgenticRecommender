@@ -26,15 +26,11 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 
 | # | Stage | Enabled | Purpose |
 |---|-------|---------|---------|
-| 1 | `load_data` | yes | Load/merge Singapore food delivery data |
+| 1 | `load_data` | yes | Load/merge food delivery data |
 | 2 | `build_users` | yes | Build enriched user representations |
 | 3 | `build_cuisines` | yes | Build cuisine profiles |
-| 4 | `generate_prompts` | no | Legacy prompt generation |
-| 5 | `run_predictions` | no | Legacy LLM predictions |
-| 6 | `run_topk_evaluation` | no | Direct LLM ranking |
-| 7 | `run_rerank_evaluation` | no | Simple retrieve-rerank |
-| 8 | `run_enhanced_rerank_evaluation` | yes | **Main eval**: two-round LLM + LightGCN reflection |
-| 9 | `run_repeat_evaluation` | yes | Repeated orders: two-round LLM (cuisine→vendor) |
+| 4 | `run_enhanced_rerank_evaluation` | yes | **Main eval**: two-round LLM + LightGCN reflection |
+| 5 | `run_repeat_evaluation` | yes | Agent-based two-round LLM (cuisine→vendor) |
 
 ## Key Files
 
@@ -44,6 +40,7 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | Config (data_se) | `agentic_recommender/workflow/workflow_config_se.yaml` |
 | Config (data_sg) | `agentic_recommender/workflow/workflow_config_sg.yaml` |
 | Rerank evaluator | `agentic_recommender/evaluation/rerank_eval.py` |
+| Repeat evaluator | `agentic_recommender/evaluation/repeat_evaluator.py` |
 | LightGCN | `agentic_recommender/similarity/lightGCN.py` |
 | Swing similarity | `agentic_recommender/similarity/methods.py` |
 | LLM providers | `agentic_recommender/models/llm_provider.py` |
@@ -52,7 +49,14 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 | Stage cache | `agentic_recommender/workflow/stage_cache.py` |
 | Repeat filter | `agentic_recommender/data/repeat_filter.py` |
 | Geohash index | `agentic_recommender/data/geohash_index.py` |
-| Repeat evaluator | `agentic_recommender/evaluation/repeat_evaluator.py` |
+| Agent base class | `agentic_recommender/agents/base.py` |
+| Similarity agent | `agentic_recommender/agents/similarity_agent.py` |
+| User profiler agent | `agentic_recommender/agents/user_profiler.py` |
+| Vendor profiler agent | `agentic_recommender/agents/vendor_profiler.py` |
+| Cuisine predictor agent | `agentic_recommender/agents/cuisine_predictor.py` |
+| Vendor ranker agent | `agentic_recommender/agents/vendor_ranker.py` |
+| Orchestrator (manager) | `agentic_recommender/agents/orchestrator.py` |
+| Deprecated MACRec agents | `deprecated/deprecation_agents_macrec/` |
 
 ## Output Structure
 
@@ -95,12 +99,12 @@ python -m agentic_recommender.workflow.workflow_runner --config workflow_config_
 python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages build_cuisines
 ```
 
-**Stage 8 — run_enhanced_rerank_evaluation:** Check `stage8_enhanced_rerank_results.json` for Hit@K, NDCG, MRR metrics.
+**Stage 4 — run_enhanced_rerank_evaluation:** Check `stage8_enhanced_rerank_results.json` for Hit@K, NDCG, MRR metrics.
 ```bash
 python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages run_enhanced_rerank_evaluation
 ```
 
-**Stage 9 — run_repeat_evaluation:** Check `stage9_repeat_results.json` for Hit@1/3/5, NDCG, MRR on repeat orders.
+**Stage 5 — run_repeat_evaluation:** Check `stage9_repeat_results.json` for Hit@1/3/5, NDCG, MRR on repeat orders. Uses agent-based pipeline (6 agents + orchestrator).
 ```bash
 python -m agentic_recommender.workflow.workflow_runner --config workflow_config_se.yaml --stages run_repeat_evaluation
 ```
