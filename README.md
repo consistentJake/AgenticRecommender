@@ -1,17 +1,42 @@
 # Agentic Sequential Recommendation System
 
-A cuisine-level recommendation system for **[food delivery datset(delivery hero)](https://github.com/deliveryhero/dh-reco-dataset)** with **two-round LLM reranking**, **LightGCN collaborative filtering**, and **basket prediction support**.
+A multi-agent recommendation system for **[food delivery dataset (Delivery Hero)](https://github.com/deliveryhero/dh-reco-dataset)** with **two-round LLM evaluation**, **LightGCN collaborative filtering**, **Swing user-user similarity**, and **basket prediction support**.
 
-## Current System Architecture
+## Multi-Agent Architecture
+
+The repeat evaluation pipeline (Stage 5) is built around 6 specialized agents coordinated by an orchestrator:
 
 ```
-Training Data → LightGCN + Swing (cached per method)
-    → Candidate Generation (top 20 cuisines)
-    → Round 1: LLM Reranking
-    → LightGCN User-Cuisine Scores
-    → Round 2: LLM Reflection (final reranking)
-    → Evaluation Metrics (single-item + basket)
+┌─────────────────────────────────────────────────────────┐
+│                 RecommendationManager                   │
+│                    (Orchestrator)                        │
+│                                                         │
+│  1. SimilarityAgent (LightGCN)                          │
+│     └─ Predict top-K cuisines per user                  │
+│                                                         │
+│  2. CuisinePredictorAgent (Round 1 LLM)                 │
+│     └─ LLM ranks cuisines + frequency ensemble          │
+│                                                         │
+│  3. VendorProfilerAgent (GeohashIndex)                  │
+│     └─ Fetch candidate vendors for predicted cuisines   │
+│                                                         │
+│  4. UserProfilerAgent (Swing + Records)                 │
+│     └─ Build user context from similar users' orders    │
+│                                                         │
+│  5. VendorRankerAgent (Round 2 LLM)                     │
+│     └─ LLM ranks vendors → final recommendation        │
+└─────────────────────────────────────────────────────────┘
 ```
+
+### Pipeline Stages
+
+| # | Stage | Purpose |
+|---|-------|---------|
+| 1 | `load_data` | Load/merge food delivery data |
+| 2 | `build_users` | Build enriched user representations |
+| 3 | `build_cuisines` | Build cuisine profiles |
+| 4 | `run_enhanced_rerank_evaluation` | Two-round LLM + LightGCN reflection (rerank) |
+| 5 | `run_repeat_evaluation` | Agent-based two-round LLM (cuisine → vendor) |
 
 ## Quick Start
 
@@ -22,13 +47,19 @@ source venv/bin/activate
 # 2. Set LLM API key (required)
 export OPENROUTER_API_KEY="your-openrouter-api-key"
 
-# 3. Run complete pipeline
+# 3. Run complete pipeline (rerank evaluation)
 python -m agentic_recommender.workflow.workflow_runner \
     --config workflow_config_se.yaml \
     --stages load_data run_enhanced_rerank_evaluation
 
+# 4. Run agent-based repeat evaluation
+python -m agentic_recommender.workflow.workflow_runner \
+    --config workflow_config_se.yaml \
+    --stages run_repeat_evaluation
+
 # Check outputs
-ls -la outputs/data_se/stage8_*
+ls -la outputs/data_se/stage8_*  # rerank results
+ls -la outputs/data_se/stage9_*  # repeat results
 ```
 
 ### Environment Variables
@@ -110,11 +141,12 @@ stages:
 
 | File | Description |
 |------|-------------|
-| `outputs/stage1_merged_data.parquet` | Merged training data |
-| `outputs/stage1_test_data.parquet` | Merged test data (if load_test_data=true) |
-| `outputs/stage8_enhanced_rerank_results.json` | Evaluation metrics |
-| `outputs/stage8_enhanced_rerank_samples.json` | Test samples with ground truth |
-| `outputs/stage8_enhanced_rerank_detailed.json` | Per-sample predictions |
+| `outputs/data_se/stage1_merged_data.parquet` | Merged training data |
+| `outputs/data_se/stage1_test_data.parquet` | Merged test data (if load_test_data=true) |
+| `outputs/data_se/stage8_enhanced_rerank_results.json` | Rerank evaluation metrics |
+| `outputs/data_se/stage8_enhanced_rerank_detailed.json` | Per-sample rerank predictions |
+| `outputs/data_se/stage9_repeat_results.json` | Repeat evaluation metrics (Hit@K, NDCG, MRR) |
+| `outputs/data_se/stage9_repeat_detailed.json` | Per-sample repeat predictions |
 
 ---
 
@@ -136,16 +168,24 @@ stages:
 
 ## Cache Files
 
-Models are cached per evaluation method to prevent data leakage:
+Models and precomputed data are cached to avoid redundant computation:
 
 ```
 ~/.cache/agentic_recommender/
 ├── lightgcn/
 │   ├── data_se_method1_lightgcn.pkl
-│   └── data_se_method2_lightgcn.pkl
-└── swing/
-    ├── data_se_method1_swing.pkl
-    └── data_se_method2_swing.pkl
+│   ├── data_se_method2_lightgcn.pkl
+│   └── data_se_repeat_lightgcn.pkl
+├── swing/
+│   └── data_se_repeat_swing_user.pkl
+├── swing_user/
+│   └── data_se_repeat_swing_user.pkl
+├── geohash_index/
+│   └── <hash>.pkl
+├── user_records/
+│   └── <hash>.pkl
+└── user_lookups/
+    └── <hash>.pkl
 ```
 
 ---
@@ -172,16 +212,27 @@ python -m agentic_recommender.workflow.workflow_runner \
 
 ```
 agentic_recommender/
+├── agents/
+│   ├── base.py                # RecommendationAgent ABC
+│   ├── similarity_agent.py    # LightGCN cuisine similarity
+│   ├── user_profiler.py       # Swing + user record building
+│   ├── vendor_profiler.py     # Geohash-based vendor lookup
+│   ├── cuisine_predictor.py   # Round 1 LLM (cuisine prediction)
+│   ├── vendor_ranker.py       # Round 2 LLM (vendor ranking)
+│   └── orchestrator.py        # RecommendationManager (coordinates agents)
 ├── data/
-│   └── enriched_loader.py      # Data loading (train + test)
+│   ├── enriched_loader.py     # Data loading (train + test)
+│   ├── repeat_filter.py       # Repeat order dataset filtering
+│   └── geohash_index.py       # Geospatial vendor indexing
 ├── evaluation/
-│   ├── basket_metrics.py       # Basket-aware metrics (NEW)
-│   └── rerank_eval.py          # Two-round evaluation
+│   ├── rerank_eval.py         # Two-round rerank evaluation
+│   ├── repeat_evaluator.py    # Repeat evaluation (async + agent-based)
+│   └── basket_metrics.py      # Basket-aware metrics
 ├── similarity/
-│   ├── lightGCN.py             # LightGCN embeddings + helpers
-│   └── methods.py              # Swing similarity with caching
+│   ├── lightGCN.py            # LightGCN embeddings + helpers
+│   └── methods.py             # Swing similarity with caching
 └── workflow/
-    ├── workflow_runner.py      # Main entry point
+    ├── workflow_runner.py     # Main entry point
     ├── workflow_config_se.yaml # Sweden dataset config
     └── workflow_config_sg.yaml # Singapore dataset config
 ```
@@ -190,15 +241,28 @@ agentic_recommender/
 
 ## Key Components
 
+### Agents
+
+| Agent | File | Purpose |
+|-------|------|---------|
+| `RecommendationAgent` | `agents/base.py` | Abstract base class for all agents |
+| `SimilarityAgent` | `agents/similarity_agent.py` | LightGCN collaborative filtering for cuisine similarity |
+| `UserProfilerAgent` | `agents/user_profiler.py` | Swing user-user similarity + user record building |
+| `VendorProfilerAgent` | `agents/vendor_profiler.py` | Geohash-based candidate vendor lookup |
+| `CuisinePredictorAgent` | `agents/cuisine_predictor.py` | Round 1 LLM cuisine prediction with frequency ensemble |
+| `VendorRankerAgent` | `agents/vendor_ranker.py` | Round 2 LLM vendor ranking |
+| `RecommendationManager` | `agents/orchestrator.py` | Orchestrates all agents for a single recommendation |
+
+### Other Components
+
 | Component | File | Purpose |
 |-----------|------|---------|
 | `EnrichedDataLoader` | `data/enriched_loader.py` | Load train/test data |
-| `build_test_samples` | `evaluation/rerank_eval.py` | Method 1 test samples |
-| `build_test_samples_from_test_file` | `evaluation/rerank_eval.py` | Method 2 test samples |
-| `filter_interactions_leave_last_out` | `similarity/lightGCN.py` | Method 1 interactions |
-| `get_all_interactions` | `similarity/lightGCN.py` | Method 2 interactions |
-| `CuisineSwingMethod` | `similarity/methods.py` | Swing with caching |
+| `RepeatDatasetFilter` | `data/repeat_filter.py` | Filter repeat orders |
+| `GeohashVendorIndex` | `data/geohash_index.py` | Geospatial vendor indexing |
+| `AgentBasedAsyncEvaluator` | `evaluation/repeat_evaluator.py` | Async eval using agent pipeline |
 | `LightGCNEmbeddingManager` | `similarity/lightGCN.py` | LightGCN with caching |
+| `CuisineSwingMethod` | `similarity/methods.py` | Swing with caching |
 | `BasketMetrics` | `evaluation/basket_metrics.py` | Basket metric computation |
 
 ---
@@ -277,15 +341,7 @@ ls -la ~/.cache/agentic_recommender/swing/
 | Issue | Solution |
 |-------|----------|
 | "Test data not found" | Enable `load_test_data: true` and run `load_data` stage |
-| "Method 2 requires test_data input" | Add `test_data` to input section |
+| "API key not found" | Set `OPENROUTER_API_KEY` env var or configure in YAML |
 | Cache not updating | Delete cache files in `~/.cache/agentic_recommender/` |
 | Cold-start users skipped | Expected - only users in both train/test are evaluated |
-
----
-
-## Documentation
-
-- `docs/evaluation_methods_update.md` - Detailed implementation notes
-- `docs/testing_plan_evaluation_methods.md` - Testing procedures
-- `agentic_recommender/evaluation/basket_evaluation.md` - Basket metric formulas
 
